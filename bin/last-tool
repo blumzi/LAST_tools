@@ -1,0 +1,131 @@
+#!/bin/bash
+
+export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${BASH_LINENO[0]}:${FUNCNAME[0]}] '
+
+prog=$(basename "${0}")
+
+source lib/module.sh
+module_include lib/message
+
+function help() {
+    cat << EOF
+
+    This tool sets up the LAST installation on the current machine.
+
+    Usage: ${prog} config|check|run [-q|--quiet] [-H|--host <name>] [[[-s|--section <name>] ...]
+           ${prog} --show-sections
+           ${prog} --help
+
+     The first argument selects the running mode:
+        config:              manages configuration files for the selected sections
+        check:               checks if the current state of the selected sections meets the requirements
+        run:                 runs code that enforces the requirements for the selected sections
+        show:                only show some information
+
+     -H|--host <name>:       specifies the required hostname
+     -s|--section <section>: add <section> to the selection set
+     -q|--quiet:             be silent
+
+EOF
+}
+
+function show_info() {
+    message_info ""
+    message_info "Sections:"
+    for section in $( sections_registered_sections ); do
+        message_info "$(printf '   %-10s %s\n' "${section}" "$(sections_section_description "${section}")")"
+    done | sort
+
+    message_info ""
+    message_info "Hostname:"
+    message_info "   ${LAST_HOSTNAME:=None supplied}"
+}
+
+function root_or_die() {
+    if [ "$(id -un)" != root ]; then
+        echo "${prog}: Must be root to run this tool!"
+        exit 1
+    fi
+}
+
+case "${1}" in
+    -h|--help)
+        help
+        exit 0
+        ;;
+    
+    check|run|config|show)
+        mode="${1}"
+        shift 1
+        ;;
+esac
+
+if [ ! "${mode}" ]; then
+    message_failure "The first argument must select a running mode (check|run|config), see help below!"
+    help
+    exit 1
+fi
+
+OPTS=$( getopt -o 'qhcH:s:' --long "quiet,help,check,host:,section:,install,show-sections" -n "${prog}" -- "$@" )
+eval set -- "${OPTS}"
+
+while true; do
+	case "${1}" in
+
+    -H|--host)
+        export LAST_HOSTNAME=${2}
+        shift 2
+        ;;
+
+    -s|--section)
+        selected_sections+=( "${2}" )
+        shift 2
+        ;;
+
+    -q|--quiet)
+        export LAST_INSTALLATION_QUIET=true
+        shift 1
+        ;;
+
+	--)
+		shift 1
+		break
+		;;
+	esac
+done
+
+#
+# These modules will register sections
+#
+module_include sections/bios
+module_include sections/user
+module_include sections/packages
+module_include sections/profile
+module_include sections/hostname
+module_include sections/apt
+module_include sections/paths
+module_include sections/matlab
+
+readarray -d ' ' registered_sections < <( sections_registered_sections )
+if [ "${mode}" = show ]; then
+    show_info
+    exit 0
+fi
+
+root_or_die
+
+# No sections were specified, use all those defined
+if [ ${#selected_sections[*]} -eq 0 ]; then
+    selected_sections=( "${registered_sections[@]}" )
+fi
+
+# build a topologically sorted array of the needed section
+readarray -d ' ' needed_sections < <( sections_ordered_sections "${selected_sections[*]}" )
+
+for section in "${needed_sections[@]}"; do
+    if sections_section_has_method "${section}" "${mode}"; then
+        eval "${section}_${mode}"
+    else
+        message_warning "Section \"${section}\" does not have a \"${section}_${mode}\" method, skipping"
+    fi
+done
