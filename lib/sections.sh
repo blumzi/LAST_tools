@@ -38,7 +38,7 @@ function sections_ordered_sections() {
     local -a ordered_sections needed
 
     # build a topologically sorted array of the needed section
-    readarray -d ' ' ordered_sections < <(
+    read -r -a ordered_sections < <(
             for section in "${requested_sections[@]}"; do
                 if [ "${_required_sections[${section}]}" ]; then
                     needed=( ${_required_sections["${section}"]} )
