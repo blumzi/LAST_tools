@@ -17,19 +17,16 @@ function user_run() {
         useradd -m -G sudo ${user_ocs}
     fi
 
-    local is_sudo_member=false
-    readarray -d ' ' grps < <( groups ${user_ocs} 2>&- | sed -e 's;^.*:.;;' )
-    if [ ${#grps[@]} -gt 0 ]; then
-        for g in "${grps[@]}"; do
-            if [ "${g}" == sudo ]; then
-                is_sudo_member=true
-                break
-            fi
-        done
-        if ! ${is_sudo_member}; then
-            message_info "Making \"${user_ocs}\" a member of the \"sudo\" group"
-            usermod -G sudo ${user_ocs}
+    local ngroups=0
+    read -r -a grps <<< "$( groups ${user_ocs} 2>&- | sed -e 's;^.*:.;;' )"
+    for g in "${grps[@]}"; do
+        if [ "${g}" == sudo ] || [ "${g}" = dialup ]; then
+            (( ngroups++ ))
         fi
+    done
+    if [ "${ngroups}" -ne 2 ]; then
+        message_info "Making \"${user_ocs}\" a member of the \"sudo\" and \"dialup\" groups"
+        usermod -G sudo,dialup ${user_ocs}
     fi
 }
 
@@ -44,10 +41,19 @@ function user_check() {
     else
         message_failure "User \"${user_ocs}\" does not exit"
     fi
-    
-    if groups ${user_ocs} 2>&- | grep -w sudo >&-; then
-        message_success "User \"${user_ocs}\" is a member of the sudo group"
-    else
-        message_failure "User \"${user_ocs}\" is NOT a member of the sudo group"
-    fi
+
+    local is_sudo=false is_dialup=false
+    read -r -a grps <<< "$( groups ${user_ocs} 2>&- | sed -e 's;^.*:.;;' )"
+    for g in "${grps[@]}"; do
+        [ "${g}" = sudo ]   && is_sudo=true
+        [ "${g}" = dialup ] && is_dialup=true
+    done
+
+    ${is_sudo} &&
+        message_success "User \"${user_ocs}\" is a member of the \"sudo\" group" ||
+        message_failure "User \"${user_ocs}\" is not a member of the \"sudo\" group"
+
+    ${is_dialup} &&
+        message_success "User \"${user_ocs}\" is a member of the \"dialup\" group" ||
+        message_failure "User \"${user_ocs}\" is not a member of the \"dialup\" group"
 }
