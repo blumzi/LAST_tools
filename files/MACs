@@ -1,10 +1,10 @@
 #
-# This file maps MACs to IP addresses to machine names. It is used 
+# This file maps MACs to IP addresses and host names. It is used 
 #  to generate /etc/hosts (and other) files on the LAST computers.
 #
 # Empty lines are ignored and '#'s start comments.  Each line 
-#  contains three space separated fields:
-#   MAC name IP-address
+#  consists of three white-space separated fields:
+#   MAC hostname IP-address
 #
 
 # Power switches:
