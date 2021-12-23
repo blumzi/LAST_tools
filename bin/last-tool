@@ -3,6 +3,7 @@
 export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${BASH_LINENO[0]}:${FUNCNAME[0]}] '
 
 prog=$(basename "${0}")
+export LAST_TOOL_PID="${$}"
 
 source lib/module.sh
 module_include lib/message
@@ -106,7 +107,8 @@ module_include sections/apt
 module_include sections/paths
 module_include sections/matlab
 
-readarray -d ' ' registered_sections < <( sections_registered_sections )
+read -r -a registered_sections <<< "$( sections_registered_sections )"
+
 if [ "${mode}" = show ]; then
     show_info
     exit 0
@@ -120,7 +122,7 @@ if [ ${#selected_sections[*]} -eq 0 ]; then
 fi
 
 # build a topologically sorted array of the needed section
-readarray -d ' ' needed_sections < <( sections_ordered_sections "${selected_sections[*]}" )
+read -r -a needed_sections <<< "$( sections_ordered_sections "${selected_sections[*]}" )"
 
 for section in "${needed_sections[@]}"; do
     if sections_section_has_method "${section}" "${mode}"; then

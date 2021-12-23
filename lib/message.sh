@@ -2,51 +2,48 @@
 
 module_include lib/ansi
 
+# top process may (or may not) set the --quiet option
 if [ ! "${LAST_INSTALLATION_QUIET}" ]; then
     export LAST_INSTALLATION_QUIET=false
 fi
 
-
+# section header
 function message_section() {
     if ! ${LAST_INSTALLATION_QUIET}; then
-        printf "\n       Section: %s%s%s\n\n" "${ansi_bright_white}" "${*}" ${ansi_normal}""
+        echo -e "    Section: $( ansi_underline "${*}" )"
     fi
 }
 
-# "msg [OK]"
+# [ OK ] message
 function message_success {
     if ! ${LAST_INSTALLATION_QUIET}; then
-        printf "[%s OK %s] %s\n" "${ansi_bright_green}" "${ansi_normal}" "${@}"
+        echo -e "[$( ansi_bright_green " OK " )] ${*}"
     fi
 }
 
-# "msg [!!]"
+# [FAIL] message
 function message_failure {        
     if ! ${LAST_INSTALLATION_QUIET}; then
-        printf "[%sFAIL%s] %s\n" "${ansi_bright_red}" "${ansi_normal}" "${@}"
+        echo -e "[$( ansi_bright_red FAIL )] ${*}"
     fi
 }
 
-# Warning msg in yellow
+# [WARN] message
 function message_warning {
     if ! ${LAST_INSTALLATION_QUIET}; then
-        printf "[%sWARN%s] %s\n" "${ansi_bright_yellow}" "${ansi_normal}" "${@}"
+        echo -e "[$( ansi_bright_yellow WARN )] ${*}" >&2
     fi
 }
 
-# Information msg in blue
+# plain message
 function message_info {
-    printf "       %s\n" "${@}"
+    echo "       ${*}"
 }
 
-# Successful completion msg in green
-function message_ok {
-    echo -e "${ansi_bright_green}${*}${CNRM}"
-}
-
-# Error msg in red
-function message_error {
-    if ! ${QUIET}; then
-        echo -e "${ansi_bright_red}${*}${CNRM}"
+# red mesage + optionally kill top shell process
+function message_fatal() {    
+    echo -e "FATAL: $( ansi_bright_red "${@}" )" >&2
+    if [ "${LAST_TOOL_PID}" ]; then
+        kill "${LAST_TOOL_PID}"
     fi
 }
