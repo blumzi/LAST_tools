@@ -38,7 +38,10 @@ function profile_start() {
         append_to_path \${LAST_TOOL_ROOT}
         export LAST_TOOL_MATLAB_VERSION=R2020b
 
-        unset found p
+        export LAST_SITE_ID=0
+        export LAST_SITE_NAME=weizmann
+        export LAST_SITE_LAT=
+        export LAST_SITE_LONG=
 EOF
     fi
 }

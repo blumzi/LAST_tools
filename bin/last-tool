@@ -42,7 +42,7 @@ function show_info() {
 
     message_info ""
     message_info "Matlab:"
-    message_info "   Version: ${LAST_TOOL_MATLAB_VERSION}"
+    message_info "   Installed release: ${matlab_installed_release}"
 
     local keys_file
     keys_file="$(matlab_file_installation_keys)"
@@ -51,7 +51,7 @@ function show_info() {
     else
         message_info "   Installation Keys File: Missing"
     fi
-    
+
     local license_file
     license_file="$(matlab_license_file)"
     if [ -r "${license_file}" ]; then
@@ -97,9 +97,9 @@ if [ ! "${mode}" ]; then
     exit 1
 fi
 
-export LAST_TOOL_MATLAB_VERSION=R2020b # default Matlab version
+export LAST_TOOL_MATLAB_VERSION=R2020b # default Matlab release
 
-OPTS=$( getopt -o 'qs:M:' --long "quiet,section:,matlab-version:" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'qs:M:' --long "quiet,section:,matlab-release:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 while true; do
@@ -115,8 +115,8 @@ while true; do
         shift 1
         ;;
     
-    -M|--matlab-version)
-        export LAST_TOOL_MATLAB_VERSION="${2}"
+    -M|--matlab-release)
+        matlab_selected_release="${2}"
         shift 2
         ;;
 

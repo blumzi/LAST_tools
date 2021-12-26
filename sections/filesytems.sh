@@ -18,9 +18,11 @@ sections_register_section "filesystems" "Manages the exporting/mounting of files
 #
 
 function filesystems_start() {
+    message_info "Starting NFS kernel server"
+    service nfs-kernel-server restart
+    
     message_info "Mounting all the network filesystems"
     mount -a -t nfs
-    # start nfs server ?!?
 }
 
 function filesystems_configure() {

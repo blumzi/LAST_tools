@@ -5,6 +5,8 @@ module_include lib/sections
 
 sections_register_section "packages" "Manages additional Ubuntu packages needed by LAST" "apt"
 
+declare packages_missing
+
 packages_required=(
     synaptic
     mlocate
@@ -20,15 +22,26 @@ packages_required=(
     wget
     tree
     emacs
+    mlocate-server
+    git
+    wine
+    nfs-kernel-server
+    autofs
+    retext
+
+    xpa-tools
+    saods9
 )
 
 function packages_start() {
     message_section "Packages"
 
     packages_check
+    message_info "Updating apt ..."
+    apt update
     if [ ${#packages_missing[*]} -gt 0 ]; then
         message_info "Installing: ${packages_missing[*]}"
-        apt install "${packages_missing[@]}"    
+        apt install -y "${packages_missing[@]}"    
     fi
 }
 
