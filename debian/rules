@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+# debian/rules
+# -*- makefile -*-
+
+export DESTROOT=$(CURDIR)/debian/last-tool
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	dh_auto_install
+	install -p -D -m 0755 bin/last-tool $(DESTROOT)/usr/local/bin/last-tool
+	install -d $(DESTROOT)/usr/local/share/last-tool/lib
+	install -d $(DESTROOT)/usr/local/share/last-tool/sections
+	install -d $(DESTROOT)/usr/local/share/last-tool/files
+	install -p -m 0644 lib/*.sh $(DESTROOT)/usr/local/share/last-tool/lib
+	install -p -m 0644 sections/*.sh $(DESTROOT)/usr/local/share/last-tool/sections
+	install -p -m 0644 files/* $(DESTROOT)/usr/local/share/last-tool/files
+
+override_dh_usrlocal:

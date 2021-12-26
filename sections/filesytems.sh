@@ -19,7 +19,7 @@ sections_register_section "filesystems" "Manages the exporting/mounting of files
 # The hostname for the current machine is passed in LAST_HOSTNAME by the main tool
 #
 
-function filesystems_run() {
+function filesystems_start() {
     message_info "Mounting all the network filesystems"
     mount -a -t nfs
 }

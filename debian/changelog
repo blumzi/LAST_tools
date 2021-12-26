@@ -1,0 +1,6 @@
+# debian/changelog
+last-tool (1.0.0-0) stable; urgency=low
+
+  * Release 1.0.0
+
+ -- Arie Blumenzweig <theblumz@gmail.com>  Sat, 25 Dec 2021 10:00:00 +0200

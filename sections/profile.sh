@@ -7,7 +7,7 @@ sections_register_section "profile" "Manages profile files"
 
 _profile_last=/etc/profile.d/last.sh
 
-function profile_run() {
+function profile_start() {
     message_section "Profile"
 
     if [ ! -r "${_profile_last}" ]; then
@@ -19,7 +19,7 @@ function profile_run() {
         export http_proxy=http://bcproxy.weizmann.ac.il:8080
         export https_proxy=http://bcproxy.weizmann.ac.il:8080
 
-        export LAST_ROOT=/usr/local/share/last-tools
+        export LAST_ROOT=/usr/local/share/last-tool
         found=false
         for p in \${PATH//:/ }; do
             if [ "\${p}" = "\${LAST_ROOT}" ]; then

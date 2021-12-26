@@ -3,7 +3,15 @@
 module_include lib/message
 module_include lib/sections
 
-sections_register_section "matlab" "Manages the MATLAB installation"
+declare matlab_mac matlab_file_installation_key
+
+function matlab_init() {
+    sections_register_section "matlab" "Manages the MATLAB installation"
+}
+
+function matlab_start() {
+    :
+}
 
 function matlab_configure() {
     :

@@ -22,7 +22,7 @@ packages_required=(
     emacs
 )
 
-function packages_run() {
+function packages_start() {
     message_section "Packages"
 
     packages_check

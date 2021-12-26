@@ -5,6 +5,10 @@ module_include lib/sections
 
 sections_register_section "hostname" "Manages stuff related to the machine's host name"
 
+function hostname_start() {
+    :
+}
+
 function hostname_configure() {
     message_section "Hostname"
 

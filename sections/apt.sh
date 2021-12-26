@@ -7,7 +7,7 @@ apt_config_file=/etc/apt/apt.conf
 
 sections_register_section "apt" "Configures Apt"
 
-function apt_run() {
+function apt_start() {
     apt update
 }
 

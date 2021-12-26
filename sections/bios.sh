@@ -10,7 +10,7 @@ function bios_configure() {
     message_section "BIOS"
 }
 
-function bios_run() {
+function bios_start() {
     :
 }
 
