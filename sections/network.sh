@@ -3,9 +3,9 @@
 module_include macmap
 module_include sections
 
-declare network_local_hostname network_local_ipaddr network_peer_hostname network_peer_ipaddr
-declare network_netpart network_netmask network_interface network_gateway network_gateway
-declare network_broadcast network_prefix
+export network_local_hostname network_local_ipaddr network_peer_hostname network_peer_ipaddr
+export network_netpart network_netmask network_interface network_gateway network_gateway
+export network_broadcast network_prefix
 
 function network_init() {
     network_local_hostname=$( macmap_get_local_hostname )

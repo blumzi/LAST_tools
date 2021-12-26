@@ -2,7 +2,7 @@
 
 module_include lib/message
 
-export _macmap_file=${LAST_ROOT}/files/MACs
+export _macmap_file=${LAST_TOOL_ROOT}/files/MACmap
 
 function macmap_init() {
     if [ ! -r "${_macmap_file}" ]; then

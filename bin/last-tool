@@ -24,7 +24,6 @@ function help() {
         start:               runs code that enforces the requirements for the selected sections
         show:                only show some information
 
-     -H|--host <name>:       specifies the required hostname
      -s|--section <section>: add <section> to the selection set
      -q|--quiet:             be silent
 
@@ -32,15 +31,45 @@ EOF
 }
 
 function show_info() {
+
+    export LAST_TOOL_DONTLOG=true   # inform message_xxx not to log
+
     message_info ""
+    message_info "Environment:"
+    message_info "   LAST_TOOL_ROOT:  ${LAST_TOOL_ROOT}"
+    message_info "   LAST_TOOL_QUIET: ${LAST_TOOL_QUIET}"
+    message_info ""
+
+    message_info ""
+    message_info "Matlab:"
+    message_info "   Version: ${LAST_TOOL_MATLAB_VERSION}"
+
+    local keys_file
+    keys_file="$(matlab_file_installation_keys)"
+    if [ -r "${keys_file}" ]; then
+        message_info "   Installation Keys File: ${keys_file}"
+    else
+        message_info "   Installation Keys File: Missing"
+    fi
+    
+    local license_file
+    license_file="$(matlab_license_file)"
+    if [ -r "${license_file}" ]; then
+        message_info "   License File: ${license_file}"
+    else
+        message_info "   License File: Missing"
+    fi
+
     message_info "Sections:"
+    message_info " Available:"
     for section in $( sections_registered_sections ); do
         message_info "$(printf '   %-10s %s\n' "${section}" "$(sections_section_description "${section}")")"
     done | sort
 
-    message_info ""
-    message_info "Hostname:"
-    message_info "   ${LAST_HOSTNAME:=None supplied}"
+    message_info " Selected (ordered, including dependencies):"
+    for section in "${needed_sections[@]}"; do
+        message_info "$(printf '   %-10s %s\n' "${section}" "$(sections_section_description "${section}")")"
+    done
 }
 
 function root_or_die() {
@@ -68,16 +97,13 @@ if [ ! "${mode}" ]; then
     exit 1
 fi
 
-OPTS=$( getopt -o 'qhcH:s:' --long "quiet,help,check,host:,section:,install,show-sections" -n "${PROG}" -- "$@" )
+export LAST_TOOL_MATLAB_VERSION=R2020b # default Matlab version
+
+OPTS=$( getopt -o 'qs:M:' --long "quiet,section:,matlab-version:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 while true; do
 	case "${1}" in
-
-    -H|--host)
-        export LAST_HOSTNAME=${2}
-        shift 2
-        ;;
 
     -s|--section)
         selected_sections+=( "${2}" )
@@ -85,8 +111,13 @@ while true; do
         ;;
 
     -q|--quiet)
-        export LAST_INSTALLATION_QUIET=true
+        export LAST_TOOL_QUIET=true
         shift 1
+        ;;
+    
+    -M|--matlab-version)
+        export LAST_TOOL_MATLAB_VERSION="${2}"
+        shift 2
         ;;
 
 	--)
@@ -110,13 +141,6 @@ module_include sections/matlab
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 
-if [ "${mode}" = show ]; then
-    show_info
-    exit 0
-fi
-
-root_or_die
-
 # No sections were specified, use all those defined
 if [ ${#selected_sections[*]} -eq 0 ]; then
     selected_sections=( "${registered_sections[@]}" )
@@ -124,6 +148,19 @@ fi
 
 # build a topologically sorted array of the needed section
 read -r -a needed_sections <<< "$( sections_ordered_sections "${selected_sections[*]}" )"
+
+case "${mode}" in
+show)
+    show_info
+    exit 0
+    ;;
+
+check)
+    export LAST_TOOL_DONTLOG=true
+    ;;
+esac
+
+root_or_die
 
 for section in "${needed_sections[@]}"; do
     if sections_section_has_method "${section}" "${mode}"; then

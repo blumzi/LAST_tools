@@ -19,17 +19,25 @@ function profile_start() {
         export http_proxy=http://bcproxy.weizmann.ac.il:8080
         export https_proxy=http://bcproxy.weizmann.ac.il:8080
 
-        export LAST_ROOT=/usr/local/share/last-tool
-        found=false
-        for p in \${PATH//:/ }; do
-            if [ "\${p}" = "\${LAST_ROOT}" ]; then
-                found=true
-                break
+        function append_to_path() {
+            local subpath="\$1"
+            local found=false p
+
+            for p in \${PATH//:/ }; do
+                if [ "\${p}" = "\${subpath}" ]; then
+                    found=true
+                    break
+                fi
+            done
+            if ! \${found}; then
+                export PATH=\${PATH}:\${subpath}
             fi
-        done
-        if ! \${found}; then
-            export PATH=\${PATH}:\${LAST_ROOT}
-        fi
+        }
+
+        export LAST_TOOL_ROOT=/usr/local/share/last-tool
+        append_to_path \${LAST_TOOL_ROOT}
+        export LAST_TOOL_MATLAB_VERSION=R2020b
+
         unset found p
 EOF
     fi
