@@ -27,8 +27,10 @@ if [ ! "${MODULE_INCLUDED}" ]; then
             module_included+=( "${module}" )
 
             # if the module has an initiator, call it
-            if typeset -F "${module}_init" >/dev/null; then
-                eval "${module}_init"
+            local initiator
+            initiator="$(basename "${module}")_init"
+            if typeset -F "${initiator}" >/dev/null; then
+                eval "${initiator}"
             fi
         fi
     }

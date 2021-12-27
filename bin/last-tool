@@ -1,11 +1,15 @@
 #!/bin/bash
 
+source /etc/profile.d/last.sh
+
 export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${BASH_LINENO[0]}:${FUNCNAME[0]}] '
+env | grep LAST_
 
 prog=$(basename "${0}")
 
 source lib/module.sh
 module_include lib/message
+module_include lib/macmap
 
 function help() {
     cat << EOF
@@ -31,14 +35,26 @@ EOF
 
 function show_info() {
     message_info ""
+    message_info "Environment:"
+    message_info "   LAST_ROOT: ${LAST_ROOT}"
+    message_info "   MACs file: ${_macmap_file}"
+
+    message_info ""
     message_info "Sections:"
     for section in $( sections_registered_sections ); do
         message_info "$(printf '   %-10s %s\n' "${section}" "$(sections_section_description "${section}")")"
     done | sort
 
+    local mac ipaddr hostname
+    mac="$(macmap_get_local_mac)" || message_fatal "Cannot get local MAC"
+    ipaddr="$(macmap_get_local_ip_address)" || message_fatal "Cannot get IP address for local mac: ${mac}"
+    hostname="$(macmap_get_local_hostname)" || message_fatal "Cannot get hostname for local mac: ${mac}"
     message_info ""
-    message_info "Hostname:"
-    message_info "   ${LAST_HOSTNAME:=None supplied}"
+    message_info "Network:"
+    message_info "   MAC:        ${mac:-Could not get it}"
+    message_info "   IP address: ${ipaddr:-Could not get it}"
+    message_info "   hostname:   ${hostname:-Could not get it}"
+    message_info ""
 }
 
 function root_or_die() {

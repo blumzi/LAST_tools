@@ -50,3 +50,8 @@ function message_error {
         echo -e "${ansi_bright_red}${*}${CNRM}"
     fi
 }
+
+function message_fatal() {
+    echo -e "FATAL: ${ansi_bright_red}${*}${ansi_normal}, Exiting!"
+    exit 2
+}
