@@ -1,0 +1,10 @@
+# debian/control
+Source: last-tool
+Section: admin
+Priority: optional
+Maintainer: Weizmann Astrophysics Software <astrosoft@weizmann.ac.il>
+
+Package: last-tool
+Architecture: all
+Description: A management tool for the LAST project
+ last-tool manages the software installation on a LAST project machine

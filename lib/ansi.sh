@@ -1,46 +1,69 @@
 #!/bin/bash
 
+export ANSI_BREAK ANSI_NORMAL ANSI_UNDERLINE ANSI_FLASH ANSI_REVERSE
 # Control characters
-CBRK=$'\x1b[0;01m'  # Line break?
-ansi_normal=$'\x1b[0;0m'   # Clear color
-ansi_underline=$'\x1B[4m'     # Underline
-ansi_flash=$'\x1B[5m'     # Flash
-ansi_reverse=$'\x1B[7m'     # Reverse video
+ANSI_BREAK=$'\X1B[0;01M'   # line break?
+ANSI_NORMAL=$'\X1B[0;0M'   # clear color(s)
+ANSI_UNDERLINE=$'\X1B[4M'  # underline
+ANSI_FLASH=$'\X1B[5M'      # flash
+ANSI_REVERSE=$'\X1B[7M'    # reverse video
 
 # Normal color
-ansi_fg_black=$'\x1B[0;30m'
-ansi_fg_red=$'\x1b[0;31m'
-ansi_fg_green=$'\x1b[0;32m'
-ansi_fg_yellow=$'\x1b[0;33m'
-ansi_fg_blue=$'\x1b[0;34m'
-ansi_fg_magenta=$'\x1b[0;35m'
-ansi_fg_cyan=$'\x1b[0;36m'
-ansi_fg_white=$'\x1B[0;37m'
+export ANSI_NORMAL_BLACK ANSI_NORMAL_RED ANSI_NORMAL_GREEN ANSI_NORMAL_YELLOW
+export ANSI_NORMAL_MAGENTA ANSI_NORMAL_CYAN ANSI_NORMAL_WHITE ANSI_NORMAL_BLUE
+ANSI_NORMAL_BLACK=$'\X1B[0;30M'
+ANSI_NORMAL_RED=$'\X1B[0;31M'
+ANSI_NORMAL_GREEN=$'\X1B[0;32M'
+ANSI_NORMAL_YELLOW=$'\X1B[0;33M'
+ANSI_NORMAL_BLUE=$'\X1B[0;34M'
+ANSI_NORMAL_MAGENTA=$'\X1B[0;35M'
+ANSI_NORMAL_CYAN=$'\X1B[0;36M'
+ANSI_NORMAL_WHITE=$'\X1B[0;37M'
 
 # Bright color
-ansi_bright_black=$'\x1B[1;30m'
-ansi_bright_red=$'\x1b[1;31m'
-ansi_bright_green=$'\x1b[1;32m'
-ansi_bright_yellow=$'\x1b[1;33m'
-ansi_bright_blue=$'\x1b[1;34m'
-ansi_bright_magenta=$'\x1b[1;35m'
-ansi_bright_cyan=$'\x1b[1;36m'
-ansi_bright_white=$'\x1B[1;37m'
+export ANSI_BRIGHT_BLACK ANSI_BRIGHT_RED ANSI_BRIGHT_GREEN ANSI_BRIGHT_YELLOW
+export ANSI_BRIGHT_BLUE ANSI_BRIGHT_MAGENTA ANSI_BRIGHT_CYAN ANSI_BRIGHT_WHITE
+ANSI_BRIGHT_BLACK=$'\X1B[1;30M'
+ANSI_BRIGHT_RED=$'\X1B[1;31M'
+ANSI_BRIGHT_GREEN=$'\X1B[1;32M'
+ANSI_BRIGHT_YELLOW=$'\X1B[1;33M'
+ANSI_BRIGHT_BLUE=$'\X1B[1;34M'
+ANSI_BRIGHT_MAGENTA=$'\X1B[1;35M'
+ANSI_BRIGHT_CYAN=$'\X1B[1;36M'
+ANSI_BRIGHT_WHITE=$'\X1B[1;37M'
 
 # Background colors
-ansi_bg_black=$'\x1B[40m'
-ansi_bg_red=$'\x1b[41m'
-ansi_bg_green=$'\x1b[42m'
-ansi_bg_yellow=$'\x1b[43m'
-ansi_bg_blue=$'\x1b[44m'
-ansi_bg_magenta=$'\x1b[45m'
-ansi_bg_cyan=$'\x1b[46m'
-ansi_bg_white=$'\x1B[47m'
+export ANSI_BG_BLACK ANSI_BG_RED ANSI_BG_GREEN ANSI_BG_YELLOW
+export ANSI_BG_BLUE ANSI_BG_MAGENTA ANSI_BG_CYAN ANSI_BG_WHITE
+ANSI_BG_BLACK=$'\X1B[40M'
+ANSI_BG_RED=$'\X1B[41M'
+ANSI_BG_GREEN=$'\X1B[42M'
+ANSI_BG_YELLOW=$'\X1B[43M'
+ANSI_BG_BLUE=$'\X1B[44M'
+ANSI_BG_MAGENTA=$'\X1B[45M'
+ANSI_BG_CYAN=$'\X1B[46M'
+ANSI_BG_WHITE=$'\X1B[47M'
 
 function ansi_reset() {
-    echo "${ansi_fg_white}${BKBLK}"
+    echo -ne "${ANSI_NORMAL}"
 }
 
-function ansi_red() {
-    echo -n "${ansi_bright_red}${*}${ansi_bright_white}"
+function ansi_bright_yellow() {
+    echo -ne "${ANSI_BRIGHT_YELLOW}${*}${ANSI_NORMAL}"
+}
+
+function ansi_bright_red() {
+    echo -ne "${ANSI_BRIGHT_RED}${*}${ANSI_NORMAL}"
+}
+
+function ansi_bright_green() {
+    echo -ne "${ANSI_BRIGHT_GREEN}${*}${ANSI_NORMAL}"
+}
+
+function ansi_bright_white() {
+    echo -ne "${ANSI_BRIGHT_WHITE}${*}${ANSI_NORMAL}"
+}
+
+function ansi_underline() {
+    echo -ne "${ANSI_UNDERLINE}${*}${ANSI_NORMAL}"
 }

@@ -7,7 +7,7 @@ sections_register_section "profile" "Manages profile files"
 
 _profile_last=/etc/profile.d/last.sh
 
-function profile_run() {
+function profile_start() {
     message_section "Profile"
 
     if [ ! -r "${_profile_last}" ]; then
@@ -19,18 +19,29 @@ function profile_run() {
         export http_proxy=http://bcproxy.weizmann.ac.il:8080
         export https_proxy=http://bcproxy.weizmann.ac.il:8080
 
-        export LAST_ROOT=/usr/local/share/last-tools
-        found=false
-        for p in \${PATH//:/ }; do
-            if [ "\${p}" = "\${LAST_ROOT}" ]; then
-                found=true
-                break
+        function append_to_path() {
+            local subpath="\$1"
+            local found=false p
+
+            for p in \${PATH//:/ }; do
+                if [ "\${p}" = "\${subpath}" ]; then
+                    found=true
+                    break
+                fi
+            done
+            if ! \${found}; then
+                export PATH=\${PATH}:\${subpath}
             fi
-        done
-        if ! \${found}; then
-            export PATH=\${PATH}:\${LAST_ROOT}
-        fi
-        unset found p
+        }
+
+        export LAST_TOOL_ROOT=/usr/local/share/last-tool
+        append_to_path \${LAST_TOOL_ROOT}
+        export LAST_TOOL_MATLAB_VERSION=R2020b
+
+        export LAST_SITE_ID=0
+        export LAST_SITE_NAME=weizmann
+        export LAST_SITE_LAT=
+        export LAST_SITE_LONG=
 EOF
     fi
 }

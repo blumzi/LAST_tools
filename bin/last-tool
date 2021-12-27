@@ -5,7 +5,9 @@ source /etc/profile.d/last.sh
 export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${BASH_LINENO[0]}:${FUNCNAME[0]}] '
 env | grep LAST_
 
-prog=$(basename "${0}")
+export PROG
+PROG=$(basename "${0}")
+export LAST_TOOL_PID="${$}"
 
 source lib/module.sh
 module_include lib/message
@@ -16,17 +18,16 @@ function help() {
 
     This tool sets up the LAST installation on the current machine.
 
-    Usage: ${prog} config|check|run [-q|--quiet] [-H|--host <name>] [[[-s|--section <name>] ...]
-           ${prog} --show-sections
-           ${prog} --help
+    Usage: ${PROG} config|check|start [-q|--quiet] [-H|--host <name>] [[[-s|--section <name>] ...]
+           ${PROG} --show-sections
+           ${PROG} --help
 
      The first argument selects the running mode:
         config:              manages configuration files for the selected sections
         check:               checks if the current state of the selected sections meets the requirements
-        run:                 runs code that enforces the requirements for the selected sections
+        start:               runs code that enforces the requirements for the selected sections
         show:                only show some information
 
-     -H|--host <name>:       specifies the required hostname
      -s|--section <section>: add <section> to the selection set
      -q|--quiet:             be silent
 
@@ -34,13 +35,37 @@ EOF
 }
 
 function show_info() {
-    message_info ""
-    message_info "Environment:"
-    message_info "   LAST_ROOT: ${LAST_ROOT}"
-    message_info "   MACs file: ${_macmap_file}"
+
+    export LAST_TOOL_DONTLOG=true   # inform message_xxx not to log
 
     message_info ""
+    message_info "Environment:"
+    message_info "   LAST_TOOL_ROOT:  ${LAST_TOOL_ROOT}"
+    message_info "   LAST_TOOL_QUIET: ${LAST_TOOL_QUIET}"
+    message_info ""
+
+    message_info ""
+    message_info "Matlab:"
+    message_info "   Installed release: ${matlab_installed_release}"
+
+    local keys_file
+    keys_file="$(matlab_file_installation_keys)"
+    if [ -r "${keys_file}" ]; then
+        message_info "   Installation Keys File: ${keys_file}"
+    else
+        message_info "   Installation Keys File: Missing"
+    fi
+
+    local license_file
+    license_file="$(matlab_license_file)"
+    if [ -r "${license_file}" ]; then
+        message_info "   License File: ${license_file}"
+    else
+        message_info "   License File: Missing"
+    fi
+
     message_info "Sections:"
+    message_info " Available:"
     for section in $( sections_registered_sections ); do
         message_info "$(printf '   %-10s %s\n' "${section}" "$(sections_section_description "${section}")")"
     done | sort
@@ -55,11 +80,15 @@ function show_info() {
     message_info "   IP address: ${ipaddr:-Could not get it}"
     message_info "   hostname:   ${hostname:-Could not get it}"
     message_info ""
+    message_info " Selected (ordered, including dependencies):"
+    for section in "${needed_sections[@]}"; do
+        message_info "$(printf '   %-10s %s\n' "${section}" "$(sections_section_description "${section}")")"
+    done
 }
 
 function root_or_die() {
     if [ "$(id -un)" != root ]; then
-        echo "${prog}: Must be root to run this tool!"
+        echo "${PROG}: Must be root to run this tool!"
         exit 1
     fi
 }
@@ -70,28 +99,25 @@ case "${1}" in
         exit 0
         ;;
     
-    check|run|config|show)
+    check|start|config|show)
         mode="${1}"
         shift 1
         ;;
 esac
 
 if [ ! "${mode}" ]; then
-    message_failure "The first argument must select a running mode (check|run|config), see help below!"
+    message_failure "The first argument must select a running mode (check|start|config|show), see help below!"
     help
     exit 1
 fi
 
-OPTS=$( getopt -o 'qhcH:s:' --long "quiet,help,check,host:,section:,install,show-sections" -n "${prog}" -- "$@" )
+export LAST_TOOL_MATLAB_VERSION=R2020b # default Matlab release
+
+OPTS=$( getopt -o 'qs:M:' --long "quiet,section:,matlab-release:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 while true; do
 	case "${1}" in
-
-    -H|--host)
-        export LAST_HOSTNAME=${2}
-        shift 2
-        ;;
 
     -s|--section)
         selected_sections+=( "${2}" )
@@ -99,8 +125,13 @@ while true; do
         ;;
 
     -q|--quiet)
-        export LAST_INSTALLATION_QUIET=true
+        export LAST_TOOL_QUIET=true
         shift 1
+        ;;
+    
+    -M|--matlab-release)
+        matlab_selected_release="${2}"
+        shift 2
         ;;
 
 	--)
@@ -122,13 +153,7 @@ module_include sections/apt
 module_include sections/paths
 module_include sections/matlab
 
-readarray -d ' ' registered_sections < <( sections_registered_sections )
-if [ "${mode}" = show ]; then
-    show_info
-    exit 0
-fi
-
-root_or_die
+read -r -a registered_sections <<< "$( sections_registered_sections )"
 
 # No sections were specified, use all those defined
 if [ ${#selected_sections[*]} -eq 0 ]; then
@@ -136,7 +161,20 @@ if [ ${#selected_sections[*]} -eq 0 ]; then
 fi
 
 # build a topologically sorted array of the needed section
-readarray -d ' ' needed_sections < <( sections_ordered_sections "${selected_sections[*]}" )
+read -r -a needed_sections <<< "$( sections_ordered_sections "${selected_sections[*]}" )"
+
+case "${mode}" in
+show)
+    show_info
+    exit 0
+    ;;
+
+check)
+    export LAST_TOOL_DONTLOG=true
+    ;;
+esac
+
+root_or_die
 
 for section in "${needed_sections[@]}"; do
     if sections_section_has_method "${section}" "${mode}"; then
