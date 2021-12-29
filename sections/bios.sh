@@ -10,7 +10,7 @@ function bios_configure() {
     message_section "BIOS"
 }
 
-function bios_start() {
+function bios_enforce() {
     :
 }
 
@@ -31,6 +31,6 @@ function bios_check() {
     fi
 
     if [ "${wakeup_type}" = "Power Switch" ]; then
-        message_warning "Wake-up is: $(ansi_red "Power Switch")"
+        message_warning "Wake-up is: $(ansi_bright_red "Power Switch")"
     fi
 }

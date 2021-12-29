@@ -9,4 +9,5 @@ package:
 	tar cf - ./bin ./lib ./files ./sections | (cd ${PACKAGE_DIR} ; tar xf -)
 	mkdir ${PACKAGE_DIR}/debian
 	cp debian/{control,rules,compat,changelog} ${PACKAGE_DIR}/debian
-	cd ${PACKAGE_DIR}; dpkg-buildpackage --build=all
+	cd ${PACKAGE_DIR}; dpkg-buildpackage --build=all -d -nc
+	#cd ${PACKAGE_DIR}; dh_make --indep --createorig

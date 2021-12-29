@@ -1,0 +1,4 @@
+lib/* /usr/local/share/last-tool/lib
+bin/last-tool /usr/local/bin
+sections/* /usr/local/share/last-tool/sections
+files/* usr/local/share/last-tool/files

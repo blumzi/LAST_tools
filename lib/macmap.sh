@@ -2,12 +2,19 @@
 
 module_include lib/message
 
-export _macmap_file=${LAST_TOOL_ROOT}/files/MACmap
-
 function macmap_init() {
-    if [ ! -r "${_macmap_file}" ]; then
-        message_fatal "${FUNCNAME[0]}: File \"${_macmap_file}\" is not readable."
+    :
+}
+
+function macmap_file() {
+    if [ ! "${_macmap_file}" ]; then
+        _macmap_file="$(module_locate files/MACmap)"
+
+        if [ ! "${_macmap_file}" ]; then
+            message_fatal "${FUNCNAME[0]}: Cannot locate \"files/MACmap\" in LAST_BASH_INCLUDE_PATH=\"${LAST_BASH_INCLUDE_PATH}\""
+        fi
     fi
+    echo "${_macmap_file}"
 }
 
 function macmap_get_local_mac() {
@@ -49,9 +56,11 @@ function macmap_mac_to_hostname() {
 function macmap_getent_by_mac() {
     local mac="${1}"
     local -a words
+    local file
     
-    read -r -a words <<< "$(grep -wi "^${mac}" "${_macmap_file}" )" || 
-        message_fatal "${FUNCNAME[0]}: Missing mac=${mac} in ${_macmap_file}"
+    file="$(module_locate files/MACmap)"    
+    read -r -a words <<< "$(grep -wi "^${mac}" "${file}" )" || 
+        message_fatal "${FUNCNAME[0]}: Missing mac=${mac} in ${file}"
 
     if [ ${#words[*]} -ne 3 ]; then
         message_fatal "${FUNCNAME[0]} Badly formatted line for mac \"${mac}\ in ${_macmap_file}"
@@ -62,12 +71,15 @@ function macmap_getent_by_mac() {
 function macmap_getent_by_hostname() {
     local hostname="${1}"
     local -a words
+    local file
     
-    read -r -a words <<< "$(grep -w "${hostname}" "${_macmap_file}" )" || 
-        message_fatal "${FUNCNAME[0]}: Missing hostname=${hostname} in ${_macmap_file}"
+    file="$(module_locate files/MACmap)"  
+    
+    read -r -a words <<< "$(grep -w "${hostname}" "${file}" )" || 
+        message_fatal "${FUNCNAME[0]}: Missing hostname=${hostname} in ${file}"
 
     if [ ${#words[*]} -ne 3 ]; then
-        message_fatal "${FUNCNAME[0]} Badly formatted line for hostname \"${hostname}\ in ${_macmap_file}"
+        message_fatal "${FUNCNAME[0]} Badly formatted line for hostname \"${hostname}\ in ${file}"
     fi
     echo "${words[@]}"
 }
@@ -77,18 +89,20 @@ function macmap_getent_by_ipaddr() {
     local ipaddr="${1}"
     local -a words
     
-    read -r -a words <<< "$(grep -w "${ipaddr}" "${_macmap_file}" )" || 
-        message_fatal "${FUNCNAME[0]}: Missing ipaddr=${ipaddr} in ${_macmap_file}"
+    file="$(module_locate files/MACmap)" 
+    
+    read -r -a words <<< "$(grep -w "${ipaddr}" "${file}" )" || 
+        message_fatal "${FUNCNAME[0]}: Missing ipaddr=${ipaddr} in ${file}"
 
     if [ ${#words[*]} -ne 3 ]; then
-        message_fatal "${FUNCNAME[0]} Badly formatted line for ipaddr \"${ipaddr}\ in ${_macmap_file}"
+        message_fatal "${FUNCNAME[0]} Badly formatted line for ipaddr \"${ipaddr}\ in ${file}"
     fi
     echo "${words[@]}"
 }
 #
 # Gets the IP address for the current machine, based on the Ethernet MAC
 #
-function macmap_get_local_ip_address() {
+function macmap_get_local_ipaddr() {
     macmap_mac_to_ip_address "$( macmap_get_local_mac )"
 }
 

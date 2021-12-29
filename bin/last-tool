@@ -2,30 +2,29 @@
 
 source /etc/profile.d/last.sh
 
-export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${BASH_LINENO[0]}:${FUNCNAME[0]}] '
-env | grep LAST_
+#env | grep LAST_
 
 export PROG
 PROG=$(basename "${0}")
 export LAST_TOOL_PID="${$}"
 
-source lib/module.sh
+#source lib/module.sh
 module_include lib/message
 module_include lib/macmap
+module_include lib/deploy
 
 function help() {
     cat << EOF
 
     This tool sets up the LAST installation on the current machine.
 
-    Usage: ${PROG} config|check|start [-q|--quiet] [-H|--host <name>] [[[-s|--section <name>] ...]
-           ${PROG} --show-sections
+    Usage: ${PROG} config|check|enforce|show [-q|--quiet] [[[-s|--section <name>] ...]
            ${PROG} --help
 
      The first argument selects the running mode:
         config:              manages configuration files for the selected sections
         check:               checks if the current state of the selected sections meets the requirements
-        start:               runs code that enforces the requirements for the selected sections
+        enforce:             runs code that enforces the requirements for the selected sections
         show:                only show some information
 
      -s|--section <section>: add <section> to the selection set
@@ -35,44 +34,77 @@ EOF
 }
 
 function show_info() {
+    local msg
 
     export LAST_TOOL_DONTLOG=true   # inform message_xxx not to log
+    local deploy_dir
+    deploy_dir=$(deploy_media_dir)
 
     message_info ""
     message_info "Environment:"
-    message_info "   LAST_TOOL_ROOT:  ${LAST_TOOL_ROOT}"
-    message_info "   LAST_TOOL_QUIET: ${LAST_TOOL_QUIET}"
+    message_info " LAST_BASH_INCLUDE_PATH: ${LAST_BASH_INCLUDE_PATH}"
+    message_info "        LAST_TOOL_QUIET: ${LAST_TOOL_QUIET}"
+    message_info "                  Media: ${deploy_dir}"
     message_info ""
 
-    message_info ""
     message_info "Matlab:"
-    message_info "   Installed release: ${matlab_installed_release}"
+    message_info "   Installed: $(matlab_installed_release)"
+    
+    local -a available_matlabs available_matlab_dirs
+    if [ "${deploy_dir}" ]; then
+        read -r -a matlabs <<< "$(cd "${deploy_dir}/matlab" || exit; echo R*)"
+        for matlab in "${matlabs[@]}"; do
+            if [ -r "${deploy_dir}/matlab/${matlab}/disk1.iso" ] && [ -r "${deploy_dir}/matlab/${matlab}/disk2.iso" ]; then
+                available_matlabs+=( "${matlab}" )
+                available_matlab_dirs+=( "${deploy_dir}/matlab/${matlab}" )
+            fi
+        done
+
+        if [ ${#available_matlabs[*]} -gt 0 ]; then
+            for (( i = 0 ; i < ${#available_matlabs[*]}; i++ )); do
+                message_info "   Available: ${available_matlabs[i]} in ${available_matlab_dirs[i]}"
+            done
+        else
+            message_info "   Available: None"
+        fi
+    fi
 
     local keys_file
     keys_file="$(matlab_file_installation_keys)"
+    msg="   Installation Keys File: "
     if [ -r "${keys_file}" ]; then
-        message_info "   Installation Keys File: ${keys_file}"
+        msg+="${keys_file}"
     else
-        message_info "   Installation Keys File: Missing"
+        msg+="Missing"
     fi
+    message_info "${msg}"
 
     local license_file
     license_file="$(matlab_license_file)"
+    msg="   License File:           "       
     if [ -r "${license_file}" ]; then
-        message_info "   License File: ${license_file}"
+        msg+="${license_file}"
     else
-        message_info "   License File: Missing"
+        msg+="Missing"
     fi
+    message_info "${msg}"
+    message_info ""
 
     message_info "Sections:"
     message_info " Available:"
     for section in $( sections_registered_sections ); do
-        message_info "$(printf '   %-10s %s\n' "${section}" "$(sections_section_description "${section}")")"
+        message_info "$(printf '   %-12s %s\n' "${section}" "$(sections_section_description "${section}")")"
     done | sort
+
+    message_info ""
+    message_info " Selected (ordered, including dependencies):"
+    for section in "${needed_sections[@]}"; do
+        message_info "$(printf '   %-12s %s\n' "${section}" "$(sections_section_description "${section}")")"
+    done
 
     local mac ipaddr hostname
     mac="$(macmap_get_local_mac)" || message_fatal "Cannot get local MAC"
-    ipaddr="$(macmap_get_local_ip_address)" || message_fatal "Cannot get IP address for local mac: ${mac}"
+    ipaddr="$(macmap_get_local_ipaddr)" || message_fatal "Cannot get IP address for local mac: ${mac}"
     hostname="$(macmap_get_local_hostname)" || message_fatal "Cannot get hostname for local mac: ${mac}"
     message_info ""
     message_info "Network:"
@@ -80,10 +112,6 @@ function show_info() {
     message_info "   IP address: ${ipaddr:-Could not get it}"
     message_info "   hostname:   ${hostname:-Could not get it}"
     message_info ""
-    message_info " Selected (ordered, including dependencies):"
-    for section in "${needed_sections[@]}"; do
-        message_info "$(printf '   %-10s %s\n' "${section}" "$(sections_section_description "${section}")")"
-    done
 }
 
 function root_or_die() {
@@ -99,7 +127,7 @@ case "${1}" in
         exit 0
         ;;
     
-    check|start|config|show)
+    check|enforce|config|show)
         mode="${1}"
         shift 1
         ;;
@@ -113,7 +141,7 @@ fi
 
 export LAST_TOOL_MATLAB_VERSION=R2020b # default Matlab release
 
-OPTS=$( getopt -o 'qs:M:' --long "quiet,section:,matlab-release:" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'qs:' --long "quiet,section:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 while true; do
@@ -127,11 +155,6 @@ while true; do
     -q|--quiet)
         export LAST_TOOL_QUIET=true
         shift 1
-        ;;
-    
-    -M|--matlab-release)
-        matlab_selected_release="${2}"
-        shift 2
         ;;
 
 	--)
@@ -152,6 +175,7 @@ module_include sections/hostname
 module_include sections/apt
 module_include sections/paths
 module_include sections/matlab
+module_include sections/filesystems
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 

@@ -3,12 +3,12 @@
 if [ ! "${MODULE_INCLUDED}" ]; then
     export MODULE_INCLUDED=true
 
-    declare -a module_included
+    declare -A module_included_modules
 
     function module_already_included() {
         local module="${1}"
 
-        for m in "${module_included[@]}"; do
+        for m in ${!module_included_modules[*]}; do
             if [ "${m}" = "${module}" ]; then
                 return 0
             fi
@@ -18,24 +18,59 @@ if [ ! "${MODULE_INCLUDED}" ]; then
 
     function module_include() {
         local module="${1}"
+        local file
 
-        if ! module_already_included "${module}"; then
-            if ! eval source "${module}.sh" 2>/dev/null; then
-                message_failure "module_include: Cannot include module \"${module}\" (source ${module}.sh failed)."
-                exit 1
-            fi
-            module_included+=( "${module}" )
+        if module_already_included "${module}"; then
+            return
+        fi
 
-            # if the module has an initiator, call it
-            local initiator
-            initiator="$(basename "${module}")_init"
-            if typeset -F "${initiator}" >/dev/null; then
-                eval "${initiator}"
+        for dir in ${LAST_BASH_INCLUDE_PATH//:/ }; do
+            file="${dir}/${module}.sh"
+
+            if [ -r "${file}" ]; then
+                source "${file}"
+                module_included_modules["${module}"]="${file}"
+                break
             fi
+        done
+
+        #
+        # If the module has an initiator, call it
+        #
+        # NOTE:
+        #   The initiator's function name does not include the path to the module
+        #   Example:
+        #       module_include lib/matlab
+        #     will call:
+        #       matlab_init
+        #
+        local initiator
+        initiator="$(basename "${module}")_init"
+        if typeset -F "${initiator}" >/dev/null; then
+            eval "${initiator}"
         fi
     }
 
-    function module_list_included() {
-        echo "${module_included[@]}"
+    #
+    # Lists the currently included modules
+    #
+    function module_list_included_modules() {
+        local m
+
+        for m in ${!module_included_modules[*]}; do
+            printf "%-20s %s\n" "${m}" "${module_included_modules[${m}]}"
+        done
+    }
+
+    function module_locate() {
+        local name="${1}" path dir
+
+        for dir in ${LAST_BASH_INCLUDE_PATH//:/ }; do
+            path="${dir}/${name}"
+            if [ -f "${path}" ] || [ -d "${path}" ]; then
+                echo "${path}"
+                return
+            fi
+        done
     }
 fi

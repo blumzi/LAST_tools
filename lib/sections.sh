@@ -34,12 +34,13 @@ function sections_registered_sections() {
 #  including their dependencies
 #
 function sections_ordered_sections() {
-    local requested_sections=( "${1}" )
+    local -a requested_sections=( "${1}" )
     local -a ordered_sections needed
 
     # build a topologically sorted array of the needed section
-    read -r -a ordered_sections < <(
-            for section in "${requested_sections[@]}"; do
+    ordered_sections=(
+        $(
+            for section in ${requested_sections[*]}; do
                 if [ "${_required_sections[${section}]}" ]; then
                     needed=( ${_required_sections["${section}"]} )
                     for need in "${needed[@]}"; do
@@ -49,6 +50,7 @@ function sections_ordered_sections() {
                 echo "top ${section}"
             done | tsort | grep -vw top
         )
+    )
     echo "${ordered_sections[@]}"
 }
 

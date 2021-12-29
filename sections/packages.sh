@@ -33,7 +33,7 @@ packages_required=(
     saods9
 )
 
-function packages_start() {
+function packages_enforce() {
     message_section "Packages"
 
     packages_check

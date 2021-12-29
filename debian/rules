@@ -2,6 +2,7 @@
 # debian/rules
 # -*- makefile -*-
 
+SHELL := bash -x
 export DESTROOT=$(CURDIR)/debian/last-tool
 
 %:
@@ -18,3 +19,7 @@ override_dh_auto_install:
 	install -p -m 0644 files/* $(DESTROOT)/usr/local/share/last-tool/files
 
 override_dh_usrlocal:
+
+clean:
+
+build:

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-module_include macmap
-module_include sections
+module_include lib/macmap
+module_include lib/sections
 
 export network_local_hostname network_local_ipaddr network_peer_hostname network_peer_ipaddr
 export network_netpart network_netmask network_interface network_gateway network_gateway
@@ -22,7 +22,7 @@ function network_init() {
     sections_register_section "network" "Configures the LAST network"
 }
 
-function network_start() {
+function network_enforce() {
     systemctl restart networking
 }
 
