@@ -6,7 +6,7 @@
 
 export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]}] '
 
-export http_proxy=http://bcproxy.weizmann.ac.il:8080
+export  http_proxy=http://bcproxy.weizmann.ac.il:8080
 export https_proxy=http://bcproxy.weizmann.ac.il:8080
 
 function append_to_bash_include_path() {
@@ -15,13 +15,13 @@ function append_to_bash_include_path() {
 
     for p in ${LAST_BASH_INCLUDE_PATH//:/ }; do
         if [ "${p}" = "${subpath}" ]; then
-            found=true
-            break
+            return
         fi
     done
-    if ! ${found}; then
-        export LAST_BASH_INCLUDE_PATH=${LAST_BASH_INCLUDE_PATH}:${subpath}
-    fi
+    
+    LAST_BASH_INCLUDE_PATH+=":${subpath}"
+    LAST_BASH_INCLUDE_PATH="${LAST_BASH_INCLUDE_PATH##:}"
+    export LAST_BASH_INCLUDE_PATH
 }
 
 export LAST_TOOL_ROOT=/usr/local/share/last-tool

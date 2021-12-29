@@ -38,7 +38,7 @@ function show_info() {
 
     export LAST_TOOL_DONTLOG=true   # inform message_xxx not to log
     local deploy_dir
-    deploy_dir=$(deploy_media_dir)
+    deploy_dir=$(deploy_container)
 
     message_info ""
     message_info "Environment:"

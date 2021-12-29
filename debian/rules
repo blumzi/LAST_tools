@@ -10,7 +10,9 @@ export DESTROOT=$(CURDIR)/debian/last-tool
 
 override_dh_auto_install:
 	dh_auto_install
-	install -p -D -m 0755 bin/last-tool $(DESTROOT)/usr/local/bin/last-tool
+	#install -p -D -m 0755 bin/last-tool $(DESTROOT)/usr/local/bin/last-tool
+	ln -sf bin/last-tool $(DESTROOT)/usr/local/bin/last-tool
+	ln -sf bin/last-fetch-from-github $(DESTROOT)/usr/local/bin/last-fetch-from-github
 	install -d $(DESTROOT)/usr/local/share/last-tool/lib
 	install -d $(DESTROOT)/usr/local/share/last-tool/sections
 	install -d $(DESTROOT)/usr/local/share/last-tool/files
