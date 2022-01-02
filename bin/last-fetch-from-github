@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# env | grep LAST
 source /etc/profile.d/last.sh
 
 module_include lib/message
@@ -8,7 +7,6 @@ module_include lib/message
 PROG=$(basename "${0}")
 #last_user="ocs"
 last_user="blumzi"
-token=""
 
 declare -A git_repo
 #git_repo["AstroPack"]="https://github.com/EranOfek/AstroPack.git"
