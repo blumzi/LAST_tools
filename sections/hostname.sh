@@ -6,19 +6,57 @@ module_include lib/sections
 sections_register_section "hostname" "Manages stuff related to the machine's host name"
 
 function hostname_enforce() {
-    :
+    message_section "Hostname"
+    local this_hostname
+
+    this_hostname=$( macmap_get_local_hostname )
+
+    if ! hostname_is_valid "${this_hostname}"; then
+        message_failure "Invalid hostname \"${this_hostname}\""
+        return
+    fi
+
+    if hostnamectl --static "${this_hostname}"; then
+        message_success "Hostname set to ${this_hostname}"
+    else
+        message_failure "Could not set hostname to \"${this_hostname}\""
+    fi
+
+    #
+    # Create a fresh /etc/hosts
+    #
+    local tmp
+
+    tmp=$(mktemp)
+    {
+        echo -e "127.0.0.1\tlocalhost ${this_hostname}"
+        echo -e "127.0.1.1\t${this_hostname}"
+        echo ""
+
+        local -a words
+        while read -r -a words; do
+            echo -e "${words[2]}\t${words[1]}"
+        done < <( grep 10.23 "$(macmap_file)")
+
+        cat << EOF
+        # The following lines are desirable for IPv6 capable hosts
+        ::1     ip6-localhost ip6-loopback
+        fe00::0 ip6-localnet
+        ff00::0 ip6-mcastprefix
+        ff02::1 ip6-allnodes
+        ff02::2 ip6-allrouters
+
+        132.77.100.5 ntp.weizmann.ac.il
+
+EOF
+
+    } > "${tmp}"
+    mv "${tmp}" /etc/hosts
+    message_success "Create a canonical \"/etc/hosts\" file."
 }
 
 function hostname_configure() {
-    message_section "Hostname"
-
-    if ! hostname_is_valid "${LAST_HOSTNAME}"; then
-        message_failure "Invalid hostname \"${LAST_HOSTNAME}\""
-        return
-    fi
-    hostnamectl --static "${LAST_HOSTNAME}"
-
-    # TODO: /etc/hosts alias
+    :
 }
 
 function hostname_make_name() {
@@ -37,9 +75,12 @@ function hostname_make_name() {
 
 function hostname_check() {
     message_section "Hostname"
+    local this_hostname
 
-    if ! hostname_is_valid "${LAST_HOSTNAME}"; then
-        message_failure "Invalid hostname \"${LAST_HOSTNAME}\""
+    this_hostname="$( macmap_get_local_hostname )"
+
+    if ! hostname_is_valid "${this_hostname}"; then
+        message_failure "Invalid hostname \"${this_hostname}\""
         return
     fi
 
@@ -47,10 +88,10 @@ function hostname_check() {
     local current_hostname
     current_hostname="$(hostname)"
 
-    if [ "${LAST_HOSTNAME}" = "${current_hostname}" ]; then
+    if [ "${this_hostname}" = "${current_hostname}" ]; then
         message_success "The hostname is \"${current_hostname}\""
     else
-        message_failure "The hostname is \"${current_hostname}\" instead of \"${LAST_HOSTNAME}\""
+        message_failure "The hostname is \"${current_hostname}\" instead of \"${this_hostname}\""
     fi
 
     if hostname_is_valid "${current_hostname}"; then
@@ -75,7 +116,25 @@ function hostname_check() {
         message_failure "Missing entries for hostname(s) \"${missing[*]}\" in /etc/hosts"
     else
         message_success "All LAST hosts have entries in /etc/hosts."
-    fi 
+    fi
+
+    #
+    # the hostname should be an alias of localhost (127.0.0.1)
+    #
+    local found=false
+    read -r -a hostnames <<< <( grep '^127.0.0.1' /etc/hosts )
+    for (( i = 1; i < ${#hostnames[*]}; i++)); do
+        if [ "${hostnames[i]}" = "${this_hostname}" ]; then
+            found=true
+            break
+        fi
+    done
+
+    if ${found}; then
+        message_success "${this_hostname} is an alias of 127.0.0.1 (localhost)"
+    else
+        message_failure "${this_hostname} is not an alias of 127.0.0.1 (localhost)"
+    fi
 }
 
 #
@@ -86,10 +145,6 @@ function hostname_check() {
 #
 function hostname_is_valid() {
     local name="${1}"
-
-    if [ ! "${name}" ] && [ "${LAST_HOSTNAME}" ]; then
-        name=${LAST_HOSTNAME}
-    fi
 
     [[ ${name} != last* ]] || return 1
 

@@ -5,4 +5,5 @@ Package: last-tool
 Architecture: all
 Version: 1.0
 Description: A management tool for the LAST project
- last-tool manages the software installation on a LAST project machine
+ last-tool is a tool for checking if the current software installation complies with
+ the LAST software installation policy.  It can also enforce the above named policy.

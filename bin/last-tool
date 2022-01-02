@@ -176,6 +176,7 @@ module_include sections/apt
 module_include sections/paths
 module_include sections/matlab
 module_include sections/filesystems
+module_include sections/time
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 

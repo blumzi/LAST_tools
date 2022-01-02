@@ -37,7 +37,7 @@ function profile_enforce() {
         export LAST_TOOL_ROOT=/usr/local/share/last-tool
         append_to_bash_include_path \${LAST_TOOL_ROOT}
 
-        export TMOUT=0
+        unset TMOUT
 EOF
     fi
 }
