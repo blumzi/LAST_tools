@@ -12,7 +12,10 @@ function network_init() {
     network_local_ipaddr=$( macmap_get_local_ipaddr )
     network_peer_hostname=$( macmap_get_peer_hostname )
     network_peer_ipaddr=$( macmap_get_peer_ipaddr )
-    network_interface=eth0
+	local -a info
+	read -r -a info <<< $( ip -o -4 link show | grep ': en' )
+    network_interface=${info[1]}
+	network_interface=${network_interface%:}
     network_netmask=255.255.0.0
     network_broadcast=10.23.255.255
     network_netpart=10.23.0.0
@@ -54,6 +57,8 @@ function network_check() {
     local config_file="/etc/network/interfaces"
     local -i OKs=0
     local already_seen_auto_line=false
+
+	message_section "Network"
 
     # check /etc/network/interfaces
     function callback() {
@@ -121,20 +126,22 @@ function network_check() {
         esac
     }
 
-    if [ ! -r ${config_file} ]; then
+    if [ -r ${config_file} ]; then
+		mapfile -t -C callback -c 1 < ${config_file}
+		if (( OKs == 6 )); then
+			message_success "${config_file} seems OK"
+		else
+			message_failure "${config_file} has errors"
+			(( errors++ ))
+		fi
+	else
         message_failure "Missing configuration file ${config_file}."
+		(( errors++ ))
     fi
 
-    mapfile -t -C callback -c 1 < ${config_file}
-    if (( OKs == 6 )); then
-        message_success "${config_file} seems OK"
-    else
-        message_failure "${config_file} has errors"
-        (( errors++ ))
-    fi
 
     #  check eth0 is up
-    read -r -a words <<< "$( ip -o -4 a dev ${network_interface})"
+    read -r -a words <<< "$( ip -o -4 address show dev ${network_interface})"
     if (( ${#words[*]} != 14 )); then
         message_failure "Interface \"${network_interface}\" is not properly configured"
         (( errors++ ))
@@ -163,12 +170,14 @@ function network_check() {
 
     # TODO: check we can ping weizmann
 
-    # check we can ping 8.8.8.8
-    if ! ping -4 -q -c 1 -w 1 8.8.8.8 > /dev/null 2>&1; then
-        message_failure "Cannot ping \"8.8.8.8\" (no Internet ?!?)."
+    # check we can ping someone at Weizmann
+	local wiz_host
+	wiz_host=wisfiler
+    if ! ping -4 -q -c 1 -w 1 ${wiz_host} > /dev/null 2>&1; then
+        message_failure "Cannot ping \"${wiz_host}\" (no Internet ?!?)."
         (( errors++ ))
     else
-        message_success "Can ping \"8.8.8.8\", Internet is reachable."
+        message_success "Can ping \"${wiz_host}\", Internet is reachable."
     fi
 
     return $(( errors ))

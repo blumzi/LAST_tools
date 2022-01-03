@@ -20,8 +20,8 @@ function macmap_file() {
 function macmap_get_local_mac() {
     local -a words
 
-    read -r -a words <<< "$(ip -o link show | grep link/ether)"
-    if [ ${#words[*]} -ne 19 ]; then
+    read -r -a words <<< "$(ip -o link show | grep link/ether | grep ': en')"
+    if [ ${#words[*]} -ne 21 ]; then
         message_fatal "${FUNCNAME[0]}: Cannot get MAC address of local Ethernet (${#words[*]}, ${words[*]})"
         return
     fi

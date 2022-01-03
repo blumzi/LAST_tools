@@ -16,16 +16,15 @@ module_include lib/deploy
 function help() {
     cat << EOF
 
-    This tool sets up the LAST installation on the current machine.
+    This tool checks or enforces the LAST installation policy.
 
-    Usage: ${PROG} config|check|enforce|show [-q|--quiet] [[[-s|--section <name>] ...]
+    Usage: ${PROG} check|enforce|show [-q|--quiet] [[[-s|--section <name>] ...]
            ${PROG} --help
 
      The first argument selects the running mode:
-        config:              manages configuration files for the selected sections
-        check:               checks if the current state of the selected sections meets the requirements
-        enforce:             runs code that enforces the requirements for the selected sections
-        show:                only show some information
+        check:   Checks if the current machine complies with the LAST installation policy
+        enforce: Enforces the LAST installation policy upon the current machine
+        show:    Shows some information about the available installation resources
 
      -s|--section <section>: add <section> to the selection set
      -q|--quiet:             be silent
@@ -127,14 +126,14 @@ case "${1}" in
         exit 0
         ;;
     
-    check|enforce|config|show)
+    check|enforce|show)
         mode="${1}"
         shift 1
         ;;
 esac
 
 if [ ! "${mode}" ]; then
-    message_failure "The first argument must select a running mode (check|start|config|show), see help below!"
+    message_failure "The first argument must select a running mode (check|enforce|show), see help below!"
     help
     exit 1
 fi
@@ -196,6 +195,10 @@ show)
 
 check)
     export LAST_TOOL_DONTLOG=true
+    ;;
+
+enforce)
+    :
     ;;
 esac
 

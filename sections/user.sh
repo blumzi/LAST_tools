@@ -31,30 +31,31 @@ function user_enforce() {
         usermod -G "${user_group_list}" ${user_last}
     fi
 
-    local tmp
-    tmp=$(mktemp)
-    if [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' )" != 3 ]; then
-        {
-            cat /etc/skel/.bashrc
-            cat << EOF
-            
-            export http_proxy=http://bcproxy.weizmann.ac.il:8080
-            export https_proxy=http://bcproxy.weizmann.ac.il:8080
-            unset TMOUT
+	local bashrc
+	bashrc=/home/${user_last}/.bashrc
+	if [ -r ${bashrc} ] ;then
+		local tmp
+		tmp=$(mktemp)
+		if [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' ${bashrc} )" != 3 ]; then
+			{
+				cat /etc/skel/.bashrc
+				cat << EOF
+				
+				export http_proxy=http://bcproxy.weizmann.ac.il:8080
+				export https_proxy=http://bcproxy.weizmann.ac.il:8080
+				unset TMOUT
 EOF
-        } > "${tmp}"
-        install -D --mode 644 --owner "${user_last}" --group "${user_last}" "${tmp}" /home/${user_last}/.bashrc
-        rm -f "${tmp}"
+			} > "${tmp}"
+			install -D --mode 644 --owner "${user_last}" --group "${user_last}" "${tmp}" ${bashrc}
+			rm -f "${tmp}"
 
-        message_success "Regenerated ~${user_last}/.bashrc"
+			message_success "Regenerated ${bashrc}"
+		else
+			message_failure "Missing ${bashrc}"
+		fi
     else
         message_success "~${user_last}/.bashrc complies"
     fi
-
-}
-
-function user_configure() {
-    :
 }
 
 function user_check() {
@@ -87,12 +88,17 @@ function user_check() {
 
     local rcfile
     rcfile=/home/${user_last}/.bashrc
-    if [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' "${rcfile}" )" = 3 ]; then
-        message_success "${rcfile} complies"
-    else
-        message_failure "${rcfile} does not have all the required code"
-        (( ret++ ))
-    fi
+	if [ -r ${rcfile} ]; then
+		if [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' "${rcfile}" )" = 3 ]; then
+			message_success "${rcfile} complies"
+		else
+			message_failure "${rcfile} does not have all the required code"
+			(( ret++ ))
+		fi
+	else
+		message_failure "Missing \"${rcfile}\""
+		(( ret++ ))
+	fi
 
     return $(( ret ))
 }
