@@ -2,8 +2,6 @@
 
 module_include lib/ansi
 
-export message_session
-
 # top process may (or may not) set the --quiet option
 if [ ! "${LAST_TOOL_QUIET}" ]; then
     export LAST_TOOL_QUIET=false
@@ -12,8 +10,6 @@ fi
 if [ ! "${LAST_TOOL_DONTLOG}" ]; then
     export LAST_TOOL_DONTLOG=false
 fi
-
-declare message_session
 
 function message_init() {
     :
@@ -30,7 +26,7 @@ function message_log() {
 # section header
 function message_section() {
     if ! ${LAST_TOOL_QUIET}; then
-        echo -e "\n    Section: $( ansi_underline "${*}" )\n"
+        echo -e "\nSection: $( ansi_bright_blue "${*}" )\n"
     fi
 }
 

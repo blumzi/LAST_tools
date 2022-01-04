@@ -64,6 +64,10 @@ function ansi_bright_white() {
     echo -ne "${ANSI_BRIGHT_WHITE}${*}${ANSI_NORMAL}"
 }
 
+function ansi_bright_blue() {
+    echo -ne "${ANSI_BRIGHT_BLUE}${*}${ANSI_NORMAL}"
+}
+
 function ansi_underline() {
     echo -ne "${ANSI_UNDERLINE}${*}${ANSI_NORMAL}"
 }
