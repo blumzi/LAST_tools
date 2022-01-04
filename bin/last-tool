@@ -2,13 +2,10 @@
 
 source /etc/profile.d/last.sh
 
-#env | grep LAST_
-
 export PROG
 PROG=$(basename "${0}")
 export LAST_TOOL_PID="${$}"
 
-#source lib/module.sh
 module_include lib/message
 module_include lib/macmap
 module_include lib/deploy
@@ -18,7 +15,7 @@ function help() {
 
     This tool checks or enforces the LAST installation policy.
 
-    Usage: ${PROG} check|enforce|show [-q|--quiet] [[[-s|--section <name>] ...]
+    Usage: ${PROG} check|enforce|show [-q|--quiet] [[[-s|--section <name>] ...] [-n|--nodeps]
            ${PROG} --help
 
      The first argument selects the running mode:
@@ -28,6 +25,7 @@ function help() {
 
      -s|--section <section>: add <section> to the selection set
      -q|--quiet:             be silent
+     -n|--nodeps:            don't do section dependencies
 
 EOF
 }
@@ -138,8 +136,7 @@ if [ ! "${mode}" ]; then
     exit 1
 fi
 
-export LAST_TOOL_MATLAB_VERSION=R2020b # default Matlab release
-
+declare nodeps=false
 OPTS=$( getopt -o 'qs:' --long "quiet,section:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
@@ -153,6 +150,11 @@ while true; do
 
     -q|--quiet)
         export LAST_TOOL_QUIET=true
+        shift 1
+        ;;
+
+    -n|--nodeps)
+        nodeps=true
         shift 1
         ;;
 
@@ -184,8 +186,12 @@ if [ ${#selected_sections[*]} -eq 0 ]; then
     selected_sections=( "${registered_sections[@]}" )
 fi
 
-# build a topologically sorted array of the needed section
-read -r -a needed_sections <<< "$( sections_ordered_sections "${selected_sections[*]}" )"
+if ${nodeps}; then
+    needed_sections=( "${selected_sections[@]}" )
+else
+    # build a topologically sorted array of the needed section
+    read -r -a needed_sections <<< "$( sections_ordered_sections "${selected_sections[*]}" )"
+fi
 
 case "${mode}" in
 show)
