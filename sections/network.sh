@@ -13,7 +13,7 @@ function network_init() {
     network_peer_hostname=$( macmap_get_peer_hostname )
     network_peer_ipaddr=$( macmap_get_peer_ipaddr )
 	local -a info
-	read -r -a info <<< $( ip -o -4 link show | grep ': en' )
+	read -r -a info <<< "$( ip -o -4 link show | grep ': en' )"
     network_interface=${info[1]}
 	network_interface=${network_interface%:}
     network_netmask=255.255.0.0
@@ -76,7 +76,7 @@ function network_check() {
 
         case "${1}" in
             auto)
-                if [ "${2}" = ${network_interface} ]; then
+                if [ "${2}" = "${network_interface}" ]; then
                     (( OKs++ ))
                 else
                     message_failure "${config_file}:${lineno}: Exepcted \"auto ${network_interface}\", got \"${line}\"."
@@ -140,8 +140,8 @@ function network_check() {
     fi
 
 
-    #  check eth0 is up
-    read -r -a words <<< "$( ip -o -4 address show dev ${network_interface})"
+    #  check the Ethernet is up
+    read -r -a words <<< "$( ip -o -4 address show dev "${network_interface}")"
     if (( ${#words[*]} != 14 )); then
         message_failure "Interface \"${network_interface}\" is not properly configured"
         (( errors++ ))
@@ -153,7 +153,7 @@ function network_check() {
             (( errors++ ))
         fi
 
-        if [[ "$(ip -o -4 link show dev ${network_interface})" == *,UP\>* ]]; then
+        if [[ "$(ip -o -4 link show dev "${network_interface}")" == *,UP\>* ]]; then
             message_success "Interface \"${network_interface}\" is UP"
         else
             message_failure "Interface \"${network_interface}\" is not UP"
@@ -162,8 +162,7 @@ function network_check() {
     fi
 
     if ! ping -4 -q -c 1 -w 1 last0 >/dev/null 2>&1; then
-        message_failure "Cannot ping \"last0\"."
-        (( errors++ ))
+        message_warning "Cannot ping \"last0\"."
     else
         message_success "Can ping \"last0\"."
     fi
@@ -174,8 +173,7 @@ function network_check() {
 	local wiz_host
 	wiz_host=wisfiler
     if ! ping -4 -q -c 1 -w 1 ${wiz_host} > /dev/null 2>&1; then
-        message_failure "Cannot ping \"${wiz_host}\" (no Internet ?!?)."
-        (( errors++ ))
+        message_warning "Cannot ping \"${wiz_host}\" (no Internet ?!?)."
     else
         message_success "Can ping \"${wiz_host}\", Internet is reachable."
     fi
