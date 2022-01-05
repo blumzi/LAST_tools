@@ -5,7 +5,7 @@ module_include lib/sections
 module_include lib/macmap
 module_include sections/network
 
-sections_register_section "filesystems" "Manages the exporting/mounting of filesystems"
+sections_register_section "filesystems" "Manages the exporting/mounting of filesystems" "network"
 
 #
 # Cross mounting of filesystems between sibling machines (belonging to same LAST mount)
@@ -18,14 +18,6 @@ sections_register_section "filesystems" "Manages the exporting/mounting of files
 #
 
 function filesystems_enforce() {
-    message_info "Starting NFS kernel server"
-    service nfs-kernel-server restart
-    
-    message_info "Mounting all the network filesystems"
-    mount -a -t nfs
-}
-
-function filesystems_configure() {
     local local_hostname peer_hostname tmp config_file d
     local -a entry
 
@@ -64,6 +56,12 @@ function filesystems_configure() {
             message_success "${config_file} already has an entry for /data${d}"
         fi
     done
+
+    message_info "Restarting NFS kernel server"
+    service nfs-kernel-server restart
+    
+    message_info "Mounting all the network filesystems"
+    mount -a -t nfs
 }
 
 function filesystems_check() {

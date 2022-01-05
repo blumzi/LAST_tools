@@ -46,5 +46,10 @@ D8:5E:D3:04:DC:39 last7w 10.23.1.14
 D8:5E:D3:04:DC:23 last8e 10.23.1.15
 D8:5E:D3:04:DC:21 last8w 10.23.1.16
 
-
+# Dummies for last-tool testing
 30:5a:3a:47:39:61 my-machine x.y.z.0
+00:0c:29:58:94:e2 last20e 192.168.129.128
+
+# Controllers
+7c:16:0d:01:a8:88 roofcontrol 10.23.2.101
+aa:bb:cc:dd:ee:ff sitechntp 10.23.3.1																	

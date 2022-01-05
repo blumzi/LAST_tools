@@ -48,7 +48,7 @@ function deploy_container() {
 function deploy_is_valid_container() {
     declare path="${1}"
 
-    if [ -d "${path}" ] && [ -d "${path}/matlab" ] && [ -d "${path}/catalogs" ]; then
+    if [ -d "${path}" ] && [ -d "${path}/matlab" ] && [ -d "${path}/catsHTM" ]; then
         return 0
     fi
     return 1

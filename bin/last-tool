@@ -10,22 +10,35 @@ module_include lib/message
 module_include lib/macmap
 module_include lib/deploy
 
+declare mode
+
 function help() {
     cat << EOF
 
-    This tool checks or enforces the LAST installation policy.
+    The LAST installation policy is everything that differentiates a LAST installation
+     from a vanilla Ubuntu installation (network, packages, matlab, LAST software, etc.)
 
-    Usage: ${PROG} check|enforce|show [-q|--quiet] [[[-s|--section <name>] ...] [-n|--nodeps]
-           ${PROG} --help
+    This tool either checks or enforces the LAST installation policy.
 
-     The first argument selects the running mode:
+    Usage: ${PROG} [-q|--quiet] [-n|--nodeps] <mode> [[section] ...] 
+           ${PROG} -h|--help
+
+     -q|--quiet:             be silent
+     -n|--nodeps:            don't do section dependencies
+
+     Running <mode>:
+      One running <mode> must be selected from the following (no default):
         check:   Checks if the current machine complies with the LAST installation policy
         enforce: Enforces the LAST installation policy upon the current machine
         show:    Shows some information about the available installation resources
+        policy:  Prints out the LAST policy for the seected section(s)
 
-     -s|--section <section>: add <section> to the selection set
-     -q|--quiet:             be silent
-     -n|--nodeps:            don't do section dependencies
+     Sections:
+      The workload is split into (possibly inter-dependant) sections.
+      - To get a list of the defined sections run:
+          $ ${PROG} show
+      - To select a subset of all the defined sections, just list them as arguments
+         after the running <mode> (default: run all the defined sections)
 
 EOF
 }
@@ -118,52 +131,39 @@ function root_or_die() {
     fi
 }
 
-case "${1}" in
-    -h|--help)
-        help
-        exit 0
-        ;;
-    
-    check|enforce|show)
-        mode="${1}"
-        shift 1
-        ;;
-esac
+declare nodeps=false
+while true; do
+    case "${1}" in
+        -h|--help)
+            help
+            exit 0
+            ;;
+        
+        check|enforce|show|policy)
+            mode="${1}"
+            shift 1
+            break
+            ;;
+
+        -q|--quiet)
+            export LAST_TOOL_QUIET=true
+            shift 1
+            ;;
+
+        -n|--nodeps)
+            nodeps=true
+            shift 1
+            ;;
+    esac
+done
 
 if [ ! "${mode}" ]; then
-    message_failure "The first argument must select a running mode (check|enforce|show), see help below!"
+    message_failure "No running mode (check|enforce|show|policy) was selected, see help below!"
     help
     exit 1
 fi
 
-declare nodeps=false
-OPTS=$( getopt -o 'qs:' --long "quiet,section:" -n "${PROG}" -- "$@" )
-eval set -- "${OPTS}"
-
-while true; do
-	case "${1}" in
-
-    -s|--section)
-        selected_sections+=( "${2}" )
-        shift 2
-        ;;
-
-    -q|--quiet)
-        export LAST_TOOL_QUIET=true
-        shift 1
-        ;;
-
-    -n|--nodeps)
-        nodeps=true
-        shift 1
-        ;;
-
-	--)
-		shift 1
-		break
-		;;
-	esac
-done
+selected_sections=( "${@}" )
 
 #
 # These modules will register sections
@@ -178,6 +178,8 @@ module_include sections/paths
 module_include sections/matlab
 module_include sections/filesystems
 module_include sections/time
+module_include sections/catalogs
+module_include sections/software
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 
@@ -212,6 +214,8 @@ root_or_die
 
 for section in "${needed_sections[@]}"; do
     if sections_section_has_method "${section}" "${mode}"; then
+        message_section "${section^?}"
+
         eval "${section}_${mode}"
     else
         message_warning "Section \"${section}\" does not have a \"${section}_${mode}\" method, skipping"

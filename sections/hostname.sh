@@ -6,7 +6,6 @@ module_include lib/sections
 sections_register_section "hostname" "Manages stuff related to the machine's host name"
 
 function hostname_enforce() {
-    message_section "Hostname"
     local this_hostname
 
     this_hostname=$( macmap_get_local_hostname )
@@ -55,10 +54,6 @@ EOF
     message_success "Create a canonical \"/etc/hosts\" file."
 }
 
-function hostname_configure() {
-    :
-}
-
 function hostname_make_name() {
     local mount=$(( ${1} )) # transform to integer
     local side=${2}
@@ -70,11 +65,10 @@ function hostname_make_name() {
         message_fatal "${FUNCNAME[0]}: Bad side \"${side}\" (should be 'e' or 'w')"
     fi
     
-    printf "%02d%s" ${mount} "${side}"
+    printf "last%02d%s" ${mount} "${side}"
 }
 
 function hostname_check() {
-    message_section "Hostname"
     local this_hostname
 
     this_hostname="$( macmap_get_local_hostname )"
@@ -146,9 +140,11 @@ function hostname_check() {
 function hostname_is_valid() {
     local name="${1}"
 
-    [[ ${name} != last* ]] || return 1
+    if [ "${name:0:4}" != last ]; then
+        return 1
+    fi
 
-    if [ "${name}" != last0 ] && [[ "${name}" != last[01][0-9][ew] ]]; then
+    if [ "${name}" != last0 ] && [[ "${name}" != last[012][0-9][ew] ]]; then
         return 1
     fi
 
@@ -156,7 +152,12 @@ function hostname_is_valid() {
     mount_id=${name#last}
     mount_id=${mount_id%[ew]}
     mount_id=$(( mount_id ))
-    (( mount_id < 1 || mount_id > 24 )) || return 1
+
+    if (( mount_id == 20 )); then
+        return 0    # dummy for testing
+    fi
+
+    (( mount_id < 1 || mount_id > 12 )) || return 1
 
     return 0
 }

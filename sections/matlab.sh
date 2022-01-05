@@ -59,7 +59,6 @@ function matlab_check() {
     local -i errors ret
     local release
 
-    message_section "Matlab"
     (( ret = 0 ))
     release=$(matlab_installed_release)
     if [ ! "${release}" ]; then

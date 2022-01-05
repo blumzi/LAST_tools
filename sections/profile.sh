@@ -8,7 +8,6 @@ sections_register_section "profile" "Manages profile files"
 _profile_last=/etc/profile.d/last.sh
 
 function profile_enforce() {
-    message_section "Profile"
 
     if [ ! -r "${_profile_last}" ]; then
         cat << EOF > ${_profile_last}
@@ -42,12 +41,7 @@ EOF
     fi
 }
 
-function profile_configure() {
-    :
-}
-
 function profile_check() {
-    message_section "Profile"
     
     if [ -r "${_profile_last}" ]; then
         message_success "The file \"${_profile_last}\" exists"

@@ -4,85 +4,96 @@ module_include lib/message
 module_include lib/sections
 
 export user_last="ocs"
-export -a user_groups=( sudo dialup )
-export user_group_list
-user_group_list="$( IFS=,; echo ${user_groups[*]} )"
+export -a user_expected_groups=( sudo dialout )
+export user_expected_groups_list
+user_expected_groups_list="$( echo "${user_expected_groups[*]}" | tr ' ' ',')"
 
 sections_register_section "user" "Manages the \"${user_last}\" user"
 
 function user_enforce() {
-    message_section "User \"${user_last}\""
-    if grep -w "^${user_last}:" /etc/passwd; then
+    if grep "^${user_last}:" /etc/passwd >/dev/null; then
         message_success "User ${user_last} exists"
+
+        local expected found
+        local -a missing
+        read -r -a groups <<< "$( groups ${user_last} 2>/dev/null | sed -e 's;^.*:.;;' )"
+        for expected in "${user_expected_groups[@]}"; do
+            found=false
+            for g in "${groups[@]}"; do
+                if [ "${g}" = "${expected}" ]; then
+                    found=true
+                    break
+                fi
+            done
+            if ! ${found}; then
+                missing+=( "${expected}" )
+            fi
+        done
+        if (( ${#missing[*]} != 0 )); then
+            message_info "Making \"${user_last}\" a member of the groups: ${user_expected_groups_list}"
+            usermod -G "${user_expected_groups_list}" ${user_last}
+		else
+			message_success "User ${user_last} is a member of groups: ${user_expected_groups_list}"
+        fi
     else
         message_info "Creating user \"${user_last}\" ..."
-        useradd -m -G "${user_group_list}" ${user_last}
-    fi
-
-    local -i ngroups=0
-    read -r -a grps <<< "$( groups ${user_last} 2>&- | sed -e 's;^.*:.;;' )"
-    for g in "${grps[@]}"; do
-        if "${g}" in "${user_groups[@]}"; then
-            (( ngroups++ ))
-        fi
-    done
-    if (( ngroups != 2 )); then
-        message_info "Making \"${user_last}\" a member of the groups: ${user_group_list}"
-        usermod -G "${user_group_list}" ${user_last}
+        useradd -m -G "${user_expected_groups_list}" ${user_last}
     fi
 
 	local bashrc
 	bashrc=/home/${user_last}/.bashrc
-	if [ -r ${bashrc} ] ;then
+	if [ ! -r "${bashrc}" ] || [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' ${bashrc} )" != 3 ]; then
 		local tmp
 		tmp=$(mktemp)
-		if [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' ${bashrc} )" != 3 ]; then
-			{
-				cat /etc/skel/.bashrc
-				cat << EOF
-				
-				export http_proxy=http://bcproxy.weizmann.ac.il:8080
-				export https_proxy=http://bcproxy.weizmann.ac.il:8080
-				unset TMOUT
+		{
+			cat /etc/skel/.bashrc
+			cat <<- EOF
+			
+			export http_proxy=http://bcproxy.weizmann.ac.il:8080
+			export https_proxy=http://bcproxy.weizmann.ac.il:8080
+			unset TMOUT
 EOF
-			} > "${tmp}"
-			install -D --mode 644 --owner "${user_last}" --group "${user_last}" "${tmp}" ${bashrc}
-			rm -f "${tmp}"
+		} > "${tmp}"
+		install -D --mode 644 --owner "${user_last}" --group "${user_last}" "${tmp}" ${bashrc}
+		rm -f "${tmp}"
 
-			message_success "Regenerated ${bashrc}"
-		else
-			message_failure "Missing ${bashrc}"
-		fi
+		message_success "Regenerated ${bashrc}"
     else
-        message_success "~${user_last}/.bashrc complies"
+        message_success "${bashrc} complies"
     fi
 }
 
 function user_check() {
     local ret=0
+    local -a groups
 
-    message_section "User \"${user_last}\""
-    if grep -w "^${user_last}:" /etc/passwd; then
+    if grep "^${user_last}:" /etc/passwd >/dev/null; then
         message_success "User \"${user_last}\" exists"
     else
         message_failure "User \"${user_last}\" does not exit"
         (( ret++ ))
     fi
 
-    local -i ngrps
-    read -r -a grps <<< "$( groups ${user_last} 2>&- | sed -e 's;^.*:.;;' )"
-    for g in "${grps[@]}"; do
-        for ug in "${user_groups[@]}"; do
-            if [ "${g}" = "${ug}" ]; then
-                (( ngrps++ ))
+    local found
+    local -a missing
+    read -r -a groups <<< "$( groups ${user_last} 2>/dev/null | sed -e 's;^.*:.;;' )"
+    for expected in "${user_expected_groups[@]}"; do
+        found=false
+        for g in "${groups[@]}"; do
+            if [ "${g}" = "${expected}" ]; then
+                found=true
+                break
             fi
         done
+        if ! ${found}; then
+            missing+=( "${expected}" )
+        fi
     done
 
-    if (( ngrps == ${#user_groups[*]} )); then
-        message_success "User \"${user_last}\" is a member of groups: ${user_group_list}"
+    if (( ${#missing[*]} == 0 )); then
+        message_success "User \"${user_last}\" is a member of groups: ${user_expected_groups_list}"
     else
-        message_failure "User \"${user_last}\" is not a member of ALL the groups: ${user_group_list}"
+        message_failure "User \"${user_last}\" is not a member of the group(s): $( echo "${missing[*]}" | tr ' ' ',')"
         (( ret++ ))
     fi
 
@@ -101,4 +112,18 @@ function user_check() {
 	fi
 
     return $(( ret ))
+}
+
+function user_policy() {
+    cat <<- EOF
+
+    All the LAST processes and resources are owned by the user "ocs"
+
+    The user must exist and be a member of the sudo and dialout groups
+
+    The file ~ocs/.bashrc should contain code for:
+     - using the Weizmann Institute's HTTP(s) proxies
+     - unsetting the bash TMOUT variable, so that sessions will not time out
+    
+EOF
 }

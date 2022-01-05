@@ -33,8 +33,7 @@ function macmap_mac_to_ip_address() {
     local -a words
 
     if [ ! "${mac}" ]; then
-        message_failure "${FUNCNAME[0]}: Missing argument"
-        return
+        return 1
     fi
     
     read -r -a words <<< "$(macmap_getent_by_mac "${mac}")" || return $?
@@ -45,8 +44,7 @@ function macmap_mac_to_hostname() {
     local mac="${1}"
 
     if [ ! "${mac}" ]; then
-        message_failure "${FUNCNAME[0]}: Missing argument"
-        return
+        return 1
     fi
     
     read -r -a words <<< "$(macmap_getent_by_mac "${mac}")" || return $?

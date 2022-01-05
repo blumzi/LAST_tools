@@ -23,10 +23,10 @@ function message_log() {
     fi
 }
 
-# section header
+# [SECT] section
 function message_section() {
     if ! ${LAST_TOOL_QUIET}; then
-        echo -e "\nSection: $( ansi_bright_blue "${*}" )\n"
+        echo -e "\n[$(ansi_bright_blue SECT)] $( ansi_bright_blue "${*}" )"
     fi
 }
 
@@ -65,7 +65,7 @@ function message_warning {
 
 # plain message
 function message_info {
-    echo "       ${*}"
+    echo "[INFO] ${*}"
 
     if ! ${LAST_TOOL_DONTLOG}; then
         message_log "[INFO] ${*}"

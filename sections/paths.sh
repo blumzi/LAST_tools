@@ -11,7 +11,7 @@ sections_register_section "paths" "Manages various paths"
 
 # TODO: Cross mount of data1 and data2
 
-function paths_configure() {
+function paths_enforce() {
     :
 }
 

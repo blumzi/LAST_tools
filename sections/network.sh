@@ -25,42 +25,34 @@ function network_init() {
     sections_register_section "network" "Configures the LAST network"
 }
 
-function network_enforce() {
-    systemctl restart networking
-}
-
 #
 # Creates a proper /etc/network/interfaces for this machine
 # We use static addresses.  The actual addresses are deduced from the macmap file.
 # The only configured (and active interface) is eth0
 #
-function network_configure() {
+function network_enforce() {
 
-    cat << EOF > /etc/network/interfaces
+    if ! LAST_TOOL_QUIET=true network_check_etc_network_interfaces; then
+        cat << EOF > /etc/network/interfaces
 
-    #
-    # This file was created by ${PROG}, $(date --rfc-email)
-    #
-    auto ${network_interface}
-    iface ${network_interface} inet static 
-        address ${network_local_ipaddr}
-        network ${network_netpart}
-        netmask ${network_netmask}
-        broadcast ${network_broadcast}
-        gateway ${network_gateway}
+        #
+        # This file was created by ${PROG}, $(date --rfc-email)
+        #
+        auto ${network_interface}
+        iface ${network_interface} inet static 
+            address ${network_local_ipaddr}
+            network ${network_netpart}
+            netmask ${network_netmask}
+            broadcast ${network_broadcast}
+            gateway ${network_gateway}
 EOF
+        systemctl restart networking
+    fi
 }
 
-function network_check() {
-    local -a words
-    local -i errors
+function network_check_etc_network_interfaces() {
     local config_file="/etc/network/interfaces"
-    local -i OKs=0
-    local already_seen_auto_line=false
 
-	message_section "Network"
-
-    # check /etc/network/interfaces
     function callback() {
         local lineno="${1}" line="${2}"
 
@@ -138,7 +130,15 @@ function network_check() {
         message_failure "Missing configuration file ${config_file}."
 		(( errors++ ))
     fi
+}
 
+function network_check() {
+    local -a words
+    local -i errors
+    local -i OKs=0
+    local already_seen_auto_line=false
+
+    network_check_etc_network_interfaces
 
     #  check the Ethernet is up
     read -r -a words <<< "$( ip -o -4 address show dev "${network_interface}")"
@@ -166,8 +166,6 @@ function network_check() {
     else
         message_success "Can ping \"last0\"."
     fi
-
-    # TODO: check we can ping weizmann
 
     # check we can ping someone at Weizmann
 	local wiz_host

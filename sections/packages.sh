@@ -11,7 +11,7 @@ packages_required=(
     synaptic
     mlocate
     ubuntu-software
-    libusb-1.0.0-dev
+    libusb-dev
     xterm
     git-cola
     setserial
@@ -22,7 +22,6 @@ packages_required=(
     wget
     tree
     emacs
-    mlocate-server
     git
     wine
     nfs-kernel-server
@@ -31,10 +30,19 @@ packages_required=(
 
     xpa-tools
     saods9
+
+    meld
+    git
+    mlocate
+
+    telnetd
+    ftpd
+    xterm
+
+    synaptic
 )
 
 function packages_enforce() {
-    message_section "Packages"
 
     packages_check
     message_info "Updating apt ..."
@@ -45,13 +53,14 @@ function packages_enforce() {
     fi
 }
 
-# nothing to configure here
-function packages_configure() {
-    :
-}
-
 function packages_check() {
-    message_section "Packages"
+
+    packages_missing=()
+
+    if [ -x /usr/local/bin/matlab ]; then
+        packages_required+=( matlab-support )   # this one needs matlab to be installed
+    fi
+    
     for package in "${packages_required[@]}"; do
         if dpkg -l "${package}" >& /dev/null; then
             message_success "Package \"${package}\" is installed"
