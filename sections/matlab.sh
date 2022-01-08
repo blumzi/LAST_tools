@@ -3,6 +3,7 @@
 module_include lib/message
 module_include lib/sections
 module_include lib/macmap
+module_include lib/container
 
 export matlab_local_mac
 export matlab_selected_release _matlab_installed_release
@@ -57,7 +58,7 @@ function matlab_installed_release() {
 
 function matlab_check() {
     local -i errors ret
-    local release
+    local release container
 
     (( ret = 0 ))
     release=$(matlab_installed_release)
@@ -80,65 +81,63 @@ function matlab_check() {
     message_info "Checking available Matlab installations (for mac=${matlab_local_mac})"
     local msg keys_file license_file
 
-    deploy_dir="$( deploy_container )"
-    if [ "${deploy_dir}" ] && [ -d "${deploy_dir}/matlab" ]; then
-        for deployable_release in $(cd "${deploy_dir}/matlab" || exit; echo R*); do
+    container="${selected_container}"
+    for deployable_release in $(cd "${container}/matlab" || exit; echo R*); do
 
-            release_info_dir="${matlab_releases_dir}/${deployable_release}"
-            (( errors = 0 ))
-            if [ "${deployable_release}" = "${matlab_selected_release}" ]; then
-                msg="Release $(ansi_bright_green "${deployable_release}"): "
-            else
-                msg="Release ${deployable_release}"
-            fi
-            
-            iso=$(cd "${deploy_dir}/matlab/${deployable_release}" || exit ; echo *.iso)
-            # check that we have the installation images for this release
-            msg+=", installer "
-            if [ -x "${deploy_dir}/matlab/${deployable_release}/install" ]; then
-                msg+="$(ansi_bright_green EXISTS)"
-            else
-                msg+="$(ansi_bright_red MISSING)"
-                (( errors++ ))
-            fi
+        release_info_dir="${matlab_releases_dir}/${deployable_release}"
+        (( errors = 0 ))
+        if [ "${deployable_release}" = "${matlab_selected_release}" ]; then
+            msg="Release $(ansi_bright_green "${deployable_release}"): "
+        else
+            msg="Release ${deployable_release}"
+        fi
+        
+        iso=$(cd "${container}/matlab/${deployable_release}" || exit ; echo *.iso)
+        # check that we have the installation images for this release
+        msg+=", installer "
+        if [ -x "${container}/matlab/${deployable_release}/install" ]; then
+            msg+="$(ansi_bright_green EXISTS)"
+        else
+            msg+="$(ansi_bright_red MISSING)"
+            (( errors++ ))
+        fi
 
-            keys_file="${release_info_dir}/file-installation-keys"
-            msg+=", keys-file: "
-            if [ -r "${keys_file}" ]; then
-                msg+="$(ansi_bright_green EXISTS)"
-            else
-                msg+="$(ansi_bright_red MISSING)"
-                (( errors++ ))
-            fi
+        keys_file="${release_info_dir}/file-installation-keys"
+        msg+=", keys-file: "
+        if [ -r "${keys_file}" ]; then
+            msg+="$(ansi_bright_green EXISTS)"
+        else
+            msg+="$(ansi_bright_red MISSING)"
+            (( errors++ ))
+        fi
 
-            # check that we have a file installation key for this machine
-            msg+=", key-for-this-machine: "
-            if grep -qwi "^${matlab_local_mac}" "${keys_file}" >/dev/null 2>&1; then
-                msg+="$(ansi_bright_green EXISTS)"
-            else
-                msg+="$(ansi_bright_red MISSING)"
-                (( errors++ ))
-            fi
+        # check that we have a file installation key for this machine
+        msg+=", key-for-this-machine: "
+        if grep -qwi "^${matlab_local_mac}" "${keys_file}" >/dev/null 2>&1; then
+            msg+="$(ansi_bright_green EXISTS)"
+        else
+            msg+="$(ansi_bright_red MISSING)"
+            (( errors++ ))
+        fi
 
-            # check that we have a license key for this machine
-            license_file="${release_info_dir}/licenses/$(mac_to_file_name "${matlab_local_mac}")"
+        # check that we have a license key for this machine
+        license_file="${release_info_dir}/licenses/$(mac_to_file_name "${matlab_local_mac}")"
 
-            msg+=", license-for-this-machine: "
-            if [ -r "${license_file}" ]; then
-                msg+="$(ansi_bright_green EXISTS)"
-            else
-                msg+="$(ansi_bright_red MISSING)"
-                (( errors++ ))
-            fi
+        msg+=", license-for-this-machine: "
+        if [ -r "${license_file}" ]; then
+            msg+="$(ansi_bright_green EXISTS)"
+        else
+            msg+="$(ansi_bright_red MISSING)"
+            (( errors++ ))
+        fi
 
-            if [ $(( errors )) -eq 0 ]; then
-                message_success "${msg} (==> installable)"
-            else
-                (( ret++ ))
-                message_failure "${msg} (==> not installable)"
-            fi
-        done
-    fi
+        if [ $(( errors )) -eq 0 ]; then
+            message_success "${msg} (==> installable)"
+        else
+            (( ret++ ))
+            message_failure "${msg} (==> not installable)"
+        fi
+    done
 
     return $(( ret ))
 }
@@ -153,7 +152,7 @@ function matlab_install() {
 
     local_mac=$( macmap_get_local_mac )
 
-    container=$( deploy_container )
+    container=${selected_container}
     installer=${container}/matlab/${matlab_selected_release}/install
     if [ ! -x "${installer}" ]; then
         message_fatal "Missing installer for Matlab ${matlab_selected_release} in ${installer}, exiting"

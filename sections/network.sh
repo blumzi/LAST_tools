@@ -178,3 +178,30 @@ function network_check() {
 
     return $(( errors ))
 }
+
+function network_policy() {
+
+    cat <<- EOF
+
+    There is a single Ethernet adapter in each LAST machine.
+
+    At this point-in-time the LAST project uses static allocation of the IP addresses.  In the 
+     future we may opt for dynamic alocations (via DHCP) from the main IP switch.
+
+    - The network is maintained by the Network Manager service, which is configured via
+       the /etc/network/interfaces configuration file. A valid file has the following format:
+
+        auto en???
+        iface en??? inet static 
+            address   10.23.1.x
+            network   10.23.0.0
+            netmask   255.255.0.0
+            broadcast 10.23.255.255
+            gateway   10.23.?.?
+    
+    - The network must be UP on the Ethernet adapter.
+    - The last0 machine must be reachable (ping)
+    - A machine at the Weizmann Institute must be reachable (ping)
+
+EOF
+}

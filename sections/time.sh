@@ -44,10 +44,11 @@ function time_check() {
 function time_policy() {
     cat <<- EOF
 
-    We use an on-site NTP server (by SiTech Inc.) as the primary server and the Weizmann Institute's
-     ntp.weizmann.ac.il as the secondary server.
+    LAST uses an on-site NTP server (by SiTech Inc.) as primary server and the Weizmann Institute's
+     ntp.weizmann.ac.il as the secondary.
 
-    The config file /etc/systemd/timesync.conf should reflect this in it's NTP= line
+    - The config file /etc/systemd/timesync.conf should reflect this in it's NTP= line
+    - The systemd-timesyncd service should be running
     
 EOF
 }

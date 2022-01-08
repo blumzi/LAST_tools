@@ -8,7 +8,7 @@ export LAST_TOOL_PID="${$}"
 
 module_include lib/message
 module_include lib/macmap
-module_include lib/deploy
+module_include lib/container
 
 declare mode
 
@@ -20,11 +20,12 @@ function help() {
 
     This tool either checks or enforces the LAST installation policy.
 
-    Usage: ${PROG} [-q|--quiet] [-n|--nodeps] <mode> [[section] ...] 
+    Usage: ${PROG} [-q|--quiet] [-n|--nodeps] [-c|--container <path>] <mode> [[section] ...] 
            ${PROG} -h|--help
 
-     -q|--quiet:             be silent
-     -n|--nodeps:            don't do section dependencies
+     -q|--quiet:       be silent (default: verbose)
+     -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
+     -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH)
 
      Running <mode>:
       One running <mode> must be selected from the following (no default):
@@ -47,26 +48,27 @@ function show_info() {
     local msg
 
     export LAST_TOOL_DONTLOG=true   # inform message_xxx not to log
-    local deploy_dir
-    deploy_dir=$(deploy_container)
 
     message_info ""
     message_info "Environment:"
     message_info " LAST_BASH_INCLUDE_PATH: ${LAST_BASH_INCLUDE_PATH}"
     message_info "        LAST_TOOL_QUIET: ${LAST_TOOL_QUIET}"
-    message_info "                  Media: ${deploy_dir}"
+
+    message_info "Container(s):"
+    message_info "  Selected: ${selected_container:-$(container_lookup)}"
+    message_info "      Path: $(container_path)"
     message_info ""
 
     message_info "Matlab:"
     message_info "   Installed: $(matlab_installed_release)"
     
     local -a available_matlabs available_matlab_dirs
-    if [ "${deploy_dir}" ]; then
-        read -r -a matlabs <<< "$(cd "${deploy_dir}/matlab" || exit; echo R*)"
+    if [ "${container}" ]; then
+        read -r -a matlabs <<< "$(cd "${container}/matlab" || exit; echo R*)"
         for matlab in "${matlabs[@]}"; do
-            if [ -r "${deploy_dir}/matlab/${matlab}/disk1.iso" ] && [ -r "${deploy_dir}/matlab/${matlab}/disk2.iso" ]; then
+            if [ -r "${container}/matlab/${matlab}/disk1.iso" ] && [ -r "${container}/matlab/${matlab}/disk2.iso" ]; then
                 available_matlabs+=( "${matlab}" )
-                available_matlab_dirs+=( "${deploy_dir}/matlab/${matlab}" )
+                available_matlab_dirs+=( "${container}/matlab/${matlab}" )
             fi
         done
 
@@ -132,6 +134,8 @@ function root_or_die() {
 }
 
 declare nodeps=false
+declare selected_container
+
 while true; do
     case "${1}" in
         -h|--help)
@@ -154,8 +158,17 @@ while true; do
             nodeps=true
             shift 1
             ;;
+
+        -c|--container)
+            selected_container="${2}"
+            shift 2
+            ;;
     esac
 done
+
+if [ ! "${selected_container}" ]; then
+    selected_container="$( container_lookup )"
+fi
 
 if [ ! "${mode}" ]; then
     message_failure "No running mode (check|enforce|show|policy) was selected, see help below!"

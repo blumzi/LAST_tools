@@ -70,3 +70,23 @@ function packages_check() {
         fi
     done
 }
+
+function packages_policy() {
+    cat <<- EOF
+
+    The LAST project is based ob an 'Ubuntu 20.04.03 workstation LTS' installation, with the addition 
+     of the following packages:
+
+EOF
+    local package
+    for package in "${packages_required[@]}"; do
+        echo "${package}"
+    done | fmt -w 50 | sed -e 's;^;    ;'
+
+    cat <<- EOF
+
+    - $(ansi_underline "${PROG} check packages") - checks if the required packages are installed
+    - $(ansi_underline "${PROG} enforce packages") - attempts to install the packages (and dependencies)
+
+EOF
+}

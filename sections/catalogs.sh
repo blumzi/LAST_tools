@@ -10,7 +10,7 @@ export catalogs_deployed_top
 export -a catalogs=( GAIAEDR3  MergedCat )
 
 function catalogs_init() {
-    catalogs_deployed_top="$(deploy_container)/catsHTM"
+    catalogs_deployed_top="${selected_container}/catsHTM"
 }
 #
 # The staging area for catalogs:

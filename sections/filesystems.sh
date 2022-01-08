@@ -71,11 +71,15 @@ function filesystems_check() {
     local_hostname=$( macmap_get_local_hostname )
     peer_hostname=$( macmap_get_peer_hostname )
 
+    # check local filesystems (mounted, free space, etc.)
+
+    mount -t ext4 | grep /data
+
     # check fstab entries for mounting peer machine's filesystems
     config_file="/etc/fstab"
     for d in 1 2; do    
         read -r -a entry <<< "$( grep "^${peer_hostname}:${peer_hostname}/data${d}" "${config_file}" )"
-        if [ ${#entry} -eq 6 ] && [ "${entry[1]}" = "/${peer_hostname}/data${d}" ] && [ "${entry[2]}" = nfs ]; then
+        if [ ${#entry[*]} -eq 6 ] && [ "${entry[1]}" = "/${peer_hostname}/data${d}" ] && [ "${entry[2]}" = nfs ]; then
             message_success "${config_file} has an entry for ${peer_hostname}:/${peer_hostname}/data${d}"
         else
             message_failure "${config_file} does not have an entry for ${peer_hostname}:/${peer_hostname}/data${d}"
@@ -101,4 +105,16 @@ function filesystems_check() {
             message_failure "${peer_hostname}:/data${d} is not mounted on /${peer_hostname}/data${d}"
         fi
     done
+}
+
+function filesystems_policy() {
+
+cat <<- EOF
+
+    - Each LAST machine should have three data areas: data, data1 and data2, mounted from local disks.
+    - The data1 and data2 areas should be NFS exported to the sibling machine
+    - The sibling machine's data1 and data2 should be NFS mounted locally
+
+EOF
+
 }

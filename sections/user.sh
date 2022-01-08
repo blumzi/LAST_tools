@@ -119,9 +119,8 @@ function user_policy() {
 
     All the LAST processes and resources are owned by the user "ocs"
 
-    The user must exist and be a member of the sudo and dialout groups
-
-    The file ~ocs/.bashrc should contain code for:
+    - The user must exist and be a member of the sudo and dialout groups
+    - The file ~ocs/.bashrc should contain code for:
      - using the Weizmann Institute's HTTP(s) proxies
      - unsetting the bash TMOUT variable, so that sessions will not time out
     

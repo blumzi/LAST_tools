@@ -161,3 +161,27 @@ function hostname_is_valid() {
 
     return 0
 }
+
+function hostname_policy() {
+    cat <<- EOF
+
+    Valid LAST host names are:
+    - last{01..12}{e|w} for each of the 12 mounts, where 'e' and 'w' denote the East 
+       and the West machines respectively
+    - last0 is the LAST master machine
+    - switch{01..12}{e|w} for the IP controlled power switches (two per mount)
+
+    We currently do not use a dynamic name service (DNS) so the machine names are statically
+     mapped in /etc/hosts on each of the LAST machines.
+
+    The hostname <=> ipaddress mapping is derived from the MACmap file ($(macmap_file))
+
+    - The local machine's name must also be an alias for the localhost.
+    - The /etc/hosts file must have mappings for:
+      - The last0 master machine
+      - All the LAST machines, for all the LAST mounts
+      - All the IP controlled power switches (two per mount)
+      - The roofcontrol controller
+
+EOF
+}

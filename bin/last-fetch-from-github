@@ -46,13 +46,19 @@ function help() {
 
 EOF
     token=""
-    for key in ${!git_repo[*]}; do
-        printf "       %-35s %s\n" "${key}" "${git_repo[${key}]#*@}"
-    done
+    list_repos
     echo ""
 }
 
-OPTS=$( getopt -o 'hd:c' --long "h,dir:,check" -n "${PROG}" -- "$@" )
+function list_repos() {
+    local key
+
+    for key in ${!git_repo[*]}; do
+        printf "       %-35s %s\n" "${key}" "${git_repo[${key}]#*@}"
+    done
+}
+
+OPTS=$( getopt -o 'hd:cl' --long "h,dir:,check,list" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 top_dir=""
@@ -73,6 +79,11 @@ while true; do
     -c|--check)
         check=true
         shift 1
+        ;;
+
+    -l|--list)
+        list_repos
+        exit 0
         ;;
 
 	--)
