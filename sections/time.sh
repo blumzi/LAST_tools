@@ -13,7 +13,9 @@ sections_register_section "time" "Manages the time syncronization LAST policy" "
 export time_config="/etc/systemd/timesyncd.conf"
 export -a time_servers=( sitechntp ntp.weizmann.ac.il )
 export time_servers_list
-time_servers_list="$(echo "${time_servers[@]}" | tr ' ' ',')"
+time_servers_list="$(IFS=,; echo "${time_servers[*]}")"
+
+export time_service="systemd-timesyncd"
 
 function time_enforce() {
     if sed -i -e "s;^[#]*NTP=.*;NTP=${time_servers[*]};" "${time_config}"; then
@@ -23,7 +25,7 @@ function time_enforce() {
         return
     fi
 
-    systemctl restart systemd-timesyncd
+    systemctl restart ${time_service}
 }
 
 function time_check() {
@@ -36,6 +38,12 @@ function time_check() {
     else
         message_failure "NTP server(s) (${time_servers_list}) are not well configured in \"${time_config}\"."
         (( ret++ ))
+    fi
+
+    if sytemctl status ${time_service} >/dev/null; then
+        message_success "Time sync service is running"
+    else
+        message_failure "Time sync service is NOT running"
     fi
 
     return $(( ret ))

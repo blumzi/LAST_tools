@@ -85,6 +85,6 @@ function message_fatal() {
 }
 
 function message_fatal() {
-    echo -e "FATAL: ${ansi_bright_red}${*}${ansi_normal}, Exiting!"
+    echo -e "FATAL: $(ansi_bright_red "${*}"), Exiting!"
     exit 2
 }

@@ -23,98 +23,163 @@ function filesystems_enforce() {
 
     local_hostname=$( macmap_get_local_hostname )
     peer_hostname=$( macmap_get_peer_hostname )
+
+    mkdir -p /"${local_hostname}"/{data,data1,data2} /"${peer_hostname}"/{data1,data2}
+
     tmp=$(mktemp)
-
-    mkdir -p /"${local_hostname}"/data{1,2} /"${peer_hostname}"/data{1,2}
-
     config_file="/etc/fstab"
-    for d in 1 2; do    
-        read -r -a entry <<< "$( grep "^${peer_hostname}:${peer_hostname}/data${d}" "${config_file}" )"
-        if [ ${#entry} -ne 6 ] || [ "${entry[1]}" != "/${peer_hostname}/data${d}" ] || [ "${entry[2]}" != nfs ]; then
-            message_info "Creating ${config_file} entry for ${peer_hostname}/data{$d} ..."
-            {
-                grep -v "^${peer_hostname}/data${d}" "${config_file}"
-                echo "${peer_hostname}:${peer_hostname}/data${d} /${peer_hostname}/data${d} nfs defaults 0 0"
-            } > "${tmp}"
-            mv "${tmp}" "${config_file}"
-        else
-            message_success "${config_file} already has an entry for ${peer_hostname}:/${peer_hostname}/data${d}"
-        fi
-    done
+    {
+        grep -vE "(${local_hostname}|${peer_hostname})" ${config_file}
+        cat <<- EOF > "${tmp}"
 
+        /dev/sda1 /${local_hostname}/data1 ext4 defaults 0 0
+        /dev/sdb1 /${local_hostname}/data2 ext4 defaults 0 0
+        /dev/sdc1 /${local_hostname}/data ext4 defaults 0 0
+
+        ${peer_hostname}:/${peer_hostname}/data1 /${peer_hostname}/data1 nfs defaults 0 0
+        ${peer_hostname}:/${peer_hostname}/data2 /${peer_hostname}/data2 nfs defaults 0 0
+EOF
+    } > "${tmp}"
+    mv "${tmp}" "${config_file}"
+
+    tmp=$(mktemp)
     config_file="/etc/exports"
-    for d in 1 2; do
-        read -r -a entry <<< "$( grep "^/data${d}" "${config_file}" )"
-        if [ ${#entry[*]} -ne 2 ] || [ "${entry[1]}" != "${network_netpart}/${network_prefix}" ]; then
-            message_info "Creating ${config_file} entry for /data{$d} ..."
-            {
-                grep -v "^/data${d}" "${config_file}"
-                echo "/data{$d} ${network_netpart}/${network_prefix}"
-            } > "${tmp}"
-            mv "${tmp}" "${config_file}"
-        else
-            message_success "${config_file} already has an entry for /data${d}"
-        fi
-    done
+    {
+        grep -v "^/${local_hostname}/data" "${config_file}"
+
+        cat <<- EOF > "${tmp}"
+        /${local_hostname}/data1 ${peer_hostname}(rw)
+        /${local_hostname}/data2 ${peer_hostname}(rw)
+EOF
+    } > "${tmp}"
+    mv "${tmp}" "${config_file}"
+
+    message_info "(Re)mounting local and remote filesystems"
+    mount -all --type ext4 --type nfs
 
     message_info "Restarting NFS kernel server"
     service nfs-kernel-server restart
-    
-    message_info "Mounting all the network filesystems"
-    mount -a -t nfs
 }
 
 function filesystems_check() {
-    local local_hostname peer_hostname tmp config_file d
-    local -a entry
+    local -i ret=0
+
+    filesystems_check_config
+    (( ret += $? ))
+    filesystems_check_mounts
+    (( ret += $? ))
+
+    return $(( ret ))
+}
+
+function filesystems_policy() {
+
+    cat <<- EOF
+
+    - Each LAST machine has three data areas: data, data1 and data2, mounted from local disks.
+    - The data1 and data2 areas are NFS cross mounted between the sibling machines
+    
+        machine:          lastXXe                      lastXXw
+
+        local mounts:   /lastXXe/data               /lastXXw/data
+                        /lastXXe/data1              /lastXXw/data1
+                        /lastXXe/data2              /lastXXw/data2
+
+        NFS mounts:
+                        /lastXXe/data1     NFS->    /lastXXe/data1
+                        /lastXXe/data2     NFS->    /lastXXe/data2
+                        /lastXXw/data1     <-NFS    /lastXXw/data1
+                        /lastXXw/data2     <-NFS    /lastXXw/data2
+
+EOF
+
+}
+
+function filesystems_check_config() {
+    local config_file d entry entry
+    local -i ret=0
+    local local_hostname peer_hostname
 
     local_hostname=$( macmap_get_local_hostname )
     peer_hostname=$( macmap_get_peer_hostname )
 
-    # check local filesystems (mounted, free space, etc.)
+    # check mount points
+    for d in /${local_hostname}/{data,data1,data2} /${peer_hostname}/{data1,data2}; do
+        if [ -d "${d}" ]; then
+            message_success "Directory ${d} exists"
+        else
+            message_failure "Directory ${d} does not exist"
+            (( ret++ ))
+        fi
+    done
 
-    mount -t ext4 | grep /data
+    config_file="/etc/fstab"
+    # check /etc/fstab for local filesystems
+    for d in /${local_hostname}/{data,data1,data2}; do
+        read -r -a entry <<< "$( grep "^/dev.*[[:space:]]*${d}[[:space:]]*ext4[[:space:]]*defaults[[:space:]]*0[[:space:]]*0" "${config_file}" )"
+        if [ ${#entry[*]} -eq 6 ]; then
+            message_success "Entry for ${d} in ${config_file} exists and is valid"
+        else
+            message_failure "Missing or botched entry for ${d} in ${config_file}"
+            (( ret++ ))
+        fi
+    done
 
     # check fstab entries for mounting peer machine's filesystems
-    config_file="/etc/fstab"
-    for d in 1 2; do    
-        read -r -a entry <<< "$( grep "^${peer_hostname}:${peer_hostname}/data${d}" "${config_file}" )"
-        if [ ${#entry[*]} -eq 6 ] && [ "${entry[1]}" = "/${peer_hostname}/data${d}" ] && [ "${entry[2]}" = nfs ]; then
-            message_success "${config_file} has an entry for ${peer_hostname}:/${peer_hostname}/data${d}"
+    for d in /${peer_hostname}/{data1,data2}; do    
+        read -r -a entry <<< "$( grep "^${peer_hostname}:${d}[[:space:]]*${d}[[:space:]]*nfs[[:space:]]*defaults[[:space:]]*0[[:space:]]*0" "${config_file}" )"
+        if [ ${#entry[*]} -eq 6 ]; then
+            message_success "Entry for ${d} in ${config_file} exists and is valid"
         else
-            message_failure "${config_file} does not have an entry for ${peer_hostname}:/${peer_hostname}/data${d}"
+            message_failure "Missing or botched entry for ${d} in ${config_file}"
+            (( ret++ ))
         fi
     done
 
     # check filesytem export entries
     config_file="/etc/exports"
-    for d in 1 2; do    
-        read -r -a entry <<< "$( grep "^${peer_hostname}/data${d}" "${config_file}" )"
-        if [ ${#entry} -eq 6 ] && [ "${entry[1]}" = "/${peer_hostname}/data${d}" ] && [ "${entry[2]}" = nfs ]; then
-            message_success "${config_file} has an entry for ${peer_hostname}:/${peer_hostname}/data${d}"
+    for d in ${local_hostname}/data{1,2}; do
+        read -r -a entry <<< "$( grep "^${d}[[:space:]]*${peer_hostname}(rw)" "${config_file}" )"
+        if [ ${#entry[*]} -eq 2 ]; then
+            message_success "Entry for ${d} in ${config_file} exists and is valid"
         else
-            message_failure "${config_file} does not have an entry for ${peer_hostname}:/${peer_hostname}/data${d}"
+            message_failure "Missing or botched entry for ${d} in ${config_file}"
+            (( ret++ ))
         fi
     done
 
-    # check that we have the remote filesystems mounted
-    for d in 1 2; do
-        if [ "$( mount -t nfs | grep -qc "${peer_hostname}:/data${d} on /${peer_hostname}/data${d}")" = 1 ]; then
-            message_success "${peer_hostname}:/data${d} is mounted on /${peer_hostname}/data${d}"
-        else
-            message_failure "${peer_hostname}:/data${d} is not mounted on /${peer_hostname}/data${d}"
-        fi
-    done
+    return $(( ret ))
 }
 
-function filesystems_policy() {
+function filesystems_check_mounts() {
+    local d dev used avail pcent mpoint
+    local -i ret=0
+    local local_hostname peer_hostname
 
-cat <<- EOF
+    local_hostname=$( macmap_get_local_hostname )
+    peer_hostname=$( macmap_get_peer_hostname )
 
-    - Each LAST machine should have three data areas: data, data1 and data2, mounted from local disks.
-    - The data1 and data2 areas should be NFS exported to the sibling machine
-    - The sibling machine's data1 and data2 should be NFS mounted locally
+    # check local filesystems
+    for d in /${local_hostname}/{data,data1,data2}; do
+        read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type ext4 | grep --quiet " ${d}$" )"
+        if [ "${dev}" ] && [ "${mpoint}" ]; then
+            message_success "Local filesystem ${d} is mounted (used: ${used}, avail: ${avail}, percent: ${pcent})"
+        else
+            message_failure "Local filesystem ${d} is NOT mounted"
+            (( ret++ ))
+        fi
+    done
 
-EOF
+    # check remote filesystems
+    for d in /${peer_hostname}/{data1,data2}; do
+        read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type nfs4 | grep --quiet " ${d}$" )"
+        if [ "${dev}" ] && [ "${mpoint}" ]; then
+            message_success "Remote filesystem ${d} is mounted (used: ${used}, avail: ${avail}, percent: ${pcent})"
+        else
+            message_failure "Remote filesystem ${d} is NOT mounted"
+            (( ret++ ))
+        fi
+    done
 
+    return $(( ret ))
 }

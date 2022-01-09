@@ -56,6 +56,61 @@ function container_is_valid() {
     return 0
 }
 
+#
+# Checks whether the specified container has the stuff needed by the
+#  specified installation section
+#
+function container_has() {
+    local container_path="${1}"
+    local section="${2}"
+
+    if [ ! -d "${container_path}" ]; then
+        return 1
+    fi
+    if [ ! "${section}" ]; then
+        return 1
+    fi
+
+    case "${section}" in
+
+    matlab)
+        if [ -d "${container_path}/matlab/R2020b" ]; then
+            return 0
+        else
+            return 1
+        fi
+        ;;
+    
+    catalogs)
+        if [ -d "${container_path}/catsHTM/GAIA/DRE3" ] && [ -d "${container_path}/catsHTM/MergedCat/V1" ]; then
+            return 0
+        else
+            return 1
+        fi
+        ;;
+
+    software)
+        if [ -r "${container_path}/github-token" ]; then
+            return 0
+        else
+            return 1
+        fi
+        ;;
+
+    wine)
+        if [ -r "${container_path}/wine.tgz" ]; then
+            return 0
+        else
+            return 1
+        fi
+        ;;
+
+    *)
+        return 1
+        ;;
+    esac
+}
+
 function container_policy() {
     cat <<- EOF
 

@@ -143,7 +143,7 @@ function matlab_check() {
 }
 
 #
-# At this point-in-time we assume there's only ONE installation image on LAST-DEPLOYER
+# At this point-in-time we assume there's only ONE installation image on LAST-CONTAINER
 # TBD: how to choose between more than one
 #
 function matlab_install() {

@@ -45,6 +45,7 @@ function help() {
      The following directories will contain the respective repo contents:
 
 EOF
+    # TBD: use of token
     token=""
     list_repos
     echo ""

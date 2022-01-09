@@ -6,7 +6,7 @@ module_include lib/sections
 export user_last="ocs"
 export -a user_expected_groups=( sudo dialout )
 export user_expected_groups_list
-user_expected_groups_list="$( echo "${user_expected_groups[*]}" | tr ' ' ',')"
+user_expected_groups_list="$(IFS=,; echo "${user_expected_groups[*]}")"
 
 sections_register_section "user" "Manages the \"${user_last}\" user"
 
@@ -93,7 +93,7 @@ function user_check() {
     if (( ${#missing[*]} == 0 )); then
         message_success "User \"${user_last}\" is a member of groups: ${user_expected_groups_list}"
     else
-        message_failure "User \"${user_last}\" is not a member of the group(s): $( echo "${missing[*]}" | tr ' ' ',')"
+        message_failure "User \"${user_last}\" is not a member of the group(s): $(IFS=,; echo "${missing[*]}")"
         (( ret++ ))
     fi
 

@@ -1,2 +1,4 @@
 packaging/
-files/LAST-DEPLOYER/
+files/LAST-CONTAINER/
+github-token
+files/LAST-CATALOG/
