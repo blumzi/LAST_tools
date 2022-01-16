@@ -10,7 +10,7 @@ export catalogs_deployed_top
 export -a catalogs=( GAIAEDR3  MergedCat )
 
 function catalogs_init() {
-    catalogs_deployed_top="${selected_container}/catsHTM"
+    catalogs_deployed_top="$(deploy_container)/catsHTM"
 }
 #
 # The staging area for catalogs:
@@ -61,7 +61,7 @@ function catalogs_policy() {
 
     The LAST project uses the GAIA DRE3 and the MergedCAT catalogs.  Both need to reside in /data/catsHTM.
 
-    If a LAST-DEPLOYER container is available (USB disk, mounted filesystem, etc.):
+    If a LAST-CONTAINER container is available (USB disk, mounted filesystem, etc.):
      - $(ansi_underline "${PROG} check catalogs") - checks that the installed catalogs are in sync with the ones in the container
      - $(ansi_underline "${PROG} enforce catalogs") - synchronizes the catalogs with the ones in the container, installing them if needed.
 
