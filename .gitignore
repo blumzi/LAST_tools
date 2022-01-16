@@ -1,4 +1,4 @@
-packaging/
+packaging/*
 files/LAST-CONTAINER/
 github-token
 files/LAST-CATALOG/

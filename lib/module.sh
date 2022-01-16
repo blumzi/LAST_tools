@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ ! "${MODULE_INCLUDED}" ]; then
-    export MODULE_INCLUDED=true
+    declare MODULE_INCLUDED=true
 
     declare -A module_included_modules
 

@@ -13,6 +13,13 @@ function container_path() {
 #
 function container_lookup() {
     local container
+    local mpoint
+
+    # TBD: we assume only one container is mounted, can there be more?
+    read -r _ _ mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
+    if [ "${mpoint}" ]; then
+        LAST_CONTAINER_PATH+=":${mpoint}"
+    fi
 
     for container in ${LAST_CONTAINER_PATH//:/ }; do
         if LAST_TOOL_QUIET=true container_is_valid "${container}"; then
@@ -27,33 +34,40 @@ function container_lookup() {
 #
 function container_is_valid() {
     declare container="${1}"
+    local -i errors=0
 
     if [ ! -d "${container}" ]; then
         message_failure "\"${container}\" is not a directory"
         return 1
     fi
     
-    if [ ! -d "${container}/catsHTM" ]; then
-        message_failure "No \"${container}/catsHTM\" subdirectory"
-        retrun 1
+    if [ ! -d "${container}/catsHTM/GAIA/DRE3" ]; then
+        message_failure "Missing \"catsHTM/GAIA/DRE3\" in \"${container}\""
+        (( errors++ ))
     fi
     
+    if [ ! -d "${container}/catsHTM/MergedCat" ]; then
+        message_failure "Missing \"catsHTM/MergedCat\" in \"${container}\""
+        (( errors++ ))
+    fi
     if [ ! -d "${container}/matlab/R2020b" ]; then
-        message_failure "No \"${container}/matlab/R2020b\" subdirectory"
-        retrun 1
+        message_failure "Missing \"matlab/R2020b\" in \"${container}\""
+        (( errors++ ))
     fi
 
     if [ ! -r "${container}/github-token" ]; then
-        message_failure "No \"${container}/github-token\" file"
-        retrun 1
+        message_failure "Missing \"github-token\" in \"${container}\""
+        (( errors++ ))
     fi
 
-    if [ ! -r "${container}/last-tool*.deb" ]; then
-        message_failure "No \"${container}/last-tool\" debian package"
-        retrun 1
+    local deb
+    deb="$( find "${container}"/packages -name 'last-tool-*.deb' )"
+    if [ ! "${deb}" ]; then
+        message_failure "Missing \"last-tool\" debian package in \"${container}/packages\""
+        (( errors++ ))
     fi
 
-    return 0
+    return $(( errors ))
 }
 
 #
@@ -118,9 +132,9 @@ function container_policy() {
     One or more containers may be available at any given time. The search order is determined
      by the LAST_CONTAINER_PATH environment variable.
     
-    Possible paths may include:
-      - /media/ocs/LAST-CONTAINER - a mounted USB disk
-      - /mnt/last0 - an central container, NFS mounted from last0
+    Possible locations may include:
+      - /some/path where a disk labeled LAST-CONTAINER is mounted (see mount -l)
+      - /last0 - a central container, NFS mounted from last0
       - /some/other/path - A file-system accessible directory
 
     A directory is a valid LAST container if it contains:
@@ -128,6 +142,7 @@ function container_policy() {
       - A "catsHTM" subdirectory containing the LAST catalogs
       - A "github-token" file
       - A "last-tool-x.y.z.deb" package
+      - A wine.tgz file containing a "Copley Motion" installation
       
 EOF
 }

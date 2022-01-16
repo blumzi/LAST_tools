@@ -21,11 +21,12 @@ function macmap_get_local_mac() {
     local -a words
 
     read -r -a words <<< "$(ip -o link show | grep link/ether | grep ': en')"
-    if [ ${#words[*]} -ne 21 ]; then
-        message_fatal "${FUNCNAME[0]}: Cannot get MAC address of local Ethernet (${#words[*]}, ${words[*]})"
-        return
-    fi
-    echo "${words[16]% }"
+    for (( i = 0; i < ${#words[*]}; i++ )); do
+        if [ "${words[i]}" = "link/ether" ]; then
+            echo "${words[i+1]}"
+            return
+        fi
+    done
 }
 
 function macmap_mac_to_ip_address() {

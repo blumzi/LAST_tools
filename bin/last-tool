@@ -20,12 +20,13 @@ function help() {
 
     This tool either checks or enforces the LAST installation policy.
 
-    Usage: ${PROG} [-q|--quiet] [-n|--nodeps] [-c|--container <path>] <mode> [[section] ...] 
+    Usage: ${PROG} [-q|--quiet] [-n|--nodeps] [-c|--container <path>] [-t|--token <token-or-file>] <mode> [[section] ...] 
            ${PROG} -h|--help
 
      -q|--quiet:       be silent (default: verbose)
      -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
      -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH)
+     -t|--token:       specify a github token (either the token itself or a file containing the token)
 
      Running <mode>:
       One running <mode> must be selected from the following (no default):
@@ -81,16 +82,6 @@ function show_info() {
         fi
     fi
 
-    local keys_file
-    keys_file="$(matlab_file_installation_keys)"
-    msg="   Installation Keys File: "
-    if [ -r "${keys_file}" ]; then
-        msg+="${keys_file}"
-    else
-        msg+="Missing"
-    fi
-    message_info "${msg}"
-
     local license_file
     license_file="$(matlab_license_file)"
     msg="   License File:           "       
@@ -135,6 +126,7 @@ function root_or_die() {
 
 declare nodeps=false
 declare selected_container
+export  github_token
 
 while true; do
     case "${1}" in
@@ -163,6 +155,26 @@ while true; do
             selected_container="${2}"
             shift 2
             ;;
+
+        -t|--token)
+            if [ ! "${2}" ]; then
+                message_fatal "The github token parameter cannot be empty.  Must be either a file name ot the token itself"
+            fi
+
+            if [ -s "${2}" ]; then
+                github_token=$(< "${2}")
+            else
+                github_token="${2}"
+            fi
+            shift 2
+            ;;
+
+        *)
+            message_info "Bad argument \"${1}\", see usage below!"
+            help
+            exit 1
+            ;;
+
     esac
 done
 

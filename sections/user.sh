@@ -40,13 +40,13 @@ function user_enforce() {
         useradd -m -G "${user_expected_groups_list}" ${user_last}
     fi
 
-	local bashrc
-	bashrc=/home/${user_last}/.bashrc
-	if [ ! -r "${bashrc}" ] || [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' ${bashrc} )" != 3 ]; then
+	local bash_profile
+	bash_profile=/home/${user_last}/.bash_profile
+	if [ ! -r "${bash_profile}" ] || [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' ${bash_profile} )" != 3 ]; then
 		local tmp
 		tmp=$(mktemp)
 		{
-			cat /etc/skel/.bashrc
+			cat /etc/skel/.bash_profile
 			cat <<- EOF
 			
 			export http_proxy=http://bcproxy.weizmann.ac.il:8080
@@ -54,12 +54,12 @@ function user_enforce() {
 			unset TMOUT
 EOF
 		} > "${tmp}"
-		install -D --mode 644 --owner "${user_last}" --group "${user_last}" "${tmp}" ${bashrc}
+		install -D --mode 644 --owner "${user_last}" --group "${user_last}" "${tmp}" ${bash_profile}
 		rm -f "${tmp}"
 
-		message_success "Regenerated ${bashrc}"
+		message_success "Regenerated ${bash_profile}"
     else
-        message_success "${bashrc} complies"
+        message_success "${bash_profile} complies"
     fi
 }
 
@@ -98,7 +98,7 @@ function user_check() {
     fi
 
     local rcfile
-    rcfile=/home/${user_last}/.bashrc
+    rcfile=/home/${user_last}/.bash_profile
 	if [ -r ${rcfile} ]; then
 		if [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' "${rcfile}" )" = 3 ]; then
 			message_success "${rcfile} complies"
@@ -120,7 +120,7 @@ function user_policy() {
     All the LAST processes and resources are owned by the user "ocs"
 
     - The user must exist and be a member of the sudo and dialout groups
-    - The file ~ocs/.bashrc should contain code for:
+    - The file ~ocs/.bash_profile should contain code for:
      - using the Weizmann Institute's HTTP(s) proxies
      - unsetting the bash TMOUT variable, so that sessions will not time out
     

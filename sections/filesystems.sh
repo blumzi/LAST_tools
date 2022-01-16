@@ -55,7 +55,15 @@ EOF
     mv "${tmp}" "${config_file}"
 
     message_info "(Re)mounting local and remote filesystems"
-    mount -all --type ext4 --type nfs
+    mount -all --type ext4
+
+    if ping -w 1 -c 1 "${peer_hostname}"; then
+        message_info "Mounting filesystems from peer machine \"${peer_hostname}\"."
+        mount --all --type nfs
+    else
+        message_warning "Backgrounding mounting of filesystems from peer machine \"${peer_hostname}\"."
+        mount --all --type nfs >/dev/null 2>&1 &
+    fi
 
     message_info "Restarting NFS kernel server"
     service nfs-kernel-server restart
@@ -64,10 +72,8 @@ EOF
 function filesystems_check() {
     local -i ret=0
 
-    filesystems_check_config
-    (( ret += $? ))
-    filesystems_check_mounts
-    (( ret += $? ))
+    filesystems_check_config; (( ret += $? ))
+    filesystems_check_mounts; (( ret += $? ))
 
     return $(( ret ))
 }
@@ -96,7 +102,7 @@ EOF
 }
 
 function filesystems_check_config() {
-    local config_file d entry entry
+    local config_file d entry
     local -i ret=0
     local local_hostname peer_hostname
 
@@ -171,15 +177,20 @@ function filesystems_check_mounts() {
     done
 
     # check remote filesystems
-    for d in /${peer_hostname}/{data1,data2}; do
-        read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type nfs4 | grep --quiet " ${d}$" )"
-        if [ "${dev}" ] && [ "${mpoint}" ]; then
-            message_success "Remote filesystem ${d} is mounted (used: ${used}, avail: ${avail}, percent: ${pcent})"
-        else
-            message_failure "Remote filesystem ${d} is NOT mounted"
-            (( ret++ ))
-        fi
-    done
+    if ping -c 1 -w 1 "${peer_hostname}"; then
+        for d in /${peer_hostname}/{data1,data2}; do
+            read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type nfs4 | grep --quiet " ${d}$" )"
+            if [ "${dev}" ] && [ "${mpoint}" ]; then
+                message_success "Remote filesystem ${d} is mounted (used: ${used}, avail: ${avail}, percent: ${pcent})"
+            else
+                message_failure "Remote filesystem ${d} is NOT mounted"
+                (( ret++ ))
+            fi
+        done
+    else
+        message_warning "Peer machine \"${peer_hostname}\" does not answer to ping"
+        (( ret++ ))
+    fi
 
     return $(( ret ))
 }

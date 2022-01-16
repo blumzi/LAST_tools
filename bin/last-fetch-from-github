@@ -3,16 +3,14 @@
 source /etc/profile.d/last.sh
 
 module_include lib/message
+module_include sections/user
 
 PROG=$(basename "${0}")
-#last_user="ocs"
-last_user="blumzi"
 
-declare -A git_repo
-#git_repo["AstroPack"]="https://github.com/EranOfek/AstroPack.git"
+declare -A git_repo git_branch
+git_repo["AstroPack"]="https://github.com/EranOfek/AstroPack.git"
 git_repo["MAAT"]="https://github.com/EranOfek/MAAT.git"
 git_repo["LAST/LAST_iOptronCEM120"]="https://github.com/EastEriq/LAST_iOptronCEM120.git"
-git_repo["LAST/AstroPack"]="https://github.com/EranOfek/AstroPack.git"
 git_repo["LAST/LAST_tinycontrolIPpowerSocket"]="https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git"
 git_repo["LAST/LAST_ZWOASICamera"]="https://github.com/EastEriq/LAST_ZWOASICamera.git"
 git_repo["LAST/LAST_CelestronFocusMotor"]="https://github.com/EastEriq/LAST_CelestronFocusMotor.git"
@@ -27,26 +25,50 @@ git_repo["LAST/LAST_AtikCamera"]="https://github.com/EastEriq/LAST_AtikCamera.gi
 git_repo["LAST/LAST_config"]="https://github.com/EranOfek/LAST_config.git"
 git_repo["LAST/LAST_Handle"]="https://github.com/EastEriq/LAST_Handle.git"
 git_repo["pipeLAST"]="https://github.com/EranOfek/pipeLAST.git"
-git_repo["MAATn/imClass"]="https://github.com/EranOfek/imClass.git"
+
+git_branch["AstroPack"]="dev1"
+git_branch["MAAT"]="master"
+git_branch["LAST/LAST_iOptronCEM120"]="mastrolindo"
+git_branch["LAST/LAST_tinycontrolIPpowerSocket"]="master"
+git_branch["LAST/LAST_ZWOASICamera"]="mastrolindo"
+git_branch["LAST/LAST_CelestronFocusMotor"]="mastrolindo"
+git_branch["LAST/LAST_USBserial"]="master"
+git_branch["LAST/LAST_QHYccd"]="mastrolindo"
+git_branch["LAST/LAST_XerxesMount"]="mastrolindo"
+git_branch["LAST/LAST_OCS"]="mastrolindo"
+git_branch["LAST/LAST_Messaging"]="main"
+git_branch["LAST/LAST_EnvironmentArduinoSensors"]="master"
+git_branch["LAST/LAST_MountArduinoSensors"]="master"
+git_branch["LAST/LAST_AtikCamera"]="main"
+git_branch["LAST/LAST_config"]="mastrolindo"
+git_branch["LAST/LAST_Handle"]="mastrolindo"
+git_branch["pipeLAST"]="main"
+
+function sorted_repos() {
+    declare -a sorted
+
+    sorted=( "$( for i in ${!git_repo[*]}; do echo ${i}; done | sort)" )
+    echo "${sorted[@]}"
+}
 
 function help() {
     cat << EOF
 
     This tool clones (or pulls) the LAST software from git.
 
-    Usage: ${PROG} [-d|--dir path]
+    Usage: ${PROG} [-d|--dir path] [-t|--token <token>] [-c|--check]
            ${PROG} --help
 
-     -d|--dir <path>: fetch into the specified path (default: current directory)
-     -h|--help:       show this help
+     -c|--check:         check only, don't enforce
+     -d|--dir <path>:    fetch into the specified path (default: current directory)
+     -t|--token <token>: specifies a github token (mandatory, no default)
+     -h|--help:          show this help
 
-     NOTE: This tool must be run as ${last_user}
+     NOTE: This tool must be run as ${user_last}
 
      The following directories will contain the respective repo contents:
 
 EOF
-    # TBD: use of token
-    token=""
     list_repos
     echo ""
 }
@@ -54,12 +76,13 @@ EOF
 function list_repos() {
     local key
 
-    for key in ${!git_repo[*]}; do
+    #for key in ${!git_repo[*]}; do
+    for key in $( sorted_repos ); do
         printf "       %-35s %s\n" "${key}" "${git_repo[${key}]#*@}"
     done
 }
 
-OPTS=$( getopt -o 'hd:cl' --long "h,dir:,check,list" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'hd:clt:T:' --long "help,dir:,check,list,token:,token-file:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 top_dir=""
@@ -87,6 +110,26 @@ while true; do
         exit 0
         ;;
 
+    -t|--token)
+        if [ -s "${2}" ]; then
+            github_token=$(< "${2}" )
+        elif [ "${2}" ]; then
+            github_token="${2}"
+        else
+            message_fatal "The github token must be either a non-empty string or a file containing the token itself"
+        fi
+        shift 2
+        ;;
+
+    -T|--token-file)
+        if [ ! -s "${2}" ]; then
+            message_fatal "Missing or empty token file \"${2}\"."
+            exit 1
+        fi
+        github_token=$(< "${2}")
+        shift 2
+        ;;
+
 	--)
 		shift 1
 		break
@@ -94,8 +137,8 @@ while true; do
 	esac
 done
 
-if [ "$(id -un)" != "${last_user}" ]; then
-    echo "${PROG}: Must run as ${last_user}, exiting"
+if [ "$(id -un)" != "${user_last}" ]; then
+    echo "${PROG}: Must run as user \"${user_last}\", exiting"
     exit 1
 fi
 
@@ -105,32 +148,76 @@ if ${check}; then
         exit 1
     fi
 
-    cd "${top_dir}" || exit
-    for dir in ${!git_repo[*]}; do
-        echo -e "\n${PROG}: Checking \"${dir}\" ..."
-        pushd ${dir} >/dev/null || true
-        git status
-        popd >/dev/null || true
+    declare -i errors=0
+    cd "${top_dir}" || exit 1
+    for dir in $( sorted_repos ); do
+        if [ -d "${dir}" ] && [ -d "${dir}/.git" ]; then
+            pushd "${dir}" >/dev/null || true
+            git status >/dev/null 2>&1
+            status=$?
+            if (( status == 0 )); then
+                message_success "Repository \"${dir}\" is OK"
+            else
+                message_failure "Git status on repository \"${dir}\" failed (status: ${status})"
+                (( errors++ ))
+            fi
+            popd >/dev/null || true
+        else
+            message_failure "Missing local repository ${dir}"
+            (( errors++ ))
+        fi
     done
-    exit 0
+    exit $(( errors ))
+fi
+
+# enforce
+if [ ! "${github_token}" ]; then
+    message_fatal "Missing github token.  Use -t|--token <token> to specify one"
+    exit 1
 fi
 
 if [ ! -d "${top_dir}" ]; then
     mkdir -p "${top_dir}"
-    cd "${top_dir}" || exit 1
 fi
+cd "${top_dir}" || exit 1
 
-
-for key in ${!git_repo[*]}; do
+declare repo status url branch
+for key in $( sorted_repos ); do
     path=${key}
-    if [ ! -d ${path}/.git ]; then
-        mkdir -p ${path}
-        pushd "$(dirname ${path})" >/dev/null || continue
-        git clone ${git_repo[${key}]}
+    repo=${git_repo[${key}]}
+    if [ ! -d "${path}/.git" ]; then
+        mkdir -p "${path}"
+        pushd "$(dirname "${path}")" >/dev/null || continue
+        url="${repo/github/${github_token}@github}"
+        git clone "${url}" >/dev/null 2>&1
+        status=$?
+        if [ "${status}" -eq 0 ]; then
+            message_success "Cloned \"${repo}\" into \"${path}\"."
+            branch="${git_branch["${key}"]}"
+            if [ "${branch}" ]; then
+                pushd "$(basename "${path}")" >/dev/null || true
+                git checkout "${branch}" >/dev/null 2>&1
+                status=$?
+                if (( status == 0 )); then
+                    message_success "Switched to branch \"${branch}\" in \"${path}\"."
+                else
+                    message_failure "Could not switch to branch \"${branch}\" in \"${path}\" (status: ${status})"
+                fi
+                popd >/dev/null || true
+            fi
+        else
+            message_failure "Could not clone \"${repo}\" into \"${path}\" (status: ${status})"
+        fi
         popd >/dev/null || continue
     else
         pushd "${path}" >/dev/null || continue
-        echo git pull
+        git pull >/dev/null
+        status=$?
+        if (( status == 0 )); then
+            message_success "Pulled from \"${repo}\" into \"${path}\"."
+        else
+            message_failure "Could not pull from \"${repo}\" into \"${path}\" (status: ${status})"
+        fi
         popd >/dev/null || continue
     fi
 done
