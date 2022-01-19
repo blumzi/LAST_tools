@@ -12,6 +12,14 @@ module_include lib/container
 
 declare mode
 
+function list_sections() {
+    message_info "$(printf '   %-12s %-64s %s\n' "Section" "Description" "Requires")"
+    message_info "$(printf '   %-12s %-64s %s\n' "-------" "-----------" "--------")"
+    for section in $( sections_registered_sections ); do
+        message_info "$(printf '   %-12s %-64s %s\n' "${section}" "$(sections_section_description "${section}")" "$(sections_section_requires "${section}")" )"
+    done | sort
+}
+
 function help() {
     cat << EOF
 
@@ -30,10 +38,11 @@ function help() {
 
      Running <mode>:
       One running <mode> must be selected from the following (no default):
-        check:   Checks if the current machine complies with the LAST installation policy
-        enforce: Enforces the LAST installation policy upon the current machine
-        show:    Shows some information about the available installation resources
-        policy:  Prints out the LAST policy for the seected section(s)
+        check:         Checks if the current machine complies with the LAST installation policy
+        enforce:       Enforces the LAST installation policy upon the current machine
+        show:          Shows some information about the available installation resources
+        show-policy:   Prints out the LAST policy for the seected section(s)
+        list-sections: Just list all the available sections
 
      Sections:
       The workload is split into (possibly inter-dependant) sections.
@@ -95,9 +104,7 @@ function show_info() {
 
     message_info "Sections:"
     message_info " Available:"
-    for section in $( sections_registered_sections ); do
-        message_info "$(printf '   %-12s %s\n' "${section}" "$(sections_section_description "${section}")")"
-    done | sort
+    list_sections
 
     message_info ""
     message_info " Selected (ordered, including dependencies):"
@@ -125,7 +132,6 @@ function root_or_die() {
 }
 
 declare nodeps=false
-declare selected_container
 export  github_token
 
 while true; do
@@ -135,10 +141,15 @@ while true; do
             exit 0
             ;;
         
-        check|enforce|show|policy)
+        check|enforce|show|list-sections)
             mode="${1}"
             shift 1
             break
+            ;;
+
+        show-policy|policy)
+            mode=policy
+            shift 1
             ;;
 
         -q|--quiet)
@@ -169,11 +180,9 @@ while true; do
             shift 2
             ;;
 
-        *)
-            message_info "Bad argument \"${1}\", see usage below!"
-            help
-            exit 1
-            ;;
+		*)
+			break
+			;;
 
     esac
 done
@@ -206,7 +215,26 @@ module_include sections/time
 module_include sections/catalogs
 module_include sections/software
 
+if [ "${mode}" = "list-sections" ]; then
+    list_sections
+    exit 0
+fi
+
 read -r -a registered_sections <<< "$( sections_registered_sections )"
+
+declare known
+for section in "${selected_sections[@]}"; do
+	known=false
+	for s in "${registered_sections[@]}"; do
+		if [ "${s}" = "${section}" ]; then
+			known=true
+			break
+		fi
+	done
+	if ! ${known}; then
+		message_fatal "Unknown section \"${section}\""
+	fi
+done
 
 # No sections were specified, use all those defined
 if [ ${#selected_sections[*]} -eq 0 ]; then

@@ -9,16 +9,31 @@ export fetcher="${LAST_TOOL_ROOT}/bin/last-fetch-from-github"
 function software_enforce() {
 
     message_info "Fetching the LAST software from github ..."
-    su "${user_last}" -c "${fetcher} --dir /home/${user_last}"
+    su "${user_last}" -c "${fetcher} --dir ~${user_last}/matlab"
 
-    local wine_dir="/home/${user_last}/.wine"
+    #
+    # Frome here on we need a LAST container
+    #
+
+    if [ ! "${selected_container}" ]; then
+        message_fatal "Could not find a LAST container, please select one with --container=<path>"
+    fi
+
+    if [ ! -r "${selected_container}" ]; then
+        message_fatal "The LAST container \"${selected_container}\" is not readable."
+    fi
+    
+    local wine_dir="${user_home}/.wine"
     local wine_tgz="${selected_container}/packages/wine+CME2.tgz"
     message_info "Unpacking the wine+CME2 repository ..."
-    if [ ! -d "${wine_dir}" ]; then
+    if [ -d "${wine_dir}" ]; then
         message_success "The directory ${wine_dir} exists"
     elif [ -r "${wine_tgz}" ]; then
-        su "${user_last}" -c "cd /home/${user_last}; tar xzf ${wine_tgz}"
-        message_success "Extracted ${wine_tgz} into ${wine_dir}"
+        if su "${user_last}" -c "cd ~${user_last}; tar xzf ${wine_tgz}"; then
+            message_success "Extracted ${wine_tgz} into ${wine_dir}"
+        else
+            message_failure "Could not extract ${wine_tgz} into ${wine_dir}"
+        fi
     else
         message_failure "Missing ${wine_tgz}"
     fi
@@ -34,6 +49,7 @@ function software_enforce() {
 
         pushd "${tmp}" >/dev/null 2>&1 || :
         tar xzf "${package}"
+		cd sdk_linux64_21.07.16 || true
         chmod +x install.sh
         ./install.sh
         popd >/dev/null 2>&1 || :
@@ -42,27 +58,51 @@ function software_enforce() {
     else
         message_failure "Missing ${package}"
     fi
+
+    if ! dpkg -L nomachine >/dev/null 2>&1; then
+        local deb
+        deb="$( find "${selected_container}/packages" -name 'nomachine*' )"
+
+        if [ "${deb}" ]; then
+            if dpkg --install "${deb}"; then
+                message_success "Installed nomachine from \"${deb}\""
+            else
+                message_failure "Could not install nomachine from \"${deb}\""
+            fi
+        else
+            message_failure "Missing nomachine package in ${selected_container}/packages"
+        fi
+    else
+        message_success "Nomachine is installed"
+    fi
 }
 
 function software_check() {
     local -i ret=0
-    local wine_dir="/home/${user_last}/.wine"
+    local wine_dir="${user_home}/.wine"
 
-    su "${user_last}" -c "${fetcher} --dir /home/${user_last} --check --token ${github_token}"
+    su "${user_last}" -c "${fetcher} --dir ~${user_last}/matlab --check"
     (( ret += $? ))
 
     if [ -d "${wine_dir}" ]; then
-        message_success "wine: The directory ${wine_dir} exists"
+        message_success "The directory ${wine_dir} exists"
     else
-        message_failure "wine: The ${wine_dir} directory does not exist"
+        message_failure "The ${wine_dir} directory does not exist"
         (( ret++ ))
     fi
 
     local libdir="/usr/local/lib"
     if [ -r "${libdir}/libqhyccd.so.21.7.16.13" ] && [ -L "${libdir}/libqhyccd.so" ] && [ -L "${libdir}/libqhyccd.so.20" ]; then
-        message_success "qhy: The QHY SDK (v21.7.16.13) is installed"
+        message_success "The QHY SDK (v21.7.16.13) is installed"
     else
-        message_failure "qhy: The QHY SDK (v21.7.16.13) NOT is installed"
+        message_failure "The QHY SDK (v21.7.16.13) NOT is installed"
+        (( ret++ ))
+    fi
+
+    if dpkg -L nomachine >/dev/null 2>&1; then
+        message_success "Nomachine is installed"
+    else
+        message_failure "Nomachine is not installed"
         (( ret++ ))
     fi
 

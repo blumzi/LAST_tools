@@ -1,0 +1,36 @@
+#!/bin/bash
+
+#
+# This script manages the LAST pipeline
+#
+
+function get_pids() {
+    local -a pids
+    
+    mapfile -t pids < <(pgrep -a MATLAB | grep 'pipeline\.last\.runPipeLAST' | cut -d ' ' -f1)
+    echo "${pids[@]}"
+}
+
+declare -a pids
+
+case "${1}" in
+    start)
+        su ocs -c "LANG=en_US; matlab -batch 'pipeline.last.runPipeLAST(1)'" 2>/dev/null &
+        su ocs -c "LANG=en_US; matlab -batch 'pipeline.last.runPipeLAST(2)'" 2>/dev/null &
+        wait
+        ;;
+
+    stop)
+        read -r -a pids <<< "$(get_pids)"
+        su ocs -c "kill ${pids[*]}"
+        ;;
+
+    status)
+        read -r -a pids <<< "$(get_pids)"
+        if (( ${#pids[*]} == 2 )); then
+            exit 0
+        else
+            exit 1
+        fi
+        ;;
+esac

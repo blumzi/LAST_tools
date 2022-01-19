@@ -47,7 +47,7 @@ function matlab_enforce() {
 }
 
 function matlab_license_file() {
-    echo "${matlab_releases_dir}/licenses/$(mac_to_file_name "${matlab_local_mac}")"
+    echo "${matlab_releases_dir}/${matlab_selected_release}/licenses/$(mac_to_file_name "${matlab_local_mac}")"
 }
 
 function matlab_installed_release() {
@@ -82,7 +82,7 @@ function matlab_check() {
     if [ "${selected_container}" ]; then
         message_info "Checking available Matlab installations (for mac=${matlab_local_mac})"
         local msg keys_file license_file
-        container="${selected_container:?}"
+        container="${selected_container}"
         for deployable_release in $(cd "${container}/matlab" || exit; echo R*); do
 
             release_info_dir="${matlab_releases_dir}/${deployable_release}"
@@ -154,63 +154,80 @@ function matlab_install() {
     local installer_input activate_ini
     local keys_file local_mac container installer
 
-    local_mac=$( macmap_get_local_mac )
-
-    container=${selected_container}
-    installer=${container}/matlab/${matlab_selected_release}/install
-    if [ ! -x "${installer}" ]; then
-        message_fatal "Missing installer for Matlab ${matlab_selected_release} in ${installer}, exiting"
-    fi
-
-    keys_file="${matlab_releases_dir}/${matlab_selected_release}/file-installation-keys"
-
-    if [ ! -r "${keys_file}" ]; then
-        message_fatal "Cannot read keys file \"${keys_file}\", exiting"
-    fi
-
-    local -a keys_info
-    read -r -a keys_info <<< <(grep -i "^${local_mac}")
-    if [ ${#keys_info[*]} -ne 2 ]; then
-        message_fatal "Cannot get installation key for mac=${local_mac} from \"${keys_file}\", exiting"
-    fi
-
-    local installation_key
-    installation_key="${keys_info[1]}"
-
-    # Access the matlab installer
-
-    # Access the .iso file
     local matlab_top
     matlab_top="/usr/local/MATLAB/${matlab_selected_release}"
+	export MATLABROOT=${matlab_top}
 
-    mkdir -p "${matlab_top}"
-    #
-    # Prepare responses for the silent Matlab installation
-    #
-    installer_input=$( mktemp ) 
-    cat << EOF > "${installer_input}"
+    if [ -d "${matlab_top}" ] && [ -x "${MATLABROOT}/bin/matlab" ]; then
+        message_success "Matlab ${matlab_selected_release} seems to be already installed"
+    else
+        local_mac=$( macmap_get_local_mac )
 
-    ## SPECIFY INSTALLATION FOLDER
-    destinationFolder=${matlab_top}
+        container=${selected_container}
+        installer=${container}/matlab/${matlab_selected_release}/install
+        if [ ! -x "${installer}" ]; then
+            message_fatal "Missing installer for Matlab ${matlab_selected_release} in ${installer}, exiting"
+        fi
 
-    ## SPECIFY FILE INSTALLATION KEY
-    leInstallationKey=${installation_key}
+        keys_file="${matlab_releases_dir}/${matlab_selected_release}/file-installation-keys"
 
-    ## ACCEPT LICENSE AGREEMENT 
-    agreeToLicense=yes
+        if [ ! -r "${keys_file}" ]; then
+            message_fatal "Cannot read keys file \"${keys_file}\", exiting"
+        fi
 
-    ## SPECIFY OUTPUT LOG
-    outputFile=/tmp/matlab${matlab_selected_release}-install.log
+        local -a keys_info
+        read -r -a keys_info <<< $(grep -i "^${local_mac}" "${keys_file}")
+        if [ ${#keys_info[*]} -ne 2 ]; then
+            message_fatal "Cannot get installation key for mac=${local_mac} from \"${keys_file}\", exiting"
+        fi
 
-    ## SPECIFY INSTALLER MODE
-    mode=silent
+        local installation_key
+        installation_key="${keys_info[1]}"
+
+        # Access the matlab installer
+
+        mkdir -p "${matlab_top}"
+        #
+        # Prepare responses for the silent Matlab installation
+        #
+        installer_input=$( mktemp ) 
+        cat <<- EOF > "${installer_input}"
+
+        ## SPECIFY INSTALLATION FOLDER
+        destinationFolder=${matlab_top}
+
+        ## SPECIFY FILE INSTALLATION KEY
+        fileInstallationKey=${installation_key}
+
+        ## ACCEPT LICENSE AGREEMENT 
+        agreeToLicense=yes
+
+        ## SPECIFY OUTPUT LOG
+        outputFile=/tmp/matlab${matlab_selected_release}-install.log
+
+        ## SPECIFY INSTALLER MODE
+        mode=silent
 EOF
+        pushd "$(dirname "${installer}")" >/dev/null || true
+        message_info "Silently installing Matlab ${matlab_selected_release} from \"$(dirname "${installer}")\" (~10 minutes, get some coffee :)"
+        ./install -inputFile "${installer_input}"
+        local -i status=${?}
+        if [ ${status} -eq 0 ]; then
+            message_success "Installed Matlab ${matlab_selected_release}"
+        else
+            message_fatal "Failed to install Matlab ${matlab_selected_release} (status=${status})"
+        fi
+
+        # Then we will need to replce lmgrimpl module in the matlab installation directory for activation
+        sudo cp -r ${matlab_top}/bin/* ${MATLABROOT}/bin 2>/dev/null
+		/bin/rm -f "${installer_input}"
+    fi
 
     #
     # Prepare activation responses for the Matlab installation
     #
     activate_ini=$( mktemp )
-    cat << EOF > "${activate_ini}"
+    cat <<- EOF > "${activate_ini}"
     # SPECIFY ACTIVATION MODE
     isSilent=true
     # SPECIFY ACTIVATION TYPE (Required)
@@ -218,26 +235,13 @@ EOF
     # SPECIFY LICENSE FILE LOCATION (Required if activateCommand=activateOffline)
     licenseFile=$(matlab_license_file)
 EOF
-
-    pushd "$(dirname "${installer}")" >/dev/null || return
-    ./install -inputFile "${installer_input}"
-    local -i status=${?}
-    if [ ${status} -eq 0 ]; then
-        message_success "Installed Matlab ${matlab_selected_release}"
-    else
-        message_fatal "Failed to install Matlab ${matlab_selected_release} (status=${status})"
-    fi
-
-    export MATLABROOT=${matlab_top}/bin
-
-    # Then we will need to replce lmgrimpl module in the matlab installation directory for activation
-    sudo cp ${matlab_top}/bin/* ${MATLABROOT}
-
+    message_info "Silently activating Matlab ${matlab_selected_release} (~1 minute) ..."
     # Activate the Matlab by running, it will says 'success'
-    ${matlab_top}/bin/activate_matlab.sh -propertiesFile activate.ini
+    declare result
+    result="$( ${matlab_top}/bin/activate_matlab.sh -propertiesFile ${activate_ini} )"
     status=${?}
-    if [ ${status} -eq 0 ]; then
-        message_success "Activated Matlab ${matlab_selected_release}"
+    if [ ${status} -eq 0 ] && [ "${result}" = "Silent activation succeeded." ]; then
+        message_success "Successfuly activated Matlab ${matlab_selected_release}"
     else
         message_fatal "Failed to activate Matlab ${matlab_selected_release} (status=${status})"
     fi
@@ -247,21 +251,25 @@ EOF
 
     local tmp
     tmp=$( mktemp )
-    bashrc=/home/${user_last}/.bashrc
+    bashrc="${user_home}/.bashrc"
     {
-        grep -v "export MATLABROOT=" "${bashrc}"
+        grep -v "MATLABROOT" "${bashrc}"
         echo "export MATLABROOT=${matlab_top}/bin"
+        echo "export PATH=\${PATH}:MATLABROOT/bin"
     } > "${tmp}"
     mv "${tmp}" "${bashrc}"
     message_success "Added MATLABROOT=${matlab_top}/bin to ${bashrc}"
 
-    /bin/rm "${installer_input}" "${activate_ini}"
+    /bin/rm "${activate_ini}"
 }
 
 function matlab_policy() {
     cat <<- EOF
 
-    iblwislin01:/software/R2020b
+    The LAST project currently uses Matlab ${matlab_selected_release}.
+
+    - $(ansi_underline "${PROG} check matlab") - Checks that the relevant Matlab release is properly installed.
+    - $(ansi_underline "${PROG} enforce matlab") - Installs the relevant MAtlab release from a LAST-CONTAINER.
 
 EOF
 }

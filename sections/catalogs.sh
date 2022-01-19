@@ -3,14 +3,16 @@
 module_include message
 module_include deploy
 
-sections_register_section "catalogs" "Handles the LAST catalogs" "deploy"
+sections_register_section "catalogs" "Handles the LAST catalogs"
 
 export catalogs_local_top="/data/catsHTM"
-export catalogs_deployed_top
+export catalogs_container_top
 export -a catalogs=( GAIAEDR3  MergedCat )
 
 function catalogs_init() {
-    catalogs_deployed_top="$(deploy_container)/catsHTM"
+	if [ "${selected_container}" ]; then
+		catalogs_container_top="${selected_container}/catalogs"
+	fi
 }
 #
 # The staging area for catalogs:
@@ -27,7 +29,7 @@ function catalogs_enforce() {
         local -i nfiles
 
         message_info "Synchronizing \"${catalog}\" ..."
-        rsync -avq --delete "${catalogs_deployed_top}/${catalog}" "${catalogs_local_top}/${catalog}"
+        rsync -avq --delete "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}"
         status=$?
         if (( status = 0 )); then
             message_warning "Synchronized \"${catalog}\"."
@@ -47,7 +49,7 @@ function catalogs_check() {
     for catalog in "${catalogs[@]}"; do
         local -i nfiles
 
-        nfiles=$(rsync -avn "${catalogs_deployed_top}/${catalog}" "${catalogs_local_top}/${catalog}" | grep -c hdf5 )
+        nfiles=$(rsync -avn "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | grep -c hdf5 )
         if (( nfiles > 0 )); then
             message_warning "Catalog ${catalog}: ${nfiles} differ"
         else
@@ -59,7 +61,7 @@ function catalogs_check() {
 function catalogs_policy() {
     cat <<- EOF
 
-    The LAST project uses the GAIA DRE3 and the MergedCAT catalogs.  Both need to reside in /data/catsHTM.
+    The LAST project uses the GAIA/DRE3 and the MergedCAT catalogs.  Both need to reside in /data/catsHTM.
 
     If a LAST-CONTAINER container is available (USB disk, mounted filesystem, etc.):
      - $(ansi_underline "${PROG} check catalogs") - checks that the installed catalogs are in sync with the ones in the container

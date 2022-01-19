@@ -12,6 +12,8 @@ package: clean
 	mkdir ${PACKAGE_DIR}/DEBIAN
 	cp debian/{control,rules,compat,changelog} ${PACKAGE_DIR}/DEBIAN
 	cd packaging; dpkg --build ${PACKAGE_NAME}
+	mv packaging/*.deb .
+	${MAKE} clean
 
 clean:
 	/bin/rm -rf packaging

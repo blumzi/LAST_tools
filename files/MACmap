@@ -7,9 +7,6 @@
 #   MAC hostname IP-address
 #
 
-# Local NTP server (gps-based)
-# xx:xx:xx:xx:xx:xx ntp 10.23.x.x
-
 # Power switches:
 04:91:62:b7:0a:f0 SWITCH1 10.23.2.1
 04:91:62:c0:48:88 SWITCH2 10.23.2.2
@@ -38,15 +35,24 @@ D8:5E:D3:04:DC:31 last03w 10.23.1.6
 D8:5E:D3:04:DF:72 last04e 10.23.1.7
 D8:5E:D3:04:E0:E0 last04w 10.23.1.8
 D8:5E:D3:03:D9:B6 last05e 10.23.1.9
-D8:5E:D3:03:D9:C7 last5w 10.23.1.10
-D8:5E:D3:03:D9:B5 last6e 10.23.1.11
-D8:5E:D3:03:D9:C9 last6w 10.23.1.12
-D8:5E:D3:03:DC:1A last7e 10.23.1.13
-D8:5E:D3:04:DC:39 last7w 10.23.1.14
-D8:5E:D3:04:DC:23 last8e 10.23.1.15
-D8:5E:D3:04:DC:21 last8w 10.23.1.16
-
+D8:5E:D3:03:D9:C7 last05w 10.23.1.10
+D8:5E:D3:03:D9:B5 last06e 10.23.1.11
+D8:5E:D3:03:D9:C9 last06w 10.23.1.12
+D8:5E:D3:03:DC:1A last07e 10.23.1.13
+D8:5E:D3:04:DC:39 last07w 10.23.1.14
+D8:5E:D3:04:DC:23 last08e 10.23.1.15
+D8:5E:D3:04:DC:21 last08w 10.23.1.16
+ff:ff:ff:ff:ff:ff last09e 10.23.1.17
+ff:ff:ff:ff:ff:ff last09w 10.23.1.18
+ff:ff:ff:ff:ff:ff last10e 10.23.1.19
+ff:ff:ff:ff:ff:ff last10w 10.23.1.20
+ff:ff:ff:ff:ff:ff last11e 10.23.1.21
+ff:ff:ff:ff:ff:ff last11w 10.23.1.22
+ff:ff:ff:ff:ff:ff last12e 10.23.1.23
 D8:5E:D3:04:14:D3 last12w 10.23.1.24
+
+# TBD: last0
+ff:ff:ff:ff:ff:ff last0   10.23.1.25
 
 # Dummies for last-tool testing
 30:5a:3a:47:39:61 my-machine x.y.z.0

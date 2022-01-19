@@ -15,7 +15,7 @@ function hostname_enforce() {
         return
     fi
 
-    if hostnamectl --static "${this_hostname}"; then
+    if hostnamectl set-hostname "${this_hostname}"; then
         message_success "Hostname set to ${this_hostname}"
     else
         message_failure "Could not set hostname to \"${this_hostname}\""
@@ -37,21 +37,23 @@ function hostname_enforce() {
             echo -e "${words[2]}\t${words[1]}"
         done < <( grep 10.23 "$(macmap_file)")
 
-        cat << EOF
-        # The following lines are desirable for IPv6 capable hosts
-        ::1     ip6-localhost ip6-loopback
-        fe00::0 ip6-localnet
-        ff00::0 ip6-mcastprefix
-        ff02::1 ip6-allnodes
-        ff02::2 ip6-allrouters
+        cat <<- EOF
 
-        132.77.100.5 ntp.weizmann.ac.il
-
+		# The following lines are desirable for IPv6 capable hosts
+		::1     ip6-localhost ip6-loopback
+		fe00::0 ip6-localnet
+		ff00::0 ip6-mcastprefix
+		ff02::1 ip6-allnodes
+		ff02::2 ip6-allrouters
+		
+		132.77.100.5 ntp.weizmann.ac.il
+		
 EOF
 
     } > "${tmp}"
     mv "${tmp}" /etc/hosts
-    message_success "Create a canonical \"/etc/hosts\" file."
+    chmod 644 /etc/hosts
+    message_success "Created a canonical \"/etc/hosts\" file."
 }
 
 function hostname_make_name() {
@@ -116,7 +118,7 @@ function hostname_check() {
     # the hostname should be an alias of localhost (127.0.0.1)
     #
     local found=false
-    read -r -a hostnames <<< <( grep '^127.0.0.1' /etc/hosts )
+    read -r -a hostnames <<< "$( grep '^127.0.0.1' /etc/hosts )"
     for (( i = 1; i < ${#hostnames[*]}; i++)); do
         if [ "${hostnames[i]}" = "${this_hostname}" ]; then
             found=true
@@ -157,7 +159,7 @@ function hostname_is_valid() {
         return 0    # dummy for testing
     fi
 
-    (( mount_id < 1 || mount_id > 12 )) || return 1
+    (( mount_id < 1 || mount_id > 12 )) && return 1
 
     return 0
 }

@@ -7,9 +7,11 @@ module_include sections/user
 
 PROG=$(basename "${0}")
 
-declare -A git_repo git_branch
+declare default_tokens_file tokens_file
+default_tokens_file="${LAST_TOOL_ROOT}/files/github-tokens"
+
+declare -A git_repo git_branch git_token
 git_repo["AstroPack"]="https://github.com/EranOfek/AstroPack.git"
-git_repo["MAAT"]="https://github.com/EranOfek/MAAT.git"
 git_repo["LAST/LAST_iOptronCEM120"]="https://github.com/EastEriq/LAST_iOptronCEM120.git"
 git_repo["LAST/LAST_tinycontrolIPpowerSocket"]="https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git"
 git_repo["LAST/LAST_ZWOASICamera"]="https://github.com/EastEriq/LAST_ZWOASICamera.git"
@@ -24,10 +26,8 @@ git_repo["LAST/LAST_MountArduinoSensors"]="https://github.com/EastEriq/LAST_Moun
 git_repo["LAST/LAST_AtikCamera"]="https://github.com/EastEriq/LAST_AtikCamera.git"
 git_repo["LAST/LAST_config"]="https://github.com/EranOfek/LAST_config.git"
 git_repo["LAST/LAST_Handle"]="https://github.com/EastEriq/LAST_Handle.git"
-git_repo["pipeLAST"]="https://github.com/EranOfek/pipeLAST.git"
 
 git_branch["AstroPack"]="dev1"
-git_branch["MAAT"]="master"
 git_branch["LAST/LAST_iOptronCEM120"]="mastrolindo"
 git_branch["LAST/LAST_tinycontrolIPpowerSocket"]="master"
 git_branch["LAST/LAST_ZWOASICamera"]="mastrolindo"
@@ -42,7 +42,6 @@ git_branch["LAST/LAST_MountArduinoSensors"]="master"
 git_branch["LAST/LAST_AtikCamera"]="main"
 git_branch["LAST/LAST_config"]="mastrolindo"
 git_branch["LAST/LAST_Handle"]="mastrolindo"
-git_branch["pipeLAST"]="main"
 
 function sorted_repos() {
     declare -a sorted
@@ -56,12 +55,12 @@ function help() {
 
     This tool clones (or pulls) the LAST software from git.
 
-    Usage: ${PROG} [-d|--dir path] [-t|--token <token>] [-c|--check]
+    Usage: ${PROG} [-d|--dir path] [-c|--check] [-t|--token-file path]
            ${PROG} --help
 
      -c|--check:         check only, don't enforce
      -d|--dir <path>:    fetch into the specified path (default: current directory)
-     -t|--token <token>: specifies a github token (mandatory, no default)
+     -t|--token-file:    specify a file containing the github tokens (default: ${default_tokens_file})
      -h|--help:          show this help
 
      NOTE: This tool must be run as ${user_last}
@@ -82,7 +81,7 @@ function list_repos() {
     done
 }
 
-OPTS=$( getopt -o 'hd:clt:T:' --long "help,dir:,check,list,token:,token-file:" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'hd:clt:' --long "help,dir:,check,list,token-file:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 top_dir=""
@@ -110,23 +109,12 @@ while true; do
         exit 0
         ;;
 
-    -t|--token)
-        if [ -s "${2}" ]; then
-            github_token=$(< "${2}" )
-        elif [ "${2}" ]; then
-            github_token="${2}"
-        else
-            message_fatal "The github token must be either a non-empty string or a file containing the token itself"
-        fi
-        shift 2
-        ;;
-
-    -T|--token-file)
+    -t|--token-file)
         if [ ! -s "${2}" ]; then
             message_fatal "Missing or empty token file \"${2}\"."
             exit 1
         fi
-        github_token=$(< "${2}")
+        tokens_file="${2}"
         shift 2
         ;;
 
@@ -171,10 +159,29 @@ if ${check}; then
 fi
 
 # enforce
-if [ ! "${github_token}" ]; then
-    message_fatal "Missing github token.  Use -t|--token <token> to specify one"
+if [ ! "${tokens_file}" ]; then
+    tokens_file="${default_tokens_file}"
+fi
+
+export -A github_token=()
+source "${tokens_file}"
+if (( "${#github_token[@]}" == 0 )); then
+    message_fatal "Could not load github tokens from \"${tokens_file}\""
     exit 1
 fi
+
+#
+# We need a file containing the mapping of github repos, their URLs and the respective tokens:
+#
+#  <repo>,<url>,<token>
+#
+for key in ${!git_repo[*]}; do
+    git_token[${key}]="${github_token["Development"]}"
+done
+
+for key in "LAST/LAST_AtikCamera" "LAST/LAST_EnvironmentArduinoSensors" "LAST/LAST_MountArduinoSensors"; do
+    git_token[${key}]="${github_token["DiChecco"]}"
+done
 
 if [ ! -d "${top_dir}" ]; then
     mkdir -p "${top_dir}"
@@ -188,7 +195,7 @@ for key in $( sorted_repos ); do
     if [ ! -d "${path}/.git" ]; then
         mkdir -p "${path}"
         pushd "$(dirname "${path}")" >/dev/null || continue
-        url="${repo/github/${github_token}@github}"
+        url="${repo/github/${git_token[${key}]}@github}"
         git clone "${url}" >/dev/null 2>&1
         status=$?
         if [ "${status}" -eq 0 ]; then
@@ -221,4 +228,3 @@ for key in $( sorted_repos ); do
         popd >/dev/null || continue
     fi
 done
-

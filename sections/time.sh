@@ -40,7 +40,7 @@ function time_check() {
         (( ret++ ))
     fi
 
-    if sytemctl status ${time_service} >/dev/null; then
+    if systemctl status ${time_service} >/dev/null; then
         message_success "Time sync service is running"
     else
         message_failure "Time sync service is NOT running"

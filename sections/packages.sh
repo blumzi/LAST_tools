@@ -2,67 +2,37 @@
 
 module_include lib/message
 module_include lib/sections
+module_include lib/util
 
 sections_register_section "packages" "Manages additional Ubuntu packages needed by LAST" "apt"
 
 declare packages_missing
+declare additional_packages_file="${LAST_TOOL_ROOT}/files/additional-packages"
 
-packages_required=(
-    synaptic
-    mlocate
-    ubuntu-software
-    libusb-dev
-    xterm
-    git-cola
-    setserial
-    matlab-support
-    gnome
-    unity-tweak-tool
-    openssh-server
-    wget
-    tree
-    emacs
-    git
-    wine
-    nfs-kernel-server
-    autofs
-    retext
+# get the list of additional packages required from a file, ignoring comments and empty lines
+mapfile -t packages_required < <( util_uncomment "${additional_packages_file}" )
 
-    xpa-tools
-    saods9
-
-    meld
-    git
-    mlocate
-
-    telnetd
-    ftpd
-    xterm
-
-    synaptic
-)
+if [ -x /usr/local/bin/matlab ]; then
+    packages_required+=( matlab-support )   # this one needs matlab to be installed
+fi
 
 function packages_enforce() {
 
-    packages_check
+    LAST_TOOL_QUIET=true packages_check
     message_info "Updating apt ..."
-    apt update
+    apt -qq --no-show-upgraded update
     if [ ${#packages_missing[*]} -gt 0 ]; then
         message_info "Installing: ${packages_missing[*]}"
-        apt install -y "${packages_missing[@]}"    
+        apt install -qq -y "${packages_missing[@]}"    
     fi
 }
 
 function packages_check() {
 
     packages_missing=()
-
-    if [ -x /usr/local/bin/matlab ]; then
-        packages_required+=( matlab-support )   # this one needs matlab to be installed
-    fi
     
     for package in "${packages_required[@]}"; do
-        if dpkg -l "${package}" >& /dev/null; then
+        if dpkg -L "${package}" >& /dev/null; then
             message_success "Package \"${package}\" is installed"
         else
             message_warning "Package \"${package}\" is not installed"
@@ -74,8 +44,10 @@ function packages_check() {
 function packages_policy() {
     cat <<- EOF
 
-    The LAST project is based ob an 'Ubuntu 20.04.03 workstation LTS' installation, with the addition 
-     of the following packages:
+    The LAST project is based on an 'Ubuntu 20.04.03 workstation LTS' installation.
+    A list of additional packages is maintained in ${additional_packages_file}.
+
+    The list of currently added packages is:
 
 EOF
     local package

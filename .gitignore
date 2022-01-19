@@ -1,4 +1,5 @@
 packaging/*
 files/LAST-CONTAINER/
-github-token
+files/github-tokens
 files/LAST-CATALOG/
+last-tool-*.deb

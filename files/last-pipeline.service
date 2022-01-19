@@ -1,0 +1,8 @@
+[Unit]
+Description=LAST pipeline service
+
+[Service]
+ExecStart=/usr/local/share/last-tool/bin/last-pipeline start
+
+[Install]
+WantedBy=multi-user.target

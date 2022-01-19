@@ -16,11 +16,11 @@ function network_init() {
 	read -r -a info <<< "$( ip -o -4 link show | grep ': en' )"
     network_interface=${info[1]}
 	network_interface=${network_interface%:}
-    network_netmask=255.255.0.0
-    network_broadcast=10.23.255.255
-    network_netpart=10.23.0.0
-    network_gateway=10.23.x.x
-    network_prefix=16
+    network_netmask=255.255.255.0
+    network_broadcast=10.23.1.255
+    network_netpart=10.23.1.0
+    network_gateway=10.23.1.254
+    network_prefix=24
 
     sections_register_section "network" "Configures the LAST network"
 }
@@ -32,117 +32,31 @@ function network_init() {
 #
 function network_enforce() {
 
-    if ! LAST_TOOL_QUIET=true network_check_etc_network_interfaces; then
-        cat << EOF > /etc/network/interfaces
-
-        #
-        # This file was created by ${PROG}, $(date --rfc-email)
-        #
-        auto ${network_interface}
-        iface ${network_interface} inet static 
-            address ${network_local_ipaddr}
-            network ${network_netpart}
-            netmask ${network_netmask}
-            broadcast ${network_broadcast}
-            gateway ${network_gateway}
+    cat <<- EOF > /etc/netplan/99_last_network.yaml
+    network:
+        version: 2
+        renderer: networkd
+        ethernets:
+          ${network_interface}:
+            dhcp4: false
+            addresses:
+             - ${network_local_ipaddr}/${network_prefix}
+            gateway4: ${network_gateway}
+            nameservers:
+              addresses: [132.77.4.1, 132.77.22.1]
+              search: [wisdom.weizmann.ac.il, wismain.weizmann.ac.il, weizmann.ac.il]
 EOF
-        systemctl restart networking
-    fi
-}
 
-function network_check_etc_network_interfaces() {
-    local config_file="/etc/network/interfaces"
-
-    function callback() {
-        local lineno="${1}" line="${2}"
-
-        line="${line%%#*}"
-        eval set "${line}"
-        if [ ${#} -eq 0 ]; then
-            return
-        fi
-
-        if ${already_seen_auto_line}; then
-            return
-        fi
-
-        case "${1}" in
-            auto)
-                if [ "${2}" = "${network_interface}" ]; then
-                    (( OKs++ ))
-                else
-                    message_failure "${config_file}:${lineno}: Exepcted \"auto ${network_interface}\", got \"${line}\"."
-                fi
-                already_seen_auto_line=true
-                ;;
-
-            iface)
-                if [ "${1}" = "${network_interface}" ] && [ "${2}" = inet ] && [ "${3}" = static ]; then
-                    (( OKs++ ))
-                else
-                    message_failure "${config_file}:${lineno}: Exepcted \"iface ${network_interface} inet static\", got \"${line}\"."
-                fi
-                ;;
-
-            address)
-                if [ "${2}" = "${network_local_ipaddr}" ]; then
-                    (( OKs++ ))
-                else
-                    message_failure "${config_file}:${lineno}: Exepcted \"address ${network_local_ipaddr}\", got \"${line}\"."
-                fi
-                ;;
-
-            network)
-                if [ "${2}" = "${network_netpart}" ]; then
-                    (( OKs++ ))
-                else
-                    message_failure "${config_file}:${lineno}: Exepcted \"network ${network_netpart}\", got \"${line}\"."
-                fi
-                ;;
-
-            broadcast)
-                if [ "${2}" = "${network_broadcast}" ]; then
-                    (( OKs++ ))
-                else
-                    message_failure "${config_file}:${lineno}: Exepcted \"broadcast ${network_broadcast}\", got \"${line}\"."
-                fi
-                ;;
-
-            gateway)
-                if [ "${2}" = "${network_gateway}" ]; then
-                    (( OKs++ ))
-                else
-                    message_failure "${config_file}:${lineno}: Exepcted \"gateway ${network_gateway}\", got \"${line}\"."
-                fi
-                ;;
-        esac
-    }
-
-    if [ -r ${config_file} ]; then
-		mapfile -t -C callback -c 1 < ${config_file}
-		if (( OKs == 6 )); then
-			message_success "${config_file} seems OK"
-		else
-			message_failure "${config_file} has errors"
-			(( errors++ ))
-		fi
-	else
-        message_failure "Missing configuration file ${config_file}."
-		(( errors++ ))
-    fi
+        netplan apply
 }
 
 function network_check() {
     local -a words
     local -i errors
-    local -i OKs=0
-    local already_seen_auto_line=false
-
-    network_check_etc_network_interfaces
 
     #  check the Ethernet is up
     read -r -a words <<< "$( ip -o -4 address show dev "${network_interface}")"
-    if (( ${#words[*]} != 14 )); then
+    if (( ${#words[*]} != 13 )); then
         message_failure "Interface \"${network_interface}\" is not properly configured"
         (( errors++ ))
     else
@@ -153,7 +67,7 @@ function network_check() {
             (( errors++ ))
         fi
 
-        if [[ "$(ip -o -4 link show dev "${network_interface}")" == *,UP\>* ]]; then
+        if [[ "$(ip -o -4 link show dev "${network_interface}")" == *,UP,LOWER_UP* ]]; then
             message_success "Interface \"${network_interface}\" is UP"
         else
             message_failure "Interface \"${network_interface}\" is not UP"
@@ -161,19 +75,19 @@ function network_check() {
         fi
     fi
 
+    # last0 is on the local network, should be pingable
     if ! ping -4 -q -c 1 -w 1 last0 >/dev/null 2>&1; then
         message_warning "Cannot ping \"last0\"."
     else
         message_success "Can ping \"last0\"."
     fi
 
-    # check we can ping someone at Weizmann
-	local wiz_host
-	wiz_host=wisfiler
-    if ! ping -4 -q -c 1 -w 1 ${wiz_host} > /dev/null 2>&1; then
-        message_warning "Cannot ping \"${wiz_host}\" (no Internet ?!?)."
+    # Machines on weizmann.ac.il should be reachable via the HTTP proxy
+    if wget -O - http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep -qs 'large catalog format'; then
+        message_success "Succeeded reaching the weizmann.ac.il network (got the http://euler1.weizmann.ac.il/catsHTM page)"
     else
-        message_success "Can ping \"${wiz_host}\", Internet is reachable."
+        message_warning "Failed reaching the weizmann.ac.il network (could not wget the http://euler1.weizmann.ac.il/catsHTM page)"
+        (( errors++ ))
     fi
 
     return $(( errors ))
@@ -188,20 +102,12 @@ function network_policy() {
     At this point-in-time the LAST project uses static allocation of the IP addresses.  In the 
      future we may opt for dynamic alocations (via DHCP) from the main IP switch.
 
-    - The network is maintained by the Network Manager service, which is configured via
-       the /etc/network/interfaces configuration file. A valid file has the following format:
-
-        auto en???
-        iface en??? inet static 
-            address   10.23.1.x
-            network   10.23.0.0
-            netmask   255.255.0.0
-            broadcast 10.23.255.255
-            gateway   10.23.?.?
+    - The network is maintained by netplan(5).
+    - The file /etc/netplan/99_last_network.yaml is created and contains the LAST network (static) configuration.
     
     - The network must be UP on the Ethernet adapter.
     - The last0 machine must be reachable (ping)
-    - A machine at the Weizmann Institute must be reachable (ping)
+    - A machine at the Weizmann Institute must be reachable (wget via HTTP proxy)
 
 EOF
 }

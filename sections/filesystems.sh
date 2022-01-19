@@ -29,18 +29,19 @@ function filesystems_enforce() {
     tmp=$(mktemp)
     config_file="/etc/fstab"
     {
-        grep -vE "(${local_hostname}|${peer_hostname})" ${config_file}
+        grep -vE "(/dev/sd[abc]|${local_hostname}|${peer_hostname})" ${config_file}
         cat <<- EOF > "${tmp}"
 
-        /dev/sda1 /${local_hostname}/data1 ext4 defaults 0 0
-        /dev/sdb1 /${local_hostname}/data2 ext4 defaults 0 0
-        /dev/sdc1 /${local_hostname}/data ext4 defaults 0 0
+		/dev/sda /${local_hostname}/data1 ext4 defaults 0 0
+		/dev/sdb /${local_hostname}/data2 ext4 defaults 0 0
+		/dev/sdc /${local_hostname}/data ext4 defaults 0 0
 
-        ${peer_hostname}:/${peer_hostname}/data1 /${peer_hostname}/data1 nfs defaults 0 0
-        ${peer_hostname}:/${peer_hostname}/data2 /${peer_hostname}/data2 nfs defaults 0 0
+		${peer_hostname}:/${peer_hostname}/data1 /${peer_hostname}/data1 nfs defaults 0 0
+		${peer_hostname}:/${peer_hostname}/data2 /${peer_hostname}/data2 nfs defaults 0 0
 EOF
     } > "${tmp}"
     mv "${tmp}" "${config_file}"
+	chmod 644 "${config_file}"
 
     tmp=$(mktemp)
     config_file="/etc/exports"
@@ -48,16 +49,31 @@ EOF
         grep -v "^/${local_hostname}/data" "${config_file}"
 
         cat <<- EOF > "${tmp}"
-        /${local_hostname}/data1 ${peer_hostname}(rw)
-        /${local_hostname}/data2 ${peer_hostname}(rw)
+		/${local_hostname}/data1 ${peer_hostname}(rw)
+		/${local_hostname}/data2 ${peer_hostname}(rw)
 EOF
     } > "${tmp}"
     mv "${tmp}" "${config_file}"
+	chmod 644 "${config_file}"
 
-    message_info "(Re)mounting local and remote filesystems"
+	declare -a original_mpoints
+	read -r -a original_mpoints <<< "$( find / -maxdepth 2 \( -name data -o -name 'data[12]' \) -type d | grep -vE "(${local_hostname}|${peer_hostname})" ) )"
+	if (( ${#original_mpoints[*]} != 0 )); then
+		message_info "Unmounting the original filesystems"
+		#
+		# unmount the local volumes, originally mounted by the Weizmann installation
+		#
+		local mpoint
+		for mpoint in "${original_mpoints[@]}"; do
+			umount -f "${mpoint}" >& /dev/null
+			rmdir "${mpoint}"
+		done
+	fi
+
+    message_info "(Re)mounting the local data'*' filesystems"
     mount -all --type ext4
 
-    if ping -w 1 -c 1 "${peer_hostname}"; then
+    if ping -w 1 -c 1 "${peer_hostname}" >&/dev/null; then
         message_info "Mounting filesystems from peer machine \"${peer_hostname}\"."
         mount --all --type nfs
     else
@@ -144,7 +160,7 @@ function filesystems_check_config() {
 
     # check filesytem export entries
     config_file="/etc/exports"
-    for d in ${local_hostname}/data{1,2}; do
+    for d in /${local_hostname}/data{1,2}; do
         read -r -a entry <<< "$( grep "^${d}[[:space:]]*${peer_hostname}(rw)" "${config_file}" )"
         if [ ${#entry[*]} -eq 2 ]; then
             message_success "Entry for ${d} in ${config_file} exists and is valid"
@@ -167,7 +183,7 @@ function filesystems_check_mounts() {
 
     # check local filesystems
     for d in /${local_hostname}/{data,data1,data2}; do
-        read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type ext4 | grep --quiet " ${d}$" )"
+        read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type ext4 | grep " ${d}$" )"
         if [ "${dev}" ] && [ "${mpoint}" ]; then
             message_success "Local filesystem ${d} is mounted (used: ${used}, avail: ${avail}, percent: ${pcent})"
         else
@@ -177,7 +193,7 @@ function filesystems_check_mounts() {
     done
 
     # check remote filesystems
-    if ping -c 1 -w 1 "${peer_hostname}"; then
+    if ping -c 1 -w 1 "${peer_hostname}" >/dev/null 2>&1; then
         for d in /${peer_hostname}/{data1,data2}; do
             read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type nfs4 | grep --quiet " ${d}$" )"
             if [ "${dev}" ] && [ "${mpoint}" ]; then

@@ -2,7 +2,7 @@
 
 declare -a _registered_section_names
 declare -a _registered_section_descriptions
-declare -A _required_sections
+export -A _required_sections=()
 
 #
 # Register a section, with optional requirements
@@ -23,6 +23,20 @@ function sections_register_section() {
     if [ "${requires}" ]; then
         _required_sections[${name}]="${requires}"
     fi
+#	{
+#		local str
+#		str="register: section ${name} "
+#		for key in ${!_required_sections[*]}; do
+#			str+="_required_sections[${key}]=\"${_required_sections[${key}]}\" "
+#		done
+#		echo "${str}"
+#	} >&2
+}
+
+function sections_section_requires() {
+    local section="${1}"
+
+    echo "${_required_sections[${section}]}"
 }
 
 function sections_registered_sections() {

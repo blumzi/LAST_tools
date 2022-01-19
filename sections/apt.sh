@@ -15,6 +15,7 @@ function apt_enforce() {
             echo 'Acquire::http::Proxy "http://bcproxy.weizmann.ac.il:8080";'
             echo 'Acquire::https::Proxy "http://bcproxy.weizmann.ac.il:8080";'
         } > ${apt_config_file}
+        chmod 644 ${apt_config_file}
 
 		message_success "Generated config file ${apt_config_file}"
 		message_info "Updating apt ..."
@@ -32,6 +33,7 @@ function apt_enforce() {
             echo 'Acquire::https::Proxy "http://bcproxy.weizmann.ac.il:8080";'
         } > "${tmp}"
         mv "${tmp}" ${apt_config_file}
+        chmod 644 ${apt_config_file}
 
 		message_success "Fixed config file ${apt_config_file}"
 		message_info "Updating apt ..."
@@ -60,6 +62,6 @@ function apt_policy() {
     We use the Weizmann Institute's apt proxies, both for http and https.com
 
     The apt configuration file ${apt_config_file} should reflect this.
-    
+
 EOF
 }
