@@ -15,8 +15,8 @@ declare -a pids
 
 case "${1}" in
     start)
-        su ocs -c "LANG=en_US; matlab -batch 'pipeline.last.runPipeLAST(1)'" 2>/dev/null &
-        su ocs -c "LANG=en_US; matlab -batch 'pipeline.last.runPipeLAST(2)'" 2>/dev/null &
+        su - ocs -c "LANG=en_US; cd matlab; matlab -batch 'pipeline.last.runPipeLAST(1)'" 2>/dev/null &
+        su - ocs -c "LANG=en_US; cd matlab; matlab -batch 'pipeline.last.runPipeLAST(2)'" 2>/dev/null &
         wait
         ;;
 

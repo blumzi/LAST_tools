@@ -14,17 +14,18 @@ module_include lib/util
 declare mode
 
 function list_sections() {
-    message_info "$(printf '   %-12s %-64s %s\n' "Section" "Description" "Requires")"
-    message_info "$(printf '   %-12s %-64s %s\n' "-------" "-----------" "--------")"
+    message_info "$(printf '   %-20s %-64s %s\n' "Section" "Description" "Requires")"
+    message_info "$(printf '   %-20s %-64s %s\n' "-------" "-----------" "--------")"
     for section in $( sections_registered_sections ); do
-        message_info "$(printf '   %-12s %-64s %s\n' "${section}" "$(sections_section_description "${section}")" "$(sections_section_requires "${section}")" )"
+        message_info "$(printf '   %-20s %-64s %s\n' "${section}" "$(sections_section_description "${section}")" "$(sections_section_requires "${section}")" )"
     done | sort
 }
 
 function help() {
+    # shellcheck disable=SC2154
     cat << EOF
 
-    The LAST installation policy is everything that differentiates a LAST installation
+    The LAST installation policy is $(ansi_bold "anything and everything") that differentiates a LAST installation
      from a vanilla Ubuntu installation (network, packages, matlab, LAST software, etc.)
 
     This tool either checks or enforces the LAST installation policy.
@@ -34,7 +35,7 @@ function help() {
 
      -q|--quiet:       be silent (default: verbose)
      -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
-     -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH)
+     -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH, currently "$(container_path)"))
      -t|--token:       specify a github token (either the token itself or a file containing the token)
 
      Running <mode>:
@@ -62,16 +63,20 @@ function show_info() {
 
     message_info ""
     message_info "Environment:"
-    message_info " LAST_BASH_INCLUDE_PATH: ${LAST_BASH_INCLUDE_PATH}"
-    message_info "        LAST_TOOL_QUIET: ${LAST_TOOL_QUIET}"
+    message_info " LAST_MODULE_INCLUDE_PATH: ${LAST_MODULE_INCLUDE_PATH}"
+    message_info "          LAST_TOOL_QUIET: ${LAST_TOOL_QUIET}"
 
+    message_info ""
     message_info "Container(s):"
     message_info "  Selected: ${selected_container:-$(container_lookup)}"
     message_info "      Path: $(container_path)"
     message_info ""
 
+    local matlab_release
+    matlab_release=$(matlab_installed_release)
+    matlab_release=${matlab_release:-None}
     message_info "Matlab:"
-    message_info "   Installed: $(matlab_installed_release)"
+    message_info "      Installed: ${matlab_release}"
     
     local -a available_matlabs available_matlab_dirs
     if [ "${container}" ]; then
@@ -94,7 +99,7 @@ function show_info() {
 
     local license_file
     license_file="$(matlab_license_file)"
-    msg="   License File:           "       
+    msg="   License File: "       
     if [ -r "${license_file}" ]; then
         msg+="${license_file}"
     else
@@ -114,7 +119,10 @@ function show_info() {
     done
 
     local mac ipaddr hostname
-    mac="$(macmap_get_local_mac)" || message_fatal "Cannot get local MAC"
+    mac="$(macmap_get_local_mac)"
+    if [ ! "${mac}" ]; then
+        message_fatal "Cannot get local MAC with macmap_get_local_mac"
+    fi
     ipaddr="$(macmap_get_local_ipaddr)" || message_fatal "Cannot get IP address for local mac: ${mac}"
     hostname="$(macmap_get_local_hostname)" || message_fatal "Cannot get hostname for local mac: ${mac}"
     message_info ""
@@ -138,8 +146,8 @@ export  github_token
 while true; do
     case "${1}" in
         -h|--help)
-            help
-            exit 0
+            mode=help
+            shift 1
             ;;
         
         check|enforce|show|list-sections)
@@ -215,6 +223,11 @@ module_include sections/time
 module_include sections/catalogs
 module_include sections/last-software
 
+if [ "${mode}" = help ]; then
+    help
+    exit 0
+fi
+
 if [ "${mode}" = "list-sections" ]; then
     list_sections
     exit 0
@@ -263,16 +276,19 @@ enforce)
     ;;
 esac
 
-root_or_die
+if [ "${mode}" != policy ]; then
+    root_or_die
+fi
 
 declare bashified_section
 for section in "${needed_sections[@]}"; do
     bashified_section="$(util_bashify "${section}")"
+    method="${bashified_section}_${mode}"
 
     if sections_section_has_method "${bashified_section}" "${mode}"; then
         message_section "${section^?}"
-        eval "${bashified_section}_${mode}"
+        eval "${method}"
     else
-        message_warning "Section \"${section}\" does not have a \"${bashified_section}_${mode}\" method, skipping"
+        message_warning "Section \"${section}\" does not have a \"${method}\" method, skipping"
     fi
 done

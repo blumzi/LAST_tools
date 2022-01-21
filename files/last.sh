@@ -9,28 +9,29 @@ export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]}] 
 export  http_proxy=http://bcproxy.weizmann.ac.il:8080
 export https_proxy=http://bcproxy.weizmann.ac.il:8080
 
-function append_to_bash_include_path() {
+function append_to_module_include_path() {
     local subpath="${1}"
-    local found=false p
+    local p
 
-    for p in ${LAST_BASH_INCLUDE_PATH//:/ }; do
+    for p in ${LAST_MODULE_INCLUDE_PATH//:/ }; do
         if [ "${p}" = "${subpath}" ]; then
             return
         fi
     done
     
-    LAST_BASH_INCLUDE_PATH+=":${subpath}"
-    LAST_BASH_INCLUDE_PATH="${LAST_BASH_INCLUDE_PATH##:}"
-    export LAST_BASH_INCLUDE_PATH
+    LAST_MODULE_INCLUDE_PATH+=":${subpath}"
+    LAST_MODULE_INCLUDE_PATH="${LAST_MODULE_INCLUDE_PATH##:}"
+    export LAST_MODULE_INCLUDE_PATH
 }
 
 export LAST_TOOL_ROOT=/usr/local/share/last-tool
 
-append_to_bash_include_path ${LAST_TOOL_ROOT}
+append_to_module_include_path ${LAST_TOOL_ROOT}
 
-for dir in ${LAST_BASH_INCLUDE_PATH//:/ }; do
+for dir in ${LAST_MODULE_INCLUDE_PATH//:/ }; do
     file="${dir}/lib/module.sh"
     if [ -r  "${file}" ]; then
+        # shellcheck source=/dev/null
         source "${file}" || echo "$(basename "${0}"): Failed to source \"${file}\""
         break
     fi

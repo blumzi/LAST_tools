@@ -18,11 +18,11 @@ function profile_enforce() {
         export http_proxy=http://bcproxy.weizmann.ac.il:8080
         export https_proxy=http://bcproxy.weizmann.ac.il:8080
 
-        function append_to_bash_include_path() {
+        function append_to_module_include_path() {
             local subpath="\$1"
             local found=false p
 
-            for p in \${LAST_BASH_INCLUDE_PATH//:/ }; do
+            for p in \${LAST_MODULE_INCLUDE_PATH//:/ }; do
                 if [ "\${p}" = "\${subpath}" ]; then
                     found=true
                     break
@@ -34,7 +34,7 @@ function profile_enforce() {
         }
 
         export LAST_TOOL_ROOT=/usr/local/share/last-tool
-        append_to_bash_include_path \${LAST_TOOL_ROOT}
+        append_to_module_include_path \${LAST_TOOL_ROOT}
 
         unset TMOUT
 EOF

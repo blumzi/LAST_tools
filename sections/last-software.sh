@@ -11,6 +11,7 @@ last_software_github_repos_file="$(module_locate files/github-repos)"
 function last_software_enforce() {
 
     message_info "Fetching the LAST software from github ..."
+    # shellcheck disable=SC2154
     su "${user_last}" -c "${fetcher} --dir ~${user_last}/matlab"
 
     #
@@ -28,6 +29,8 @@ function last_software_enforce() {
     #
     # Unpack the WINE directory containing the CME2 utility
     #
+
+    # shellcheck disable=SC2154
     local wine_dir="${user_home}/.wine"
     local wine_tgz="${selected_container}/packages/wine+CME2.tgz"
     message_info "Unpacking the wine+CME2 repository ..."

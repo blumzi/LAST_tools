@@ -45,33 +45,34 @@ function container_is_valid() {
     local -i errors=0
 
     if [ ! -d "${container}" ]; then
-        message_failure "\"${container}\" is not a directory" >&2
+        # message_failure "\"${container}\" is not a directory" >&2
         return 1
     fi
     
     if [ ! -d "${container}/catalogs/GAIA/DRE3" ]; then
-        message_failure "Missing \"catalogs/GAIA/DRE3\" in \"${container}\"" >&2
+        # message_failure "Missing \"catalogs/GAIA/DRE3\" in \"${container}\"" >&2
         (( errors++ ))
     fi
     
     if [ ! -d "${container}/catalogs/MergedCat" ]; then
-        message_failure "Missing \"catalogs/MergedCat\" in \"${container}\"" >&2
+        # message_failure "Missing \"catalogs/MergedCat\" in \"${container}\"" >&2
         (( errors++ ))
     fi
+
     if [ ! -d "${container}/matlab/R2020b" ]; then
-        message_failure "Missing \"matlab/R2020b\" in \"${container}\"" >&2
+        # message_failure "Missing \"matlab/R2020b\" in \"${container}\"" >&2
         (( errors++ ))
     fi
 
     if [ ! -r "${container}/github-token" ]; then
-        message_failure "Missing \"github-token\" in \"${container}\"" >&2
+        # message_failure "Missing \"github-token\" in \"${container}\"" >&2
         (( errors++ ))
     fi
 
     local deb
     deb="$( find "${container}"/packages -name 'last-tool-*.deb' )"
     if [ ! "${deb}" ]; then
-        message_failure "Missing \"last-tool\" debian package in \"${container}/packages\"" >&2
+        # message_failure "Missing \"last-tool\" debian package in \"${container}/packages\"" >&2
         (( errors++ ))
     fi
 

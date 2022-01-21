@@ -247,6 +247,7 @@ EOF
 
     local tmp
     tmp=$( mktemp )
+    # shellcheck disable=SC2154
     bashrc="${user_home}/.bashrc"
     {
         grep -v "MATLABROOT" "${bashrc}"

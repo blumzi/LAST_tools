@@ -3,9 +3,11 @@
 source /etc/profile.d/last.sh
 
 module_include lib/message
+module_include lib/util
 module_include sections/user
 
 PROG=$(basename "${0}")
+export LAST_TOOL_PID="${$}"
 
 declare default_tokens_file tokens_file
 default_tokens_file="$(module_locate files/github-tokens)"
@@ -35,6 +37,7 @@ function sorted_repos() {
 }
 
 function help() {
+    # shellcheck disable=SC2154
     cat << EOF
 
     This tool clones (or pulls) the LAST software from github.
@@ -109,11 +112,6 @@ while true; do
 	esac
 done
 
-if [ "$(id -un)" != "${user_last}" ]; then
-    echo "${PROG}: Must run as user \"${user_last}\", exiting"
-    exit 1
-fi
-
 if ${check}; then
     if [ ! -d "${top_dir}" ]; then
         message_fatal "No such directory \"${top_dir}\""
@@ -128,19 +126,24 @@ if ${check}; then
             git status >/dev/null 2>&1
             status=$?
             if (( status == 0 )); then
-                message_success "Repository \"${dir}\" is OK"
+                message_success "Repository \"${top_dir}/${dir}\" is OK"
             else
-                message_failure "Git status on repository \"${dir}\" failed (status: ${status})"
+                message_failure "Git status on repository \"${top_dir}/${dir}\" failed (status: ${status})"
                 (( errors++ ))
             fi
             popd >/dev/null || true
         else
-            message_failure "Missing local repository ${dir}"
+            message_failure "Missing local repository ${top_dir}/${dir}"
             (( errors++ ))
         fi
     done
     exit $(( errors ))
 fi
+
+# if [ "$(id -un)" != "${user_last}" ]; then
+#     echo "${PROG}: Must run as user \"${user_last}\", exiting"
+#     exit 1
+# fi
 
 # enforce
 if [ ! "${tokens_file}" ]; then
@@ -148,6 +151,12 @@ if [ ! "${tokens_file}" ]; then
 fi
 
 export -A github_token=()
+
+if [ ! -r "${tokens_file}" ]; then
+    message_fatal "Cannot read tokens file \"${tokens_file}\""
+fi
+
+# shellcheck source=/dev/null
 source "${tokens_file}"
 if (( "${#github_token[@]}" == 0 )); then
     message_fatal "Could not load github tokens from \"${tokens_file}\""

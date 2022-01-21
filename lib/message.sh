@@ -74,17 +74,12 @@ function message_info {
 
 # red mesage + optionally kill top shell process
 function message_fatal() {    
-    echo -e "FATAL: $( ansi_bright_red "${@}" )" >&2
+    echo -e "${PROG}: $(ansi_bright_red FATAL:) $(ansi_bold "${*}")" >&2
     if [ "${LAST_TOOL_PID}" ]; then
-        kill "${LAST_TOOL_PID}"
+        kill "${LAST_TOOL_PID}" >& /dev/null
     fi
 
     if ! ${LAST_TOOL_DONTLOG}; then
         message_log "[FATAL] ${*}"
     fi
-}
-
-function message_fatal() {
-    echo -e "FATAL: $(ansi_bright_red "${*}"), Exiting!"
-    exit 2
 }

@@ -24,10 +24,11 @@ if [ ! "${MODULE_INCLUDED}" ]; then
             return
         fi
 
-        for dir in ${LAST_BASH_INCLUDE_PATH//:/ }; do
+        for dir in ${LAST_MODULE_INCLUDE_PATH//:/ }; do
             file="${dir}/${module}.sh"
 
             if [ -r "${file}" ]; then
+                # shellcheck source=/dev/null
                 source "${file}"
                 module_included_modules["${module}"]="${file}"
                 break
@@ -65,7 +66,7 @@ if [ ! "${MODULE_INCLUDED}" ]; then
     function module_locate() {
         local name="${1}" path dir
 
-        for dir in ${LAST_BASH_INCLUDE_PATH//:/ }; do
+        for dir in ${LAST_MODULE_INCLUDE_PATH//:/ }; do
             path="${dir}/${name}"
             if [ -f "${path}" ] || [ -d "${path}" ]; then
                 echo "${path}"

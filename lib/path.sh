@@ -4,7 +4,7 @@
 # PATH-like variables handling functions
 #
 
-declare path_separator=':' 
+export path_separator=':' 
 
 function path_has_member() {
     local path="${1}"

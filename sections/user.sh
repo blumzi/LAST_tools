@@ -5,6 +5,7 @@ module_include lib/sections
 
 export user_last="ocs"
 eval export user_home=~${user_last}
+# shellcheck disable=SC2154
 export user_matlab_dir="${user_home}/matlab"
 export -a user_expected_groups=( sudo dialout )
 export user_expected_groups_list

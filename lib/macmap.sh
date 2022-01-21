@@ -11,7 +11,7 @@ function macmap_file() {
         _macmap_file="$(module_locate files/MACmap)"
 
         if [ ! "${_macmap_file}" ]; then
-            message_fatal "${FUNCNAME[0]}: Cannot locate \"files/MACmap\" in LAST_BASH_INCLUDE_PATH=\"${LAST_BASH_INCLUDE_PATH}\""
+            message_fatal "${FUNCNAME[0]}: Cannot locate \"files/MACmap\" in LAST_MODULE_INCLUDE_PATH=\"${LAST_MODULE_INCLUDE_PATH}\""
         fi
     fi
     echo "${_macmap_file}"
@@ -45,7 +45,7 @@ function macmap_mac_to_hostname() {
     local mac="${1}"
 
     if [ ! "${mac}" ]; then
-        return 1
+        return
     fi
     
     read -r -a words <<< "$(macmap_getent_by_mac "${mac}")" || return $?
@@ -57,6 +57,10 @@ function macmap_getent_by_mac() {
     local -a words
     local file
     
+    if [ ! "${mac}" ]; then
+        return
+    fi
+
     file="$(module_locate files/MACmap)"    
     read -r -a words <<< "$(grep -wi "^${mac}" "${file}" )" || 
         message_fatal "${FUNCNAME[0]}: Missing mac=${mac} in ${file}"
@@ -72,13 +76,17 @@ function macmap_getent_by_hostname() {
     local -a words
     local file
     
+    if [ ! "${hostname}" ]; then
+        return
+    fi
+    
     file="$(module_locate files/MACmap)"  
     
     read -r -a words <<< "$(grep -w "${hostname}" "${file}" )" || 
-        message_fatal "${FUNCNAME[0]}: Missing hostname=${hostname} in ${file}"
+        message_fatal "${FUNCNAME[0]}: Missing hostname=${hostname} in ${file}" >&2
 
     if [ ${#words[*]} -ne 3 ]; then
-        message_fatal "${FUNCNAME[0]} Badly formatted line for hostname \"${hostname}\ in ${file}"
+        message_fatal "${FUNCNAME[0]} Badly formatted line for hostname \"${hostname}\" in ${file}"
     fi
     echo "${words[@]}"
 }
@@ -117,8 +125,11 @@ function macmap_get_local_hostname() {
 #
 function macmap_get_peer_hostname() {
     local this_hostname
-
     this_hostname="$( macmap_get_local_hostname )"
+
+    if [ ! "${this_hostname}" ]; then
+        return
+    fi
     local this_mount=${this_hostname:0:6}
     local this_side=${this_hostname:6:1}
     local peer_side
