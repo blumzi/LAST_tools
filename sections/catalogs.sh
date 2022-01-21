@@ -1,19 +1,19 @@
 #!/bin/bash
 
 module_include message
-module_include deploy
 
 sections_register_section "catalogs" "Handles the LAST catalogs"
 
 export catalogs_local_top="/data/catsHTM"
 export catalogs_container_top
-export -a catalogs=( GAIAEDR3  MergedCat )
+export -a catalogs=( GAIA/DRE3  MergedCat )
 
 function catalogs_init() {
 	if [ "${selected_container}" ]; then
 		catalogs_container_top="${selected_container}/catalogs"
 	fi
 }
+
 #
 # The staging area for catalogs:
 #   euler1:/var/www/html/data (mounted on euler:/data/euler)

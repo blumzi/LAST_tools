@@ -9,6 +9,7 @@ export LAST_TOOL_PID="${$}"
 module_include lib/message
 module_include lib/macmap
 module_include lib/container
+module_include lib/util
 
 declare mode
 
@@ -47,7 +48,7 @@ function help() {
      Sections:
       The workload is split into (possibly inter-dependant) sections.
       - To get a list of the defined sections run:
-          $ ${PROG} show
+          $ $(ansi_bold "${PROG} list-sections")
       - To select a subset of all the defined sections, just list them as arguments
          after the running <mode> (default: run all the defined sections)
 
@@ -204,16 +205,15 @@ selected_sections=( "${@}" )
 #
 module_include sections/bios
 module_include sections/user
-module_include sections/packages
+module_include sections/ubuntu-packages
 module_include sections/profile
 module_include sections/hostname
 module_include sections/apt
-module_include sections/paths
 module_include sections/matlab
 module_include sections/filesystems
 module_include sections/time
 module_include sections/catalogs
-module_include sections/software
+module_include sections/last-software
 
 if [ "${mode}" = "list-sections" ]; then
     list_sections
@@ -265,12 +265,14 @@ esac
 
 root_or_die
 
+declare bashified_section
 for section in "${needed_sections[@]}"; do
-    if sections_section_has_method "${section}" "${mode}"; then
-        message_section "${section^?}"
+    bashified_section="$(util_bashify "${section}")"
 
-        eval "${section}_${mode}"
+    if sections_section_has_method "${bashified_section}" "${mode}"; then
+        message_section "${section^?}"
+        eval "${bashified_section}_${mode}"
     else
-        message_warning "Section \"${section}\" does not have a \"${section}_${mode}\" method, skipping"
+        message_warning "Section \"${section}\" does not have a \"${bashified_section}_${mode}\" method, skipping"
     fi
 done

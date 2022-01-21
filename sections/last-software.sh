@@ -2,11 +2,13 @@
 
 module_include lib/container
 
-sections_register_section "software" "Manages our own LAST software" "user"
+sections_register_section "last-software" "Manages our own LAST software" "user"
 
 export fetcher="${LAST_TOOL_ROOT}/bin/last-fetch-from-github"
+export last_software_github_repos_file
+last_software_github_repos_file="$(module_locate files/github-repos)"
 
-function software_enforce() {
+function last_software_enforce() {
 
     message_info "Fetching the LAST software from github ..."
     su "${user_last}" -c "${fetcher} --dir ~${user_last}/matlab"
@@ -19,10 +21,13 @@ function software_enforce() {
         message_fatal "Could not find a LAST container, please select one with --container=<path>"
     fi
 
-    if [ ! -r "${selected_container}" ]; then
-        message_fatal "The LAST container \"${selected_container}\" is not readable."
+    if [ ! -d "${selected_container}" ]; then
+        message_fatal "The LAST container \"${selected_container}\" is not a directory."
     fi
     
+    #
+    # Unpack the WINE directory containing the CME2 utility
+    #
     local wine_dir="${user_home}/.wine"
     local wine_tgz="${selected_container}/packages/wine+CME2.tgz"
     message_info "Unpacking the wine+CME2 repository ..."
@@ -38,6 +43,9 @@ function software_enforce() {
         message_failure "Missing ${wine_tgz}"
     fi
 
+    #
+    # Unpack the QFY SDK
+    #
     local libdir="/usr/local/lib"
     local package="${selected_container}/packages/sdk_linux64_21.07.16.tgz"
 
@@ -59,6 +67,9 @@ function software_enforce() {
         message_failure "Missing ${package}"
     fi
 
+    #
+    # Unpack NOMACINE
+    #
     if ! dpkg -L nomachine >/dev/null 2>&1; then
         local deb
         deb="$( find "${selected_container}/packages" -name 'nomachine*' )"
@@ -77,7 +88,7 @@ function software_enforce() {
     fi
 }
 
-function software_check() {
+function last_software_check() {
     local -i ret=0
     local wine_dir="${user_home}/.wine"
 
@@ -109,14 +120,16 @@ function software_check() {
     return $(( ret ))
 }
 
-function software_policy() { 
+function last_software_policy() { 
     cat <<- EOF
 
     All the LAST computers are both production AND development machines.  As such they
-     contain git clones of the relevant software repositories (on github). You
+     contain git clones of the relevant software repositories (on github).
+    
+    The list of repositories is maintained in ${last_software_github_repos_file}
 
-    - $(ansi_underline "${PROG} check software") - checks if the local sources are up-to-date
-    - $(ansi_underline "${PROG} enforce software") - pulls the latest sources from the repositories
+    - $(ansi_bold "${PROG} check software") - checks if the local sources are up-to-date
+    - $(ansi_bold "${PROG} enforce software") - pulls the latest sources from the repositories
     
     Software repsitories:
 
@@ -125,9 +138,11 @@ EOF
     echo ""
 
     cat <<- EOF
-    The following packages are also enforced or checked:
+    The following packages cannot be installed from apt repositories, so they get installed from
+     LAST containers:
      - A 'wine' repository for the "Copley Motion" windows software
      - The QHY SDK (v21.7.16.13)
+     - Nomachine
 
 EOF
 }

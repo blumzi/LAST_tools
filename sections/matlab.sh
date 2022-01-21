@@ -76,9 +76,6 @@ function matlab_check() {
         return 1    # no point in continuing
     fi
 
-    # matlab_local_mac="18:c0:4d:82:1d:ff"
-
-
     if [ "${selected_container}" ]; then
         message_info "Checking available Matlab installations (for mac=${matlab_local_mac})"
         local msg keys_file license_file
@@ -93,7 +90,6 @@ function matlab_check() {
                 msg="Release ${deployable_release}"
             fi
             
-            iso=$(cd "${container}/matlab/${deployable_release}" || exit ; echo *.iso)
             # check that we have the installation images for this release
             msg+=", installer "
             if [ -x "${container}/matlab/${deployable_release}/install" ]; then
@@ -176,7 +172,7 @@ function matlab_install() {
         fi
 
         local -a keys_info
-        read -r -a keys_info <<< $(grep -i "^${local_mac}" "${keys_file}")
+        read -r -a keys_info <<< "$(grep -i "^${local_mac}" "${keys_file}")"
         if [ ${#keys_info[*]} -ne 2 ]; then
             message_fatal "Cannot get installation key for mac=${local_mac} from \"${keys_file}\", exiting"
         fi

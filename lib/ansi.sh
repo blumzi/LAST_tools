@@ -7,6 +7,7 @@ ANSI_NORMAL=$'\x1b[0;0m'   # clear color(s)
 ANSI_UNDERLINE=$'\x1b[4m'  # underline
 ANSI_FLASH=$'\x1b[5m'      # flash
 ANSI_REVERSE=$'\x1b[7m'    # reverse video
+ANSI_BOLD=$'\x1b[1m'       # bold
 
 # Normal color
 export ANSI_NORMAL_BLACK ANSI_NORMAL_RED ANSI_NORMAL_GREEN ANSI_NORMAL_YELLOW
@@ -70,4 +71,8 @@ function ansi_bright_blue() {
 
 function ansi_underline() {
     echo -ne "${ANSI_UNDERLINE}${*}${ANSI_NORMAL}"
+}
+
+function ansi_bold() {    
+    echo -ne "${ANSI_BOLD}${*}${ANSI_NORMAL}"
 }

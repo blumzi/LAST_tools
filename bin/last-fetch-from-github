@@ -8,58 +8,42 @@ module_include sections/user
 PROG=$(basename "${0}")
 
 declare default_tokens_file tokens_file
-default_tokens_file="${LAST_TOOL_ROOT}/files/github-tokens"
+default_tokens_file="$(module_locate files/github-tokens)"
 
-declare -A git_repo git_branch git_token
-git_repo["AstroPack"]="https://github.com/EranOfek/AstroPack.git"
-git_repo["LAST/LAST_iOptronCEM120"]="https://github.com/EastEriq/LAST_iOptronCEM120.git"
-git_repo["LAST/LAST_tinycontrolIPpowerSocket"]="https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git"
-git_repo["LAST/LAST_ZWOASICamera"]="https://github.com/EastEriq/LAST_ZWOASICamera.git"
-git_repo["LAST/LAST_CelestronFocusMotor"]="https://github.com/EastEriq/LAST_CelestronFocusMotor.git"
-git_repo["LAST/LAST_USBserial"]="https://github.com/EastEriq/LAST_USBserial.git"
-git_repo["LAST/LAST_QHYccd"]="https://github.com/EastEriq/LAST_QHYccd.git"
-git_repo["LAST/LAST_XerxesMount"]="https://github.com/EastEriq/LAST_XerxesMount.git"
-git_repo["LAST/LAST_OCS"]="https://github.com/PolishookDavid/LAST_OCS.git"
-git_repo["LAST/LAST_Messaging"]="https://github.com/EastEriq/LAST_Messaging.git"
-git_repo["LAST/LAST_EnvironmentArduinoSensors"]="https://github.com/EastEriq/LAST_EnvironmentArduinoSensors.git"
-git_repo["LAST/LAST_MountArduinoSensors"]="https://github.com/EastEriq/LAST_MountArduinoSensors.git"
-git_repo["LAST/LAST_AtikCamera"]="https://github.com/EastEriq/LAST_AtikCamera.git"
-git_repo["LAST/LAST_config"]="https://github.com/EranOfek/LAST_config.git"
-git_repo["LAST/LAST_Handle"]="https://github.com/EastEriq/LAST_Handle.git"
+export github_repos_file
+github_repos_file="$(module_locate files/github-repos)"
 
-git_branch["AstroPack"]="dev1"
-git_branch["LAST/LAST_iOptronCEM120"]="mastrolindo"
-git_branch["LAST/LAST_tinycontrolIPpowerSocket"]="master"
-git_branch["LAST/LAST_ZWOASICamera"]="mastrolindo"
-git_branch["LAST/LAST_CelestronFocusMotor"]="mastrolindo"
-git_branch["LAST/LAST_USBserial"]="master"
-git_branch["LAST/LAST_QHYccd"]="mastrolindo"
-git_branch["LAST/LAST_XerxesMount"]="mastrolindo"
-git_branch["LAST/LAST_OCS"]="mastrolindo"
-git_branch["LAST/LAST_Messaging"]="main"
-git_branch["LAST/LAST_EnvironmentArduinoSensors"]="master"
-git_branch["LAST/LAST_MountArduinoSensors"]="master"
-git_branch["LAST/LAST_AtikCamera"]="main"
-git_branch["LAST/LAST_config"]="mastrolindo"
-git_branch["LAST/LAST_Handle"]="mastrolindo"
+declare -A git_repo git_branch git_token_name
+
+declare line repo url branch token_name
+while read -r line; do
+    read -r repo url branch token_name _ <<< "${line}"
+    if [ ! "${repo}" ] || [ ! "${url}" ] || [ ! "${branch}" ] || [ ! "${token_name}" ]; then
+        message_fatal "Badly formed line \"${line}\" in \"${github_repos_file}\"."
+    fi
+
+          git_repo["${repo}"]="${url}"
+        git_branch["${repo}"]="${branch}"
+    git_token_name["${repo}"]="${token_name}"
+done < <(util_uncomment "${github_repos_file}")
 
 function sorted_repos() {
     declare -a sorted
 
-    sorted=( "$( for i in ${!git_repo[*]}; do echo ${i}; done | sort)" )
+    sorted=( "$( for i in ${!git_repo[*]}; do echo "${i}"; done | sort)" )
     echo "${sorted[@]}"
 }
 
 function help() {
     cat << EOF
 
-    This tool clones (or pulls) the LAST software from git.
+    This tool clones (or pulls) the LAST software from github.
 
-    Usage: ${PROG} [-d|--dir path] [-c|--check] [-t|--token-file path]
+    Usage: ${PROG} [-d|--dir dir] [-c|--check] [-t|--token-file dir]
            ${PROG} --help
 
      -c|--check:         check only, don't enforce
-     -d|--dir <path>:    fetch into the specified path (default: current directory)
+     -d|--dir <dir>:     fetch into the specified dir (default: current directory)
      -t|--token-file:    specify a file containing the github tokens (default: ${default_tokens_file})
      -h|--help:          show this help
 
@@ -75,7 +59,6 @@ EOF
 function list_repos() {
     local key
 
-    #for key in ${!git_repo[*]}; do
     for key in $( sorted_repos ); do
         printf "       %-35s %s\n" "${key}" "${git_repo[${key}]#*@}"
     done
@@ -84,7 +67,8 @@ function list_repos() {
 OPTS=$( getopt -o 'hd:clt:' --long "help,dir:,check,list,token-file:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
-top_dir=""
+eval top_dir=~"${user_last}"/matlab
+
 check=false
 while true; do
 	case "${1}" in
@@ -170,60 +154,54 @@ if (( "${#github_token[@]}" == 0 )); then
     exit 1
 fi
 
-#
-# We need a file containing the mapping of github repos, their URLs and the respective tokens:
-#
-#  <repo>,<url>,<token>
-#
-for key in ${!git_repo[*]}; do
-    git_token[${key}]="${github_token["Development"]}"
-done
-
-for key in "LAST/LAST_AtikCamera" "LAST/LAST_EnvironmentArduinoSensors" "LAST/LAST_MountArduinoSensors"; do
-    git_token[${key}]="${github_token["DiChecco"]}"
-done
-
 if [ ! -d "${top_dir}" ]; then
     mkdir -p "${top_dir}"
 fi
 cd "${top_dir}" || exit 1
 
-declare repo status url branch
+declare repo status url branch token_name token
 for key in $( sorted_repos ); do
-    path=${key}
-    repo=${git_repo[${key}]}
-    if [ ! -d "${path}/.git" ]; then
-        mkdir -p "${path}"
-        pushd "$(dirname "${path}")" >/dev/null || continue
-        url="${repo/github/${git_token[${key}]}@github}"
+    token_name="${git_token_name[${key}]}"
+        branch="${git_branch["${key}"]}"
+         token="${github_token[${token_name}]}"
+          repo="${git_repo[${key}]}"
+           dir="${key}"
+
+    if [ ! "${token}" ]; then
+        message_fatal "Github token \"${token_name}\" for repo \"${repo}\" not found in \"${tokens_file}\""
+    fi
+
+    if [ ! -d "${dir}/.git" ]; then
+        mkdir -p "${dir}"
+        pushd "$(dirname "${dir}")" >/dev/null || continue
+        url="${repo/github/${token}@github}"
         git clone "${url}" >/dev/null 2>&1
         status=$?
         if [ "${status}" -eq 0 ]; then
-            message_success "Cloned \"${repo}\" into \"${path}\"."
-            branch="${git_branch["${key}"]}"
+            message_success "Cloned \"${repo}\" into \"${dir}\"."
             if [ "${branch}" ]; then
-                pushd "$(basename "${path}")" >/dev/null || true
+                pushd "$(basename "${dir}")" >/dev/null || true
                 git checkout "${branch}" >/dev/null 2>&1
                 status=$?
                 if (( status == 0 )); then
-                    message_success "Switched to branch \"${branch}\" in \"${path}\"."
+                    message_success "Switched to branch \"${branch}\" in \"${dir}\"."
                 else
-                    message_failure "Could not switch to branch \"${branch}\" in \"${path}\" (status: ${status})"
+                    message_failure "Could not switch to branch \"${branch}\" in \"${dir}\" (status: ${status})"
                 fi
                 popd >/dev/null || true
             fi
         else
-            message_failure "Could not clone \"${repo}\" into \"${path}\" (status: ${status})"
+            message_failure "Could not clone \"${repo}\" into \"${dir}\" (status: ${status})"
         fi
         popd >/dev/null || continue
     else
-        pushd "${path}" >/dev/null || continue
+        pushd "${dir}" >/dev/null || continue
         git pull >/dev/null
         status=$?
         if (( status == 0 )); then
-            message_success "Pulled from \"${repo}\" into \"${path}\"."
+            message_success "Pulled from \"${repo}\" into \"${dir}\"."
         else
-            message_failure "Could not pull from \"${repo}\" into \"${path}\" (status: ${status})"
+            message_failure "Could not pull from \"${repo}\" into \"${dir}\" (status: ${status})"
         fi
         popd >/dev/null || continue
     fi

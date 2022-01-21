@@ -6,10 +6,16 @@ export LAST_CONTAINER_LABEL="LAST-CONTAINER"
 export selected_container=""
 
 declare mpoint
-# TBD: we assume only one container is mounted, can there be more?
+#
+# A container path can be supplied externally by setting the LAST_CONTAINER_PATH environment
+#  variable.  When the application starts it will automatically add to this path
+#  any mounted USB volumes labeled with the ${LAST_CONTAINER_LABEL} label.
+#
+# TBD: what happens when more than one such volume is mounted (can that happen?!?)
+#
 read -r _ _ mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
 if [ "${mpoint}" ]; then
-    path_append "${LAST_CONTAINER_PATH}" "${mpoint}"
+    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${mpoint}")"
 fi
 unset mpoint
 
@@ -18,7 +24,7 @@ function container_path() {
 }
 
 #
-# Searches for a valid LAST-container along the LAST_CONTAINER_PATH
+# Searches for the first valid LAST-container along the LAST_CONTAINER_PATH
 #
 function container_lookup() {
     local container
@@ -133,9 +139,12 @@ function container_policy() {
     The ${PROG} utility uses LAST containers to manage the local machine's installation.
     One or more containers may be available at any given time. The search order is determined
      by the LAST_CONTAINER_PATH environment variable.
+
+    At startup, if an USB volume labeled ${LAST_CONTAINER_LABEL} is mounted and is a valid LAST
+     container, it is appended to LAST_CONTAINER_PATH.
     
     Possible locations may include:
-      - /some/path where a disk labeled LAST-CONTAINER is mounted (see mount -l)
+      - /some/path where a disk labeled ${LAST_CONTAINER_LABEL} is mounted (see mount -l)
       - /last0 - a central container, NFS mounted from last0
       - /some/other/path - A file-system accessible directory
 
@@ -143,7 +152,7 @@ function container_policy() {
       - A "matlab/R2020b" subdirectory with a valid Matlab installation
       - A "catalogs" subdirectory containing the LAST catalogs
       - A "github-token" file
-      - A "last-tool-x.y.z.deb" package
+      - A "last-tool-x.y.z.deb" package in the packages subdirectory
       - A wine.tgz file containing a "Copley Motion" installation
       
 EOF

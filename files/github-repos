@@ -1,0 +1,30 @@
+#
+# This is the master list of the LAST software repositories on Github.  Each line
+#  MUST have four space-separated fields:
+#
+#   <repo-name> <repo-url> <repo-branch> <repo-token-name>
+#
+# Token names:
+#   "Development"
+#   "DiChecco"
+#
+# Caveat:
+#   The fields MUST NOT contain spaces or tabs
+#
+
+# Name                              URL                                                                 Branch          Token-name
+AstroPack                           https://github.com/EranOfek/AstroPack.git                           dev1            Development
+LAST/LAST_iOptronCEM120             https://github.com/EastEriq/LAST_iOptronCEM120.git                  mastrolindo     Development
+LAST/LAST_tinycontrolIPpowerSocket  https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git       master          Development
+LAST/LAST_ZWOASICamera              https://github.com/EastEriq/LAST_ZWOASICamera.git                   mastrolindo     Development
+LAST/LAST_CelestronFocusMotor       https://github.com/EastEriq/LAST_CelestronFocusMotor.git            mastrolindo     Development
+LAST/LAST_USBserial                 https://github.com/EastEriq/LAST_USBserial.git                      master          Development
+LAST/LAST_QHYccd                    https://github.com/EastEriq/LAST_QHYccd.git                         mastrolindo     Development
+LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    mastrolindo     Development
+LAST/LAST_OCS                       https://github.com/PolishookDavid/LAST_OCS.git                      mastrolindo     Development
+LAST/LAST_Messaging                 https://github.com/EastEriq/LAST_Messaging.git                      main            Development
+LAST/LAST_EnvironmentArduinoSensors https://github.com/EastEriq/LAST_EnvironmentArduinoSensors.git      master          DiChecco
+LAST/LAST_MountArduinoSensors       https://github.com/EastEriq/LAST_MountArduinoSensors.git            master          DiChecco
+LAST/LAST_AtikCamera                https://github.com/EastEriq/LAST_AtikCamera.git                     main            DiChecco
+LAST/LAST_config                    https://github.com/EranOfek/LAST_config.git                         mastrolindo     Development
+LAST/LAST_Handle                    https://github.com/EastEriq/LAST_Handle.git                         mastrolindo     Development
