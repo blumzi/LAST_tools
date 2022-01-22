@@ -4,8 +4,6 @@ PACKAGE_DIR=packaging/${PACKAGE_NAME}
 SHELL=bash
 
 package: clean
-	mkdir -m 755 packaging
-	mkdir -m 755 ${PACKAGE_DIR}
 	mkdir -m 755 -p ${PACKAGE_DIR}/usr/local/share/last-tool ${PACKAGE_DIR}/usr/local/bin ${PACKAGE_DIR}/etc/profile.d
 	tar cf - --exclude=LAST-CONTAINER ./bin ./lib ./files ./sections | (cd ${PACKAGE_DIR}/usr/local/share/last-tool ; tar xf -)
 	ln -sf /usr/local/share/last-tool/bin/last-tool ${PACKAGE_DIR}/usr/local/bin/last-tool
