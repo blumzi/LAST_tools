@@ -4,8 +4,8 @@ module_include lib/container
 
 sections_register_section "last-software" "Manages our own LAST software" "user"
 
-export fetcher="${LAST_TOOL_ROOT}/bin/last-fetch-from-github"
-export last_software_github_repos_file
+export fetcher last_software_github_repos_file
+fetcher="$(module_locate /bin/last-fetch-from-github)"
 last_software_github_repos_file="$(module_locate files/github-repos)"
 
 function last_software_enforce() {
