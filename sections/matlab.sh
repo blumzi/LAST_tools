@@ -35,7 +35,7 @@ function matlab_init() {
 }
 
 function matlab_enforce() {
-    local installed_release
+    local installed_release status
     installed_release=$(matlab_installed_release)
 
     if [ "${installed_release}" = "${matlab_selected_release}" ]; then
@@ -44,6 +44,20 @@ function matlab_enforce() {
     fi
 
     matlab_install
+
+    # shellcheck disable=SC2154
+    if [ -d "${user_matlab_dir}/data" ]; then
+        message_success "The script startup_installer in \"AstroPack/matlab/startup\" was invoked"
+    else
+        message_info "Invoking \"startup_installer\" in \"AstroPack/matlab/startup\" ..."
+        bash -c "LANG=en_US; cd ~/matlab/AstroPack/matlab/startup; matlab -batch startup_Installer" >& /dev/null
+        status=${?}
+        if (( status == 0 )); then
+            message_success "startup_installer has succeeded"
+        else
+            message_failure "startup_installer has failed with status: ${status}"
+        fi
+    fi
 }
 
 function matlab_license_file() {
@@ -137,6 +151,15 @@ function matlab_check() {
         done
     else
         message_info "No selected container, cannot check Matlab installation availability"
+    fi
+
+    local msg
+    msg="The script startup_installer in \"AstroPack/matlab/startup\" was "
+    if [ -d "${user_matlab_dir}/data" ]; then
+        message_success "${msg} invoked"
+    else
+        message_failure "${msg} NOT invoked"
+        (( ret++ ))
     fi
 
     return $(( ret ))
@@ -266,7 +289,11 @@ function matlab_policy() {
     The LAST project currently uses Matlab ${matlab_selected_release}.
 
     - $(ansi_underline "${PROG} check matlab") - Checks that the relevant Matlab release is properly installed.
-    - $(ansi_underline "${PROG} enforce matlab") - Installs the relevant MAtlab release from a LAST-CONTAINER.
+    - $(ansi_underline "${PROG} enforce matlab") - Installs the relevant Matlab release from a LAST-CONTAINER.
 
 EOF
+}
+
+function matlab_is_installed() {
+    command -v matlab >&/dev/null
 }
