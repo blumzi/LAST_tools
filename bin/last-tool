@@ -21,6 +21,7 @@ function list_sections() {
     done | sort
 }
 
+
 function help() {
     # shellcheck disable=SC2154
     cat << EOF
@@ -30,13 +31,12 @@ function help() {
 
     This tool either checks or enforces the LAST installation policy.
 
-    Usage: ${PROG} [-q|--quiet] [-n|--nodeps] [-c|--container <path>] [-t|--token <token-or-file>] <mode> [[section] ...] 
+    Usage: ${PROG} [-q|--quiet] [-n|--nodeps] [-c|--container <path>] <mode> [[section] ...] 
            ${PROG} -h|--help
 
      -q|--quiet:       be silent (default: verbose)
      -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
      -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH, currently "$(container_path)"))
-     -t|--token:       specify a github token (either the token itself or a file containing the token)
 
      Running <mode>:
       One running <mode> must be selected from the following (no default):
@@ -141,7 +141,6 @@ function root_or_die() {
 }
 
 declare nodeps=false
-export  github_token
 
 while true; do
     case "${1}" in
@@ -176,18 +175,10 @@ while true; do
             shift 2
             ;;
 
-        -t|--token)
-            if [ ! "${2}" ]; then
-                message_fatal "The github token parameter cannot be empty.  Must be either a file name ot the token itself"
-            fi
-
-            if [ -s "${2}" ]; then
-                github_token=$(< "${2}")
-            else
-                github_token="${2}"
-            fi
-            shift 2
-            ;;
+		-s|--sections)
+			mode=sections
+			shift 1
+			;;
 
 		*)
 			break
@@ -226,6 +217,11 @@ module_include sections/last-software
 if [ "${mode}" = help ]; then
     help
     exit 0
+fi
+
+if [ "${mode}" = sections ]; then
+	sections_registered_sections
+	exit 0
 fi
 
 if [ "${mode}" = "list-sections" ]; then
