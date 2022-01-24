@@ -17,6 +17,8 @@ github_repos_file="$(module_locate files/github-repos)"
 
 declare -A git_repo git_branch git_token_name
 
+eval top_dir=~"${user_last}"/matlab
+
 declare line repo url branch token_name
 while read -r line; do
     read -r repo url branch token_name _ <<< "${line}"
@@ -63,14 +65,12 @@ function list_repos() {
     local key
 
     for key in $( sorted_repos ); do
-        printf "       %-35s %s\n" "${key}" "${git_repo[${key}]#*@}"
+        printf "       %s/%-35s %s\n" "${top_dir}" "${key}" "${git_repo[${key}]#*@}"
     done
 }
 
 OPTS=$( getopt -o 'hd:clt:' --long "help,dir:,check,list,token-file:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
-
-eval top_dir=~"${user_last}"/matlab
 
 check=false
 while true; do
