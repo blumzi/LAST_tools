@@ -103,7 +103,7 @@ function network_policy() {
      future we may opt for dynamic alocations (via DHCP) from the main IP switch.
 
     - The network is maintained by netplan(5).
-    - The file /etc/netplan/99_last_network.yaml is created and contains the LAST network (static) configuration.
+    - The file "/etc/netplan/99_last_network.yaml" is created and contains the LAST network (static) configuration.
     
     - The network must be UP on the Ethernet adapter.
     - The last0 machine must be reachable (ping)
