@@ -25,7 +25,11 @@ function path_append() {
     local member="${2}"
 
     if ! path_has_member "${path}" "${member}"; then
-        echo "${path}${path_separator}${member}"
+        if [ "${path}" ]; then
+            echo "${path}${path_separator}${member}"
+        else
+            echo "${member}"
+        fi
     else
         echo "${path}"
     fi
@@ -36,7 +40,11 @@ function path_prepend() {
     local member="${2}"
 
     if ! path_has_member "${path}" "${member}"; then
-        echo "${member}${path_separator}${path}"
+        if [ "${path}" ]; then
+            echo "${member}${path_separator}${path}"
+        else
+            echo "${member}"
+        fi
     else
         echo "${path}"
     fi
