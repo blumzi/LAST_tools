@@ -129,10 +129,14 @@ function last_software_policy() {
     All the LAST computers are both production AND development machines.  As such they
      contain git clones of the relevant software repositories (on github).
     
-    The list of repositories is maintained in ${last_software_github_repos_file}
+    The list of repositories is maintained in "${last_software_github_repos_file}"
+    The Github tokens are maintained in "$(module_lookup files/github-tokens)"
 
-    - $(ansi_bold "${PROG} check software") - checks if the local sources are up-to-date
-    - $(ansi_bold "${PROG} enforce software") - pulls the latest sources from the repositories
+    Caveat:
+        The github-tokens MUST be ignored by git (see gitignore(5))
+
+    - $(ansi_bold "${PROG} check last-software") - checks if the local sources are up-to-date
+    - $(ansi_bold "${PROG} enforce last-software") - pulls the latest sources from the repositories
     
     Software repsitories:
 
