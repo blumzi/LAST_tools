@@ -49,3 +49,12 @@ function profile_check() {
         message_failure "The file \"${_profile_last}\" does not exist"
     fi
 }
+
+function profile_policy() {
+    cat <<- EOF
+
+    We maintain the "${_profile_last}" file.  It allows BASH scripts to
+     profit from the infrastructure developed for the LAST project (modules)
+
+EOF
+}
