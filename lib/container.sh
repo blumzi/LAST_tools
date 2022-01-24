@@ -64,11 +64,6 @@ function container_is_valid() {
         (( errors++ ))
     fi
 
-    if [ ! -r "${container}/github-token" ]; then
-        # message_failure "Missing \"github-token\" in \"${container}\"" >&2
-        (( errors++ ))
-    fi
-
     local deb
     deb="$( find "${container}"/packages -name 'last-tool-*.deb' )"
     if [ ! "${deb}" ]; then
