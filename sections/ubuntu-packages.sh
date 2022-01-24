@@ -6,9 +6,8 @@ module_include lib/util
 
 sections_register_section "ubuntu-packages" "Manages additional Ubuntu packages needed by LAST" "apt"
 
-declare ubuntu_packages_missing
-declare ubuntu_packages_file="${LAST_TOOL_ROOT}/files/ubuntu-packages"
-declare ubuntu_packages_missing
+export -a ubuntu_packages_missing
+export ubuntu_packages_file="$(module_locate files/ubuntu-packages)"
 
 # get the list of additional packages required from a file, ignoring comments and empty lines
 mapfile -t ubuntu_packages_missing < <( util_uncomment "${ubuntu_packages_file}" )
@@ -31,8 +30,6 @@ function ubuntu_packages_enforce() {
 function ubuntu_packages_check() {
     local package
 
-    ubuntu_packages_missing=()
-    
     for package in "${ubuntu_packages_missing[@]}"; do
         if dpkg -L "${package}" >& /dev/null; then
             message_success "Package \"${package}\" is installed"
@@ -47,7 +44,7 @@ function ubuntu_packages_policy() {
     cat <<- EOF
 
     The LAST project is based on an 'Ubuntu 20.04.03 workstation LTS' installation.
-    A list of additional packages is maintained in ${ubuntu_packages_file}.
+    A list of additional packages is maintained in "${ubuntu_packages_file}".
 
     The list of currently added packages is:
 
@@ -55,7 +52,7 @@ EOF
     local package
     for package in "${ubuntu_packages_missing[@]}"; do
         echo "${package}"
-    done | fmt -w 50 | sed -e 's;^;    ;'
+    done | fmt -w 70 | sed -e 's;^;    ;'
 
     cat <<- EOF
 
