@@ -3,8 +3,8 @@
 module_include lib/message
 module_include lib/sections
 
-declare apt_config_file=/etc/apt/apt.conf
-declare apt_google_source_list="/etc/apt/sources.list.d/google.list"
+export apt_config_file=/etc/apt/apt.conf
+export apt_google_source_list="/etc/apt/sources.list.d/google.list"
 
 sections_register_section "apt" "Configures Apt"
 
@@ -24,7 +24,6 @@ function apt_enforce() {
     elif [[ "$(grep -s '^Acquire::http::Proxy' "${apt_config_file}")" == *http://bcproxy.weizmann.ac.il:8080* ]] &&
 			[[ "$(grep -s '^Acquire::https::Proxy' "${apt_config_file}")" == *http://bcproxy.weizmann.ac.il:8080* ]]; then
 			message_success "Config file ${apt_config_file} contains the Weizmann Inst. proxies."
-			return
 	else
         local tmp
         tmp=$(mktemp)
@@ -38,29 +37,30 @@ function apt_enforce() {
 
 		message_success "Fixed config file ${apt_config_file}"
 
-        local google_keys
-        google_keys="$(apt-key list google)"
+	fi
 
-        if [ "${google_keys}" ]; then
-            message_success "We have Google's \"Linux Package Signing Keys\" installed"
-        else
-            if [ "$(wget -q -O - "https://dl.google.com/linux/linux_signing_key.pub" | apt-key add -)" = OK ]; then
-                message_success "Installed Google's \"Linux Package Signing Keys\"."
-            else
-                message_failure "Failed to install Google's \"Linux Package Signing Keys\"."
-            fi
-        fi
+	local google_keys
+	google_keys="$(apt-key list google 2>/dev/null)"
 
-        if [ -r "${apt_google_source_list}" ]; then
-            message_success "We have Google's apt sources list (${apt_google_source_list})"
-        else
-            echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> "${apt_google_source_list}" 
-            message_success "Added Google's apt sources list (${apt_google_source_list})"
-        fi
+	if [ "${google_keys}" ]; then
+		message_success "We have Google's \"Linux Package Signing Keys\" installed"
+	else
+		if [ "$(wget -q -O - "https://dl.google.com/linux/linux_signing_key.pub" | apt-key add -)" = OK ]; then
+			message_success "Installed Google's \"Linux Package Signing Keys\"."
+		else
+			message_failure "Failed to install Google's \"Linux Package Signing Keys\"."
+		fi
+	fi
 
-        message_info "Updating apt ..."
-		apt update
-    fi
+	if [ -r "${apt_google_source_list}" ]; then
+		message_success "We have Google's apt sources list (${apt_google_source_list})"
+	else
+		echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> "${apt_google_source_list}" 
+		message_success "Added Google's apt sources list (${apt_google_source_list})"
+	fi
+
+	message_info "Updating apt ..."
+	apt update
 }
 
 function apt_check() {
@@ -78,7 +78,7 @@ function apt_check() {
     fi
 
     local google_keys
-    google_keys="$(apt-key list google)"
+    google_keys="$(apt-key list google 2>/dev/null)"
 
     if [ "${google_keys}" ]; then
         message_success "We have Google's \"Linux Package Signing Keys\" installed"
