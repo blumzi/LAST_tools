@@ -1,16 +1,33 @@
 #!/bin/bash
 
 module_include message
+module_include deploy
 
 sections_register_section "catalogs" "Handles the LAST catalogs"
 
-export catalogs_local_top="/data/catsHTM"
+export catalogs_local_top="/$(hostname)/data/catsHTM"
 export catalogs_container_top
 export -a catalogs=( GAIA/DRE3  MergedCat )
 
 function catalogs_init() {
 	if [ "${selected_container}" ]; then
 		catalogs_container_top="${selected_container}/catalogs"
+	fi
+}
+
+function catalogs_sync_catalog() {
+	local catalog="${1}"
+	local -i nfiles
+
+	nfiles=$( rsync -av --dry-run "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | grep -cE '(hdf5|csv)')
+	message_info "Synchronizing \"${catalog}\" (${nfiles} files) ..."
+	mkdir -p "${catalogs_local_top}/${catalog}"
+	rsync -avq --delete "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}"
+	status=$?
+	if (( status == 0 )); then
+		message_warning "Synchronized \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\"."
+	else
+		message_success "Failed to synchronize \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\" (status=${status})"
 	fi
 }
 
@@ -26,17 +43,9 @@ function catalogs_enforce() {
     mkdir -p ${catalogs_local_top}
 
     for catalog in "${catalogs[@]}"; do
-        local -i nfiles
-
-        message_info "Synchronizing \"${catalog}\" ..."
-        rsync -avq --delete "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}"
-        status=$?
-        if (( status = 0 )); then
-            message_warning "Synchronized \"${catalog}\"."
-        else
-            message_success "Failed to synchronize \"${catalog}\" (status=${status})"
-        fi
+		catalogs_sync_catalog "${catalog}" &
     done
+	wait
 }
 
 function catalogs_check() {
@@ -51,9 +60,9 @@ function catalogs_check() {
 
         nfiles=$(rsync -avn "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | grep -c hdf5 )
         if (( nfiles > 0 )); then
-            message_warning "Catalog ${catalog}: ${nfiles} differ"
+            message_warning "Catalog ${catalogs_local_top}/${catalog}: ${nfiles} files differ (with ${catalogs_container_top}/${catalog})"
         else
-            message_success "Catalog ${catalog} is up-to-date"
+            message_success "Catalog ${catalogs_local_top}/${catalog} is up-to-date (with ${catalogs_container_top}/${catalog})"
         fi
     done
 }
@@ -68,7 +77,7 @@ function catalogs_policy() {
      - $(ansi_underline "${PROG} enforce catalogs") - synchronizes the catalogs with the ones in the container, installing them if needed.
 
     If no container is available:
-     - ${PROG} check catalogs - checks the catalogs hierarchy and checksums against values saved at installation time
+     - ${PROG} check catalogs - (TBD) checks the catalogs hierarchy and checksums against values saved at installation time 
 
 EOF
 }
