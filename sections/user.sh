@@ -43,13 +43,19 @@ function user_enforce() {
         useradd -m -G "${user_expected_groups_list}" ${user_last}
     fi
 
+	if [ "${user_home}" = /home/ocs ]; then
+		message_success "The user's hoem is \"/home/ocs\"."
+	else
+		sed -i 's;/home[^:]*/ocs:;/home/ocs:;' /etc/passwd
+		message_success "Changed the user's home from \"${user_home}\" to \"/home/ocs\"."
+	fi
+
 	local bash_profile
 	bash_profile="${user_home}/.bash_profile"
 	if [ ! -r "${bash_profile}" ] || [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' ${bash_profile} )" != 3 ]; then
 		local tmp
 		tmp=$(mktemp)
 		{
-			cat /etc/skel/.bash_profile
 			cat <<- EOF
 			
 			export http_proxy=http://bcproxy.weizmann.ac.il:8080
@@ -108,6 +114,12 @@ function user_check() {
         (( ret++ ))
     fi
 
+	if [ "${user_home}" = /home/ocs ]; then
+		message_success "The user's home is \"/home/ocs\"."
+	else
+		message_failure "The user's home is NOT \"/home/ocs\" (it is \"${user_home}\")."
+	fi
+
     local rcfile
     rcfile="${user_home}/.bash_profile"
 	if [ -r "${rcfile}" ]; then
@@ -137,6 +149,7 @@ function user_policy() {
     All the LAST processes and resources are owned by the user "ocs"
 
     - The user must exist and be a member of the sudo and dialout groups
+    - The user's home directory should be /home/ocs
     - The directory ~ocs/matlab must exist
     - The file ~ocs/.bash_profile should contain code for:
      - using the Weizmann Institute's HTTP(s) proxies
