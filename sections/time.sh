@@ -38,6 +38,12 @@ function time_check() {
         message_failure "The ${time_service} service is NOT running"
     fi
 
+	if [ "$(timedatectl show --value --property NTPSynchronized)" = yes ]; then
+		message_success "NTP is synchronized"
+	else
+		message_warning "NTP is not synchronized"
+	fi
+
     return $(( ret ))
 }
 
