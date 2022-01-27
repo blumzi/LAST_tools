@@ -128,7 +128,7 @@ function show_environment() {
     message_info ""
     message_info " Selected (ordered, including dependencies):"
     for section in "${needed_sections[@]}"; do
-        message_info "$(printf '   %-12s %s\n' "${section}" "$(sections_section_description "${section}")")"
+        message_info "$(printf '   %-20s %s\n' "${section}" "$(sections_section_description "${section}")")"
     done
 
     local mac ipaddr hostname
@@ -268,11 +268,14 @@ if [ ${#selected_sections[*]} -eq 0 ]; then
     selected_sections=( "${registered_sections[@]}" )
 fi
 
+declare -a needed_sections
 if ${nodeps}; then
     needed_sections=( "${selected_sections[@]}" )
 else
     # build a topologically sorted array of the needed section
+    # typeset -p needed_sections
     read -r -a needed_sections <<< "$( sections_ordered_sections "${selected_sections[*]}" )"
+    # typeset -p needed_sections
 fi
 
 case "${mode}" in
