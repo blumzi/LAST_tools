@@ -17,6 +17,7 @@ github_repos_file="$(module_locate files/github-repos)"
 
 declare -A git_repo git_branch git_token_name
 
+# shellcheck disable=SC2154
 eval top_dir=~"${user_last}"/matlab
 
 declare line repo url branch token_name
