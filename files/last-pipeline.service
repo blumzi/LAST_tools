@@ -2,6 +2,8 @@
 Description=LAST pipeline service
 
 [Service]
+User=ocs
+WorkingDirectory=~ocs/matlab
 ExecStart=/usr/local/share/last-tool/bin/last-pipeline start
 
 [Install]
