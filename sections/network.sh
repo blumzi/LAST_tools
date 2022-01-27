@@ -7,7 +7,7 @@ export network_local_hostname network_local_ipaddr network_peer_hostname network
 export network_netpart network_netmask network_interface network_gateway network_gateway
 export network_broadcast network_prefix
 
-function network_init() {
+function network_set_defaults() {
     network_local_hostname=$( macmap_get_local_hostname )
     network_local_ipaddr=$( macmap_get_local_ipaddr )
     network_peer_hostname=$( macmap_get_peer_hostname )
@@ -21,16 +21,20 @@ function network_init() {
     network_netpart=10.23.1.0
     network_gateway=10.23.1.254
     network_prefix=24
+}
 
+function network_init() {
     sections_register_section "network" "Configures the LAST network"
 }
 
 #
-# Creates a proper /etc/network/interfaces for this machine
+# Creates a netplan configuration file for this machine
 # We use static addresses.  The actual addresses are deduced from the macmap file.
-# The only configured (and active interface) is eth0
+# The only configured (and active interface) should be enp67s0
 #
 function network_enforce() {
+
+    network_set_defaults
 
     cat <<- EOF > /etc/netplan/99_last_network.yaml
     network:
@@ -47,12 +51,14 @@ function network_enforce() {
               search: [wisdom.weizmann.ac.il, wismain.weizmann.ac.il, weizmann.ac.il]
 EOF
 
-        netplan apply
+    netplan apply
 }
 
 function network_check() {
     local -a words
     local -i errors
+
+    network_set_defaults
 
     #  check the Ethernet is up
     read -r -a words <<< "$( ip -o -4 address show dev "${network_interface}")"
@@ -94,6 +100,8 @@ function network_check() {
 }
 
 function network_policy() {
+
+    network_set_defaults
 
     cat <<- EOF
 
