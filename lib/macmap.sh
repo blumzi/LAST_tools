@@ -2,8 +2,14 @@
 
 module_include lib/message
 
+export _macmap_file
+
 function macmap_init() {
-    :
+    _macmap_file="$(module_locate files/MACmap)"
+
+    if [ ! "${_macmap_file}" ]; then
+        message_warning "${FUNCNAME[0]}: Cannot module_locate \"files/MACmap\" "
+    fi
 }
 
 function macmap_file() {
@@ -12,6 +18,7 @@ function macmap_file() {
 
         if [ ! "${_macmap_file}" ]; then
             message_fatal "${FUNCNAME[0]}: Cannot locate \"files/MACmap\" in LAST_MODULE_INCLUDE_PATH=\"${LAST_MODULE_INCLUDE_PATH}\""
+            return
         fi
     fi
     echo "${_macmap_file}"
@@ -62,11 +69,16 @@ function macmap_getent_by_mac() {
     fi
 
     file="$(module_locate files/MACmap)"    
-    read -r -a words <<< "$(grep -wi "^${mac}" "${file}" )" || 
+    read -r -a words <<< "$(grep -wi "^${mac}" "${file}" )"
+    
+    if [ ${#words[*]} -eq 0 ]; then
         message_fatal "${FUNCNAME[0]}: Missing mac=${mac} in ${file}"
+        return
+    fi
 
     if [ ${#words[*]} -lt 3 ]; then
-        message_fatal "${FUNCNAME[0]} Badly formatted line for mac \"${mac}\ in ${_macmap_file}"
+        message_fatal "${FUNCNAME[0]} Badly formatted line for mac \"${mac}\" in ${_macmap_file}"
+        return
     fi
     echo "${words[@]}"
 }
@@ -82,11 +94,16 @@ function macmap_getent_by_hostname() {
     
     file="$(module_locate files/MACmap)"  
     
-    read -r -a words <<< "$(grep -w "${hostname}" "${file}" )" || 
+    read -r -a words <<< "$(grep -w "${hostname}" "${file}" )"
+    
+    if [ ${#words[*]} -eq 0 ]; then
         message_fatal "${FUNCNAME[0]}: Missing hostname=${hostname} in ${file}" >&2
+        return
+    fi
 
     if [ ${#words[*]} -lt 3 ]; then
         message_fatal "${FUNCNAME[0]} Badly formatted line for hostname \"${hostname}\" in ${file}"
+        return
     fi
     echo "${words[@]}"
 }
@@ -95,14 +112,20 @@ function macmap_getent_by_hostname() {
 function macmap_getent_by_ipaddr() {
     local ipaddr="${1}"
     local -a words
+    local file
     
     file="$(module_locate files/MACmap)" 
     
-    read -r -a words <<< "$(grep -w "${ipaddr}" "${file}" )" || 
+    read -r -a words <<< "$(grep -w "${ipaddr}" "${file}" )"
+    
+    if [ ${#words[*]} -eq 0 ]; then
         message_fatal "${FUNCNAME[0]}: Missing ipaddr=${ipaddr} in ${file}"
+        return
+    fi
 
     if [ ${#words[*]} -lt 3 ]; then
-        message_fatal "${FUNCNAME[0]} Badly formatted line for ipaddr \"${ipaddr}\ in ${file}"
+        message_fatal "${FUNCNAME[0]} Badly formatted line for ipaddr \"${ipaddr}\" in ${file}"
+        return
     fi
     echo "${words[@]}"
 }
@@ -140,6 +163,7 @@ function macmap_get_peer_hostname() {
         peer_side='e'
     else
         message_fatal "${FUNCNAME[0]}: Bad host name \"${this_hostname}\" for this machine!"
+        return
     fi
 
     echo "${this_mount}${peer_side}"
