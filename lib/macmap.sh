@@ -65,7 +65,7 @@ function macmap_getent_by_mac() {
     read -r -a words <<< "$(grep -wi "^${mac}" "${file}" )" || 
         message_fatal "${FUNCNAME[0]}: Missing mac=${mac} in ${file}"
 
-    if [ ${#words[*]} -ne 3 ]; then
+    if [ ${#words[*]} -lt 3 ]; then
         message_fatal "${FUNCNAME[0]} Badly formatted line for mac \"${mac}\ in ${_macmap_file}"
     fi
     echo "${words[@]}"
@@ -85,7 +85,7 @@ function macmap_getent_by_hostname() {
     read -r -a words <<< "$(grep -w "${hostname}" "${file}" )" || 
         message_fatal "${FUNCNAME[0]}: Missing hostname=${hostname} in ${file}" >&2
 
-    if [ ${#words[*]} -ne 3 ]; then
+    if [ ${#words[*]} -lt 3 ]; then
         message_fatal "${FUNCNAME[0]} Badly formatted line for hostname \"${hostname}\" in ${file}"
     fi
     echo "${words[@]}"
@@ -101,7 +101,7 @@ function macmap_getent_by_ipaddr() {
     read -r -a words <<< "$(grep -w "${ipaddr}" "${file}" )" || 
         message_fatal "${FUNCNAME[0]}: Missing ipaddr=${ipaddr} in ${file}"
 
-    if [ ${#words[*]} -ne 3 ]; then
+    if [ ${#words[*]} -lt 3 ]; then
         message_fatal "${FUNCNAME[0]} Badly formatted line for ipaddr \"${ipaddr}\ in ${file}"
     fi
     echo "${words[@]}"

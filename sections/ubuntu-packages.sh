@@ -10,7 +10,7 @@ export -a ubuntu_packages_missing
 export ubuntu_packages_file="$(module_locate files/ubuntu-packages)"
 
 # get the list of additional packages required from a file, ignoring comments and empty lines
-mapfile -t ubuntu_packages_missing < <( util_uncomment "${ubuntu_packages_file}" )
+mapfile -t ubuntu_packages_missing < <( util_uncomment "${ubuntu_packages_file}" | sort --unique )
 
 if [ -x /usr/local/bin/matlab ]; then
     ubuntu_packages_missing+=( matlab-support )   # this one needs matlab to be installed

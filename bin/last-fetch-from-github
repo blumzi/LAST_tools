@@ -15,21 +15,22 @@ default_tokens_file="$(module_locate files/github-tokens)"
 export github_repos_file
 github_repos_file="$(module_locate files/github-repos)"
 
-declare -A git_repo git_branch git_token_name
+declare -A git_repo git_checkout_info git_token_name
 
 # shellcheck disable=SC2154
 eval top_dir=~"${user_last}"/matlab
 
-declare line repo url branch token_name
+declare line repo url checkout_info token_name
 while read -r line; do
-    read -r repo url branch token_name _ <<< "${line}"
-    if [ ! "${repo}" ] || [ ! "${url}" ] || [ ! "${branch}" ] || [ ! "${token_name}" ]; then
+    read -r repo url checkout_info token_name _ <<< "${line}"
+    if [ ! "${repo}" ] || [ ! "${url}" ] || [ ! "${checkout_info}" ] || [ ! "${token_name}" ]; then
         message_fatal "Badly formed line \"${line}\" in \"${github_repos_file}\"."
     fi
 
-          git_repo["${repo}"]="${url}"
-        git_branch["${repo}"]="${branch}"
+ git_checkout_info["${repo}"]="${checkout_info}"
     git_token_name["${repo}"]="${token_name}"
+          git_repo["${repo}"]="${url}"
+
 done < <(util_uncomment "${github_repos_file}")
 
 function sorted_repos() {
@@ -65,6 +66,7 @@ EOF
 function list_repos() {
     local key
 
+    # TBD: list tags and branches
     for key in $( sorted_repos ); do
         printf "       %s/%-35s %s\n" "${top_dir}" "${key}" "${git_repo[${key}]#*@}"
     done
@@ -123,6 +125,9 @@ if ${check}; then
     cd "${top_dir}" || exit 1
     for dir in $( sorted_repos ); do
         if [ -d "${dir}" ] && [ -d "${dir}/.git" ]; then
+            #
+            # TBD: check branch and tag
+            #
             pushd "${dir}" >/dev/null || true
             git status >/dev/null 2>&1
             status=$?
@@ -140,11 +145,6 @@ if ${check}; then
     done
     exit $(( errors ))
 fi
-
-# if [ "$(id -un)" != "${user_last}" ]; then
-#     echo "${PROG}: Must run as user \"${user_last}\", exiting"
-#     exit 1
-# fi
 
 # enforce
 if [ ! "${tokens_file}" ]; then
@@ -169,10 +169,10 @@ if [ ! -d "${top_dir}" ]; then
 fi
 cd "${top_dir}" || exit 1
 
-declare repo status url branch token_name token
+declare repo status url checkout_info token_name token
 for key in $( sorted_repos ); do
+ checkout_info="${git_checkout_info["${key}"]}"
     token_name="${git_token_name[${key}]}"
-        branch="${git_branch["${key}"]}"
          token="${github_token[${token_name}]}"
           repo="${git_repo[${key}]}"
            dir="${key}"
@@ -180,6 +180,8 @@ for key in $( sorted_repos ); do
     if [ ! "${token}" ]; then
         message_fatal "Github token \"${token_name}\" for repo \"${repo}\" not found in \"${tokens_file}\""
     fi
+
+    declare checkout_args tag branch msg
 
     if [ ! -d "${dir}/.git" ]; then
         mkdir -p "${dir}"
@@ -189,14 +191,34 @@ for key in $( sorted_repos ); do
         status=$?
         if [ "${status}" -eq 0 ]; then
             message_success "Cloned \"${repo}\" into \"${dir}\"."
-            if [ "${branch}" ]; then
+            if [ "${checkout_info}" ] && [ "${checkout_info}" != "none" ]; then
+                declare -a info
+                read -r -a info <<< "${checkout_info//,/ }"
+	        checkout_args="" tag="" branch="" msg=""
+
+                for i in "${info[@]}"; do
+                    case "${i}" in
+                        tag:*)
+			    tag="${info#tag:}"
+                            checkout_args+="tags/${tag} "
+			    msg+="tag=${tag} "
+                            ;;
+                        branch:*)
+			    branch="${info#branch:}"
+                            checkout_args+="${branch} "
+			    msg+="branch=${branch} "
+                            ;;
+                    esac
+                    
+                done
+                
                 pushd "$(basename "${dir}")" >/dev/null || true
-                git checkout "${branch}" >/dev/null 2>&1
+                git checkout ${checkout_args} >/dev/null 2>&1
                 status=$?
                 if (( status == 0 )); then
-                    message_success "Switched to branch \"${branch}\" in \"${dir}\"."
+                    message_success "Checked out with ${msg} in \"${dir}\"."
                 else
-                    message_failure "Could not switch to branch \"${branch}\" in \"${dir}\" (status: ${status})"
+                    message_failure "Could not checkout with ${msg} in \"${dir}\" (status: ${status})"
                 fi
                 popd >/dev/null || true
             fi
@@ -206,7 +228,7 @@ for key in $( sorted_repos ); do
         popd >/dev/null || continue
     else
         pushd "${dir}" >/dev/null || continue
-        git pull >/dev/null
+        git pull --all --tags >/dev/null
         status=$?
         if (( status == 0 )); then
             message_success "Pulled from \"${repo}\" into \"${dir}\"."
