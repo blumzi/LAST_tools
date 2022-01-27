@@ -1,3 +1,7 @@
+#
+# This  file is a simple list of Ubuntu packages (installable via apt) that are
+#  required by a LAST installation
+#
 
 synaptic
 mlocate
