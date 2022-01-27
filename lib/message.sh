@@ -76,7 +76,7 @@ function message_info {
 function message_fatal() {    
     echo -e "${PROG}: $(ansi_bright_red FATAL:) $(ansi_bold "${*}")" >&2
     if [ "${LAST_TOOL_PID}" ]; then
-        kill "${LAST_TOOL_PID}" >& /dev/null
+        kill -SIGTERM "${LAST_TOOL_PID}" >& /dev/null
     fi
 
     if ! ${LAST_TOOL_DONTLOG}; then
