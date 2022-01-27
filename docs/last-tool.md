@@ -36,10 +36,12 @@ LAST_CONTAINER_PATH=/mnt/containers/central-container last-tool check matlab
 
 This will look in the `/mnt/containers/central-container/matlab` directory for available _Matlab_ installations.
 
-**NOTE**: If a USB storage device, labeled *LAST-CONTAINER*, is currently mounted on `/media/ocs/LAST-CONTAINER` it will
+**NOTE**:
+
+&nbsp;&nbsp;&nbsp;&nbsp;If a USB storage device, labeled *LAST-CONTAINER*, is currently mounted on `/media/ocs/LAST-CONTAINER` it will
 be automatically appended to the *LAST_CONTAINER_PATH*.
 
-### The specified container
+### Specifying a container
 
 A container can be specified to `last-tool` (see below) by passing the respective flag, as in:
 
@@ -49,7 +51,7 @@ last-tool --container /mnt/containers/central-container check matlab
 
 ## The one `last-tool` to rule them all
 
-The `last-tool` was conceived to fulfill these requirements.  It is designed to be used:
+The `last-tool` was conceived to fulfill the *LAST* policy.  It is designed to be used:
 
 - At deployment-time to install and configure all the software components needed by the *LAST* project.
 - Forever afterwards to maintain the *LAST* **_operational_** installation.
