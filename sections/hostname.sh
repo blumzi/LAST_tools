@@ -8,6 +8,11 @@ sections_register_section "hostname" "Manages stuff related to the machine's hos
 function hostname_enforce() {
     local this_hostname
 
+    if [ ! "$(macmap_file)" ]; then
+        message_fatal "Missing MACmap file"
+        return
+    fi
+
     this_hostname=$( macmap_get_local_hostname )
 
     if ! hostname_is_valid "${this_hostname}"; then
