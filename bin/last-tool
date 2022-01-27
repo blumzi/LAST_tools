@@ -1,12 +1,22 @@
 #!/bin/bash
 
+#
+# Signal handler for SIGTERM from message_fatal
+#
+function onSIGTERM() {
+    exit 2
+}
+
+trap onSIGTERM SIGTERM
+
+#shellcheck source=/dev/null
 source /etc/profile.d/last.sh
 
 export PROG
 PROG=$(basename "${0}")
 export LAST_TOOL_PID="${$}"
 
-export http_proxy="http://bcproxy.weizmann.ac.il:8080"
+export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
 export https_proxy="http://bcproxy.weizmann.ac.il:8080"
 
 module_include lib/message
