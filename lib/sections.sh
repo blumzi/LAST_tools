@@ -39,7 +39,7 @@ function sections_registered_sections() {
 #  including their dependencies
 #
 function sections_ordered_sections() {
-    local -a requested_sections ordered_sections needed
+    local -a requested_sections ordered_sections=() needed
     local section need
 
     read -r -a requested_sections <<< "${1}"
@@ -48,15 +48,19 @@ function sections_ordered_sections() {
     mapfile -t ordered_sections < <( 
         for section in "${requested_sections[@]}"; do
             if [ "${_sections_required[${section}]}" ]; then
+                needed=()
                 read -r -a needed <<< "${_sections_required["${section}"]}"
                 for need in "${needed[@]}"; do
                     echo "${need} ${section}"
                 done
             fi
             echo "top ${section}"
+            # echo "top ${section}" >&2
         done | tsort | grep -vw top
     )
-    echo "${ordered_sections[@]}"
+    echo "${ordered_sections[*]}"
+    # typeset -p requested_sections >&2
+    # typeset -p ordered_sections >&2
 }
 
 function sections_section_description() {
