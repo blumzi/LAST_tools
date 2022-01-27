@@ -6,6 +6,9 @@ export PROG
 PROG=$(basename "${0}")
 export LAST_TOOL_PID="${$}"
 
+export http_proxy="http://bcproxy.weizmann.ac.il:8080"
+export https_proxy="http://bcproxy.weizmann.ac.il:8080"
+
 module_include lib/message
 module_include lib/macmap
 module_include lib/container
@@ -40,11 +43,11 @@ function help() {
 
      Running <mode>:
       One running <mode> must be selected from the following (no default):
-        check:         Checks if the current machine complies with the LAST installation policy
-        enforce:       Enforces the LAST installation policy upon the current machine
-        show:          Shows some information about the available installation resources
-        show-policy:   Prints out the LAST policy for the seected section(s)
-        list-sections: Just list all the available sections
+        check:                Checks if the current machine complies with the LAST installation policy
+        enforce:              Enforces the LAST installation policy upon the current machine
+        show-env|env:         Shows some information about the available installation resources
+        show-policy|policy:   Prints out the LAST policy for the seected section(s)
+        list-sections:        Just list all the available sections
 
      Sections:
       The workload is split into (possibly inter-dependant) sections.
@@ -56,7 +59,7 @@ function help() {
 EOF
 }
 
-function show_info() {
+function show_environment() {
     local msg
 
     export LAST_TOOL_DONTLOG=true   # inform message_xxx not to log
@@ -149,10 +152,15 @@ while true; do
             shift 1
             ;;
         
-        check|enforce|show|list-sections)
+        check|enforce|list-sections)
             mode="${1}"
             shift 1
             break
+            ;;
+
+        show-env|env)
+            mode=show
+            shift 1
             ;;
 
         show-policy|policy)
@@ -175,7 +183,7 @@ while true; do
             shift 2
             ;;
 
-		-s|--sections)
+		-s|--sections)      # for bash completion
 			mode=sections
 			shift 1
 			;;
@@ -259,7 +267,7 @@ fi
 
 case "${mode}" in
 show)
-    show_info
+    show_environment
     exit 0
     ;;
 

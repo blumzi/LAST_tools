@@ -24,7 +24,7 @@ function hostname_enforce() {
     #
     # Create a fresh /etc/hosts
     #
-    local tmp
+    local tmp ipaddr aliases
 
     tmp=$(mktemp)
     {
@@ -32,9 +32,8 @@ function hostname_enforce() {
         echo -e "127.0.1.1\t${this_hostname}"
         echo ""
 
-        local -a words
-        while read -r -a words; do
-            echo -e "${words[2]}\t${words[1]}"
+        while read -r _ ipaddr aliases; do
+            echo -e "${ipaddr}\t${aliases}"
         done < <( grep 10.23 "$(macmap_file)")
 
         cat <<- EOF
@@ -171,7 +170,7 @@ function hostname_policy() {
     - last{01..12}{e|w} for each of the 12 mounts, where 'e' and 'w' denote the East 
        and the West machines respectively
     - last0 is the LAST master machine
-    - switch{01..12}{e|w} for the IP controlled power switches (two per mount)
+    - pswitch{01..12}{e|w} for the IP controlled power switches (two per mount)
 
     We currently do not use a dynamic name service (DNS) so the machine names are statically
      mapped in /etc/hosts on each of the LAST machines.

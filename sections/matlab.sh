@@ -50,7 +50,7 @@ function matlab_enforce() {
         message_success "The script startup_installer in \"AstroPack/matlab/startup\" was invoked"
     else
         message_info "Invoking \"startup_installer\" in \"AstroPack/matlab/startup\" ..."
-        bash -c "LANG=en_US; cd ~/matlab/AstroPack/matlab/startup; matlab -batch startup_Installer" >& /dev/null
+        su "${user_last}" -c "LANG=en_US; cd ${user_matlab_dir}/matlab/AstroPack/matlab/startup; matlab -batch startup_Installer" >& /dev/null
         status=${?}
         if (( status == 0 )); then
             message_success "startup_installer has succeeded"
@@ -154,7 +154,7 @@ function matlab_check() {
     fi
 
     local msg
-    msg="The script startup_installer in \"AstroPack/matlab/startup\" was "
+    msg="The script startup_installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was "
     if [ -d "${user_matlab_dir}/data" ]; then
         message_success "${msg} invoked"
     else

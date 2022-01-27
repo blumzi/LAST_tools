@@ -3,9 +3,10 @@
 module_include message
 module_include deploy
 
-sections_register_section "catalogs" "Handles the LAST catalogs"
+sections_register_section "catalogs" "Handles the LAST catalogs" "filesytems"
 
-export catalogs_local_top="/$(hostname)/data/catsHTM"
+export catalogs_local_top
+catalogs_local_top="/$(hostname)/data/catsHTM"
 export catalogs_container_top
 export -a catalogs=( GAIA/DRE3  MergedCat )
 
@@ -40,7 +41,7 @@ function catalogs_sync_catalog() {
 function catalogs_enforce() {
     local status
     
-    mkdir -p ${catalogs_local_top}
+    mkdir -p "${catalogs_local_top}"
 
     for catalog in "${catalogs[@]}"; do
 		catalogs_sync_catalog "${catalog}" &

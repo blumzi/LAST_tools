@@ -5,12 +5,13 @@ module_include lib/sections
 module_include lib/macmap
 module_include sections/network
 
-sections_register_section "filesystems" "Manages the exporting/mounting of filesystems" "network"
+sections_register_section "filesystems" "Manages the exporting/mounting of filesystems" "network ubuntu-packages"
 
 #
 # Cross mounting of filesystems between sibling machines (belonging to same LAST mount)
 # Example: Mount last1 has two computers last01e and last01w
 #   On: last01e
+
 #       /last01e/data1  - local fs
 #       /last01e/data2  - local fs
 #       /last01w/data1  - nfs mount from last01w:/last01w/data1
