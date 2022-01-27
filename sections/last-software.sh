@@ -2,7 +2,7 @@
 
 module_include lib/container
 
-sections_register_section "last-software" "Manages our own LAST software" "user"
+sections_register_section "last-software" "Manages our own LAST software" "user" "--repo"
 
 export fetcher last_software_github_repos_file
 fetcher="$(module_locate /bin/last-fetch-from-github)"
