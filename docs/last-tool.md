@@ -11,11 +11,11 @@ and subsystems to perform their tasks.
 
 These requirements induce a highly repetitive and error prone set of administrative activities, specially when considering the large number of computers in the system.
 
-## The **_LAST policy_**
+## Policies
 
-We define a **_LAST policy_**.  It defines anything and everything that differentiates  the **_operational_** installation from the **_basic_** installation.  For modularity and granularity it was split into _sections_, each with its own specific **_policy_**.
+We define a **_LAST policy_** which defines **anything and everything** that differentiates  the **_operational_** installation from the **_basic_** installation.  For modularity and granularity it was split into _sections_, each with its own specific **_policy_**.
 
-## *LAST* containers
+## Containers
 
 A *LAST* container is a directory that contains components needed for a *LAST* installation, which cannot be installed via
 the Internet.  The top directory contains a well defined list of subdirectories:
