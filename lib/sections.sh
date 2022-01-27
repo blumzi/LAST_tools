@@ -1,46 +1,37 @@
 #!/bin/bash
 
-declare -a _registered_section_names
-declare -a _registered_section_descriptions
-export -A _required_sections=()
+export -A _sections_registered=()
+export -A _sections_descriptions=()
+export -A _sections_required=()
+export -A _sections_flags=()
 
 #
-# Register a section, with optional requirements
+# Register a section, with description, requirements and flags
 #
 function sections_register_section() {
     local name="${1}"
     local description="${2}"
     local requires="${3}"
+    local flags="${4}"
 
-    for s in "${_registered_section_names[@]}"; do
-        if [ "${s}" = "${name}" ]; then
-            return
-        fi
-    done
-
-    _registered_section_names+=( "${name}" )
-    _registered_section_descriptions+=( "${description}" )
-    if [ "${requires}" ]; then
-        _required_sections[${name}]="${requires}"
+    if [ "${_sections_registered[${name}]}" ]; then # already registered
+        return
     fi
-#	{
-#		local str
-#		str="register: section ${name} "
-#		for key in ${!_required_sections[*]}; do
-#			str+="_required_sections[${key}]=\"${_required_sections[${key}]}\" "
-#		done
-#		echo "${str}"
-#	} >&2
+
+      _sections_registered[${name}]="${name}"
+    _sections_descriptions[${name}]="${description}"
+        _sections_required[${name}]="${requires}"
+           _sections_flags[${name}]="${flags}"
 }
 
 function sections_section_requires() {
     local section="${1}"
 
-    echo "${_required_sections[${section}]}"
+    echo "${_sections_required[${section}]}"
 }
 
 function sections_registered_sections() {
-    echo "${_registered_section_names[@]}"
+    echo "${!_sections_registered[@]}"
 }
 
 #
@@ -49,14 +40,15 @@ function sections_registered_sections() {
 #
 function sections_ordered_sections() {
     local -a requested_sections ordered_sections needed
+    local section need
 
     read -r -a requested_sections <<< "${1}"
 
     # build a topologically sorted array of the needed section
     mapfile -t ordered_sections < <( 
         for section in "${requested_sections[@]}"; do
-            if [ "${_required_sections[${section}]}" ]; then
-                read -r -a needed <<< "${_required_sections["${section}"]}"
+            if [ "${_sections_required[${section}]}" ]; then
+                read -r -a needed <<< "${_sections_required["${section}"]}"
                 for need in "${needed[@]}"; do
                     echo "${need} ${section}"
                 done
@@ -68,14 +60,9 @@ function sections_ordered_sections() {
 }
 
 function sections_section_description() {
-    local name="${1}"
+    local section="${1}"
 
-    for (( i = 0; i < ${#_registered_section_names[@]}; i++)); do
-        if [ "${_registered_section_names[i]}" = "${name}" ]; then
-            echo "${_registered_section_descriptions[$i]}"
-            return
-        fi
-    done
+    echo "${_sections_descriptions[${section}]}"
 }
 
 function sections_section_has_method() {
@@ -87,4 +74,10 @@ function sections_section_has_method() {
     else
         return 1
     fi
+}
+
+function sections_section_flags() {
+    local section="${1}"
+
+    echo "${_sections_flags[${section}]}"
 }
