@@ -22,13 +22,13 @@ the Internet.  The top directory contains a well defined list of subdirectories:
 
 - `catalogs`: Contains the catalogs used by the *LAST* pipeline
 - `packages`: Contains some packages that are not available via use of apt. These include the `last-tool` package itself.
-- `matlab`: Contains original _Matlab_ installation areas, used for silently installing the product
+- `matlab`: Contains original _Matlab_ installation area(s), used for silently installing the product (currently only *R2020b*)
 
 ### The default container
 
-The `last-tool` will use the first **valid** container along the *LAST_CONTAINER_PATH* environment variable.
+`last-tool` will use the first **valid** container along the *LAST_CONTAINER_PATH* environment variable.
 
-Assuming that a **valid** container has been mounted onto `/mnt/containers/central-container`, one can run:
+Assuming that a **valid** container has been manually mounted onto `/mnt/containers/central-container`, one can run:
 
 ```bash
 LAST_CONTAINER_PATH=/mnt/containers/central-container last-tool check matlab
@@ -38,8 +38,7 @@ This will look in the `/mnt/containers/central-container/matlab` directory for a
 
 **NOTE**:
 
-&nbsp;&nbsp;&nbsp;&nbsp;If a USB storage device, labeled *LAST-CONTAINER*, is currently mounted on `/media/ocs/LAST-CONTAINER` it will
-be automatically appended to the *LAST_CONTAINER_PATH*.
+&nbsp;&nbsp;&nbsp;&nbsp;If a USB storage device, labeled *LAST-CONTAINER*, is currently mounted (by default onto `/media/ocs/LAST-CONTAINER`) it will be automatically appended to the *LAST_CONTAINER_PATH*.
 
 ### Specifying a container
 
@@ -136,9 +135,20 @@ If no sections were specified, all the defined sections will be included.
 
 ### Messages
 
+`last-tool` produces the following types of messages, labeled accordingly:
+
+- `[INFO]` - Informative messages
+- `[ OK ]` - Success messages
+- `[WARN]` - Warning messages
+- `[FAIL]` - Failure messages
+- `FATAL`  - Fatal messages.  `last-tool` will terminate after producing such a message
+
+All the messages are logged to the system log (using `logger`) unless the environment variable `LAST_TOOL_DONTLOG` is set to `true`
+
 ## Scenarios
 
 Here are a few possible usage scenarios.
+
 ### First-time installations
 
 ### Pulling the latest *LAST* software
