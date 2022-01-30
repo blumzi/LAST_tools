@@ -6,7 +6,7 @@ module_include lib/sections
 export apt_config_file=/etc/apt/apt.conf
 export apt_google_source_list="/etc/apt/sources.list.d/google.list"
 
-sections_register_section "apt" "Configures Apt"
+sections_register_section "apt" "Configures Apt" "network"
 
 function apt_enforce() {
     
