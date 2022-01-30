@@ -5,6 +5,8 @@ Description=LAST pipeline service
 User=ocs
 WorkingDirectory=~ocs/matlab
 ExecStart=/usr/local/share/last-tool/bin/last-pipeline start
+ExecStop=pkill last-pipeline
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
