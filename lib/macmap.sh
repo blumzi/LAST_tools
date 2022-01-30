@@ -45,7 +45,7 @@ function macmap_mac_to_ip_address() {
     fi
     
     read -r -a words <<< "$(macmap_getent_by_mac "${mac}")" || return $?
-    echo "${words[2]}"
+    echo "${words[1]}"
 }
 
 function macmap_mac_to_hostname() {
@@ -56,7 +56,7 @@ function macmap_mac_to_hostname() {
     fi
     
     read -r -a words <<< "$(macmap_getent_by_mac "${mac}")" || return $?
-    echo "${words[1]}"
+    echo "${words[2]}"
 }
 
 function macmap_getent_by_mac() {
