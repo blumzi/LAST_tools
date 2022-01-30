@@ -13,6 +13,17 @@ matlab_releases_dir="$(module_locate files/matlab-releases)"
 
 matlab_selected_release="R2020b"
 
+eval user_last="ocs"
+# shellcheck disable=SC2154
+eval user_home=~"${user_last}"
+# shellcheck disable=SC2154
+eval user_matlab_dir="${user_home}"/matlab
+
+# shellcheck disable=SC2154
+export user_startup="${user_matlab_dir}/startup.m"
+export last_startup="${user_matlab_dir}/AstroPack/matlab/startup/startup_LAST.m"
+
+
 function mac_to_file_name() {
     declare mac="${1}"
 
@@ -24,7 +35,7 @@ function matlab_available_releases() {
 }
 
 function matlab_init() {
-    sections_register_section "matlab" "Manages the MATLAB installation" "user"
+    sections_register_section "matlab" "Manages the MATLAB installation" "user apt"
 
     matlab_local_mac=$(macmap_get_local_mac)
     
@@ -40,10 +51,9 @@ function matlab_enforce() {
 
     if [ "${installed_release}" = "${matlab_selected_release}" ]; then
         message_success "Matlab ${matlab_selected_release} is already installed"
-        return
+	else
+		matlab_install
     fi
-
-    matlab_install
 
     # shellcheck disable=SC2154
     if [ -d "${user_matlab_dir}/data" ]; then
@@ -58,6 +68,8 @@ function matlab_enforce() {
             message_failure "startup_installer has failed with status: ${status}"
         fi
     fi
+
+	startup_enforce
 }
 
 function matlab_license_file() {
@@ -153,6 +165,15 @@ function matlab_check() {
         message_info "No selected container, cannot check Matlab installation availability"
     fi
 
+    if which matlab >&/dev/null; then 
+        if ! dpkg -l matlab-support >/dev/null; then
+            message_failure "The matlab-support package is NOT installed"
+        else
+            message_success "The matlab-support package is installed"
+            (( ret++ ))
+        fi
+    fi
+
     local msg
     msg="The script startup_installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was "
     if [ -d "${user_matlab_dir}/data" ]; then
@@ -161,6 +182,9 @@ function matlab_check() {
         message_failure "${msg} NOT invoked"
         (( ret++ ))
     fi
+
+    startup_check
+    (( ret += $? ))
 
     return $(( ret ))
 }
@@ -178,7 +202,7 @@ function matlab_install() {
 	export MATLABROOT=${matlab_top}
 
     if [ -d "${matlab_top}" ] && [ -x "${MATLABROOT}/bin/matlab" ]; then
-        message_success "Matlab ${matlab_selected_release} seems to be already installed"
+        message_success "Matlab ${matlab_selected_release} is already installed"
     else
         local_mac=$( macmap_get_local_mac )
 
@@ -242,28 +266,38 @@ EOF
 		/bin/rm -f "${installer_input}"
     fi
 
-    #
-    # Prepare activation responses for the Matlab installation
-    #
-    activate_ini=$( mktemp )
-    cat <<- EOF > "${activate_ini}"
-    # SPECIFY ACTIVATION MODE
-    isSilent=true
-    # SPECIFY ACTIVATION TYPE (Required)
-    activateCommand=activateOffline
-    # SPECIFY LICENSE FILE LOCATION (Required if activateCommand=activateOffline)
-    licenseFile=$(matlab_license_file)
-EOF
-    message_info "Silently activating Matlab ${matlab_selected_release} (~1 minute) ..."
-    # Activate the Matlab by running, it will says 'success'
-    declare result
-    result="$( ${matlab_top}/bin/activate_matlab.sh -propertiesFile ${activate_ini} )"
-    status=${?}
-    if [ ${status} -eq 0 ] && [ "${result}" = "Silent activation succeeded." ]; then
-        message_success "Successfuly activated Matlab ${matlab_selected_release}"
-    else
-        message_fatal "Failed to activate Matlab ${matlab_selected_release} (status=${status})"
-    fi
+	local matlabroot license_file
+	matlabroot="$( stat --format '%N' "$(which matlab)" | sed -e 's;^.*->.;;' -e "s;';;g" -e "s;/bin/matlab;;" )"
+	matlab_release=$(basename "${matlabroot}")
+	license_file="$( find "${matlabroot}"/licenses -name "license_$(hostname -s)_*_${matlab_release}.lic" )"
+
+	if [ ! "${license_file}" ]; then
+
+		#
+		# Prepare activation responses for the Matlab installation
+		#
+		activate_ini=$( mktemp )
+		cat <<- EOF > "${activate_ini}"
+		# SPECIFY ACTIVATION MODE
+		isSilent=true
+		# SPECIFY ACTIVATION TYPE (Required)
+		activateCommand=activateOffline
+		# SPECIFY LICENSE FILE LOCATION (Required if activateCommand=activateOffline)
+		licenseFile=$(matlab_license_file)
+	EOF
+		message_info "Silently activating Matlab ${matlab_selected_release} (~1 minute) ..."
+		# Activate the Matlab by running, it will says 'success'
+		declare result
+		result="$( ${matlab_top}/bin/activate_matlab.sh -propertiesFile "${activate_ini}" )"
+		status=${?}
+		if [ ${status} -eq 0 ] && [ "${result}" = "Silent activation succeeded." ]; then
+			message_success "Successfuly activated Matlab ${matlab_selected_release}"
+		else
+			message_fatal "Failed to activate Matlab ${matlab_selected_release} (status=${status})"
+		fi
+	else
+		message_success "Matlab ${matlab_release} has already been activated"
+	fi
 
     # Finally, link the matlab to /usr/local/bin, 
     ln -sf ${matlab_top}/bin/matlab /usr/local/bin/matlab
@@ -278,9 +312,16 @@ EOF
         echo "export PATH=\${PATH}:MATLABROOT/bin"
     } > "${tmp}"
     mv "${tmp}" "${bashrc}"
+    chown "${user_last}"."${user_last}" "${bashrc}"
     message_success "Added MATLABROOT=${matlab_top}/bin to ${bashrc}"
 
-    /bin/rm "${activate_ini}"
+    /bin/rm "${activate_ini}" >& /dev/null
+
+    export MATLABROOT=${matlab_top}/bin
+    if ! dpkg -l matlab-support >&/dev/null; then
+        message_info "Installing matlab-support"
+        apt -y install matlab-support
+    fi
 }
 
 function matlab_policy() {
@@ -291,9 +332,59 @@ function matlab_policy() {
     - $(ansi_underline "${PROG} check matlab") - Checks that the relevant Matlab release is properly installed.
     - $(ansi_underline "${PROG} enforce matlab") - Installs the relevant Matlab release from a LAST-CONTAINER.
 
+    If Matlab is installed, the matlab-support package must be installed as well.
+
+    The file ${last_startup} should be hard linked to ${user_startup}.
+
 EOF
 }
 
 function matlab_is_installed() {
     command -v matlab >&/dev/null
+}
+
+function startup_check() {
+    declare -i errors=0
+
+    if [ ! -r "${last_startup}" ]; then
+        message_failure "Missing \"${last_startup}\""
+        (( errors++ ))
+	else
+		message_success "LAST startup \"${last_startup}\" exists"
+    fi
+
+    if [ ! -r "${user_startup}" ]; then
+        message_failure "Missing \"${user_startup}\""
+        (( errors++ ))
+	else
+		message_success "User startup \"${user_startup}\" exists"
+    fi
+
+	if [ -r "${user_startup}" ] && [ -r "${last_startup}" ]; then
+		local inode0 inode1
+		inode0="$(stat --format "%i" "${user_startup}" 2>/dev/null)"
+		inode1="$(stat --format "%i" "${last_startup}" 2>/dev/null)"
+		if [ "${inode0}" != "${inode1}" ]; then
+			message_failure "\"${user_startup}\" is not hard linked to \"${last_startup}\""
+			(( errors++ ))
+		else
+			message_success "\"${user_startup}\" is hard linked to \"${last_startup}\""
+		fi
+	fi
+
+    return $(( errors ))
+}
+
+function startup_enforce() {
+    declare -i errors=0
+
+    if [ ! -r "${last_startup}" ]; then
+        message_failure "Missing \"${last_startup}\""
+        (( errors++ ))
+    fi
+
+    ln -f "${last_startup}" "${user_startup}"
+    message_success "Linked \"${last_startup}\" to \"${user_startup}\"."
+
+    return $(( errors ))
 }
