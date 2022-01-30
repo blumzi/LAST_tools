@@ -7,23 +7,20 @@ module_include lib/util
 sections_register_section "ubuntu-packages" "Manages additional Ubuntu packages needed by LAST" "apt"
 
 export -a ubuntu_packages_missing
-export ubuntu_packages_file="$(module_locate files/ubuntu-packages)"
+export ubuntu_packages_file
+ubuntu_packages_file="$(module_locate files/ubuntu-packages)"
 
 # get the list of additional packages required from a file, ignoring comments and empty lines
 mapfile -t ubuntu_packages_missing < <( util_uncomment "${ubuntu_packages_file}" | sort --unique )
-
-if [ -x /usr/local/bin/matlab ]; then
-    ubuntu_packages_missing+=( matlab-support )   # this one needs matlab to be installed
-fi
 
 function ubuntu_packages_enforce() {
 
     LAST_TOOL_QUIET=true packages_check
     message_info "Updating apt ..."
-    apt -qq --no-show-upgraded update
+    apt --no-show-upgraded update
     if [ ${#ubuntu_packages_missing[*]} -gt 0 ]; then
         message_info "Installing: ${ubuntu_packages_missing[*]}"
-        apt install -qq -y "${ubuntu_packages_missing[@]}"    
+        apt install -y "${ubuntu_packages_missing[@]}"    
     fi
 }
 
