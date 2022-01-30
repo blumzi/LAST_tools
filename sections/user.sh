@@ -44,7 +44,7 @@ function user_enforce() {
     fi
 
 	if [ "${user_home}" = /home/ocs ]; then
-		message_success "The user's hoem is \"/home/ocs\"."
+		message_success "The user's home is \"/home/ocs\"."
 	else
 		sed -i 's;/home[^:]*/ocs:;/home/ocs:;' /etc/passwd
 		message_success "Changed the user's home from \"${user_home}\" to \"/home/ocs\"."
