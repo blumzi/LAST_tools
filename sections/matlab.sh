@@ -35,7 +35,7 @@ function matlab_available_releases() {
 }
 
 function matlab_init() {
-    sections_register_section "matlab" "Manages the MATLAB installation" "user apt"
+    sections_register_section "matlab" "Manages the MATLAB installation" "user apt last-software"
 
     matlab_local_mac=$(macmap_get_local_mac)
     
@@ -60,7 +60,7 @@ function matlab_enforce() {
         message_success "The script startup_installer in \"AstroPack/matlab/startup\" was invoked"
     else
         message_info "Invoking \"startup_installer\" in \"AstroPack/matlab/startup\" ..."
-        su "${user_last}" -c "LANG=en_US; cd ${user_matlab_dir}/matlab/AstroPack/matlab/startup; matlab -batch startup_Installer" >& /dev/null
+        cd "${user_matlab_dir}"/AstroPack/matlab/startup || return; LANG=en_US matlab -batch startup_Installer
         status=${?}
         if (( status == 0 )); then
             message_success "startup_installer has succeeded"
@@ -70,9 +70,20 @@ function matlab_enforce() {
     fi
 
 	startup_enforce
+    service_enforce
+}
 
-    if ! systemctl is-enabled last-pipeline >/dev/null; then
-        if systemctl enable last-pipeline >/dev/null; then
+function service_enforce() {
+    local system_file="/etc/systemd/system/last-pipeline.service"
+    local our_file="/usr/local/share/last-tool/files/last-pipeline.service"
+
+    if [ ! -r "${system_file}" ]; then
+        ln -sf "${our_file}" "${system_file}"
+        message_success "Linked \"${our_file}\" to \"${system_file}\"."
+    fi
+    
+    if ! systemctl is-enabled last-pipeline >& /dev/null; then
+        if systemctl enable last-pipeline >& /dev/null; then
             message_success "Enabled the \"last-pipeline\" service"
         else
             message_failure "Failed to enable the \"last-pipeline\" service"
@@ -193,17 +204,28 @@ function matlab_check() {
         (( ret++ ))
     fi
 
-    startup_check
-    (( ret += $? ))
+    startup_check; (( ret += $? ))
 
-    if systemctl is-enabled last-pipeline >/dev/null; then
+    service_check; (( ret += $? ))
+
+    return $(( ret ))
+}
+
+function service_check() {
+    local system_file="/etc/systemd/system/last-pipeline.service"
+    local our_file="/usr/local/share/last-tool/files/last-pipeline.service"
+
+    if [ ! -r "${system_file}" ]; then
+        message_failure "Our file \"${our_file}\" is not linked to \"${system_file}\"."
+        return 1
+    fi
+    
+    if systemctl is-enabled last-pipeline >& /dev/null; then
         message_success "The \"last-pipeline\" service is enabled"
     else
         message_failure "Failed to enable the \"last-pipeline\" service"
-        (( ret++ ))
+        return 1
     fi
-    
-    return $(( ret ))
 }
 
 #
@@ -282,6 +304,8 @@ EOF
         sudo cp -r ${matlab_top}/bin/* ${MATLABROOT}/bin 2>/dev/null
 		/bin/rm -f "${installer_input}"
     fi
+
+    hash >&/dev/null # to hash teh newly installed Matlab
 
 	local matlabroot license_file
 	matlabroot="$( stat --format '%N' "$(which matlab)" | sed -e 's;^.*->.;;' -e "s;';;g" -e "s;/bin/matlab;;" )"
