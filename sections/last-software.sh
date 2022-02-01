@@ -37,7 +37,7 @@ function last_software_enforce() {
     if [ -d "${wine_dir}" ]; then
         message_success "The directory ${wine_dir} exists"
     elif [ -r "${wine_tgz}" ]; then
-        if su "${user_last}" -c "cd ~${user_last}; tar xzf ${wine_tgz}"; then
+        if su "${user_last}" -c "cd ~${user_last}; mkdir -p .wine; tar xzf ${wine_tgz}"; then
             message_success "Extracted ${wine_tgz} into ${wine_dir}"
         else
             message_failure "Could not extract ${wine_tgz} into ${wine_dir}"
