@@ -40,44 +40,6 @@ function sorted_repos() {
     echo "${sorted[@]}"
 }
 
-# shellcheck disable=SC2154
-declare user_startup="${user_matlab_dir}/startup.m"
-declare last_startup="${user_matlab_dir}/Astropack/matlab/startup/startup_LAST.m"
-
-function startup_check() {
-    declare -i errors=0
-
-    if [ ! -r "${last_startup}" ]; then
-        message_failure "Missing \"${last_startup}\""
-        (( errors++ ))
-    fi
-
-    if [ ! -r "${user_startup}" ]; then
-        message_failure "Missing \"${user_startup}\""
-        (( errors++ ))
-    fi
-
-    if cmp "${user_startup}" "${last_startup}"; then
-        message_failure "\"${user_startup}\" differs from \"${last_startup}\""
-        (( errors++ ))
-    fi
-
-    return $(( errors ))
-}
-
-function startup_enforce() {
-    declare -i errors=0
-
-    if [ ! -r "${last_startup}" ]; then
-        message_failure "Missing \"${last_startup}\""
-        (( errors++ ))
-    fi
-
-    cp "${last_startup}" "${user_startup}"
-    message_success "Copied \"${last_startup}\" to \"${user_startup}\"."
-
-    return $(( errors ))
-}
 
 function help() {
     # shellcheck disable=SC2154
