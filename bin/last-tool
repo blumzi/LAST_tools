@@ -231,6 +231,7 @@ module_include sections/filesystems
 module_include sections/time
 module_include sections/catalogs
 module_include sections/last-software
+module_include sections/ssh
 
 if [ "${mode}" = help ]; then
     help
