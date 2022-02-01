@@ -4,6 +4,19 @@
 # This script manages the LAST pipeline
 #
 
+trap onSIGTERM SIGTERM
+
+function onSIGTERM() {
+	local pids
+
+	pids=$(get_pids)
+	if [ ! "${pids}" ]; then
+		return
+	fi
+    #shellcheck disable=SC2086
+    kill -SIGTERM ${pids}
+}
+
 function get_pids() {
     local -a pids
     
@@ -11,26 +24,23 @@ function get_pids() {
     echo "${pids[@]}"
 }
 
-declare -a pids
+export LANG=en_US
+export LANGUAGE="en_US:en"
+
+declare pids
 
 case "${1}" in
     start)
-        bash -c "LANG=en_US; cd matlab; matlab -batch 'pipeline.last.runPipeLAST(1)'" 2>/dev/null &
-        bash -c "LANG=en_US; cd matlab; matlab -batch 'pipeline.last.runPipeLAST(2)'" 2>/dev/null &
-        wait
-        ;;
-
-    stop)
-        read -r -a pids <<< "$(get_pids)"
-        su ocs -c "kill ${pids[*]}"
-        ;;
-
-    status)
-        read -r -a pids <<< "$(get_pids)"
-        if (( ${#pids[*]} == 2 )); then
-            exit 0
-        else
-            exit 1
-        fi
+		# The last-pipeline service is set to run as 'ocs'
+        for (( i = 0; i < 3; i++ )); do
+            matlab -nodisplay -batch "startup_LAST(false,true); pipeline.last.runPipeLAST(${i})"  &
+        done
+        
+		sleep 5             # wait for matlabs to start running
+		pids="$(get_pids)"
+		if [ "${pids}" ]; then
+            #shellcheck disable=SC2086
+			wait ${pids}
+		fi
         ;;
 esac

@@ -20,7 +20,7 @@ eval user_home=~"${user_last}"
 eval user_matlab_dir="${user_home}"/matlab
 
 # shellcheck disable=SC2154
-export user_startup="${user_matlab_dir}/startup.m"
+export user_startup="${user_matlab_dir}/startup_LAST.m"
 export last_startup="${user_matlab_dir}/AstroPack/matlab/startup/startup_LAST.m"
 
 
@@ -70,6 +70,16 @@ function matlab_enforce() {
     fi
 
 	startup_enforce
+
+    if ! systemctl is-enabled last-pipeline >/dev/null; then
+        if systemctl enable last-pipeline >/dev/null; then
+            message_success "Enabled the \"last-pipeline\" service"
+        else
+            message_failure "Failed to enable the \"last-pipeline\" service"
+        fi
+    else
+        message_success "The \"last-pipeline\" service is enabled"
+    fi
 }
 
 function matlab_license_file() {
@@ -186,6 +196,13 @@ function matlab_check() {
     startup_check
     (( ret += $? ))
 
+    if systemctl is-enabled last-pipeline >/dev/null; then
+        message_success "The \"last-pipeline\" service is enabled"
+    else
+        message_failure "Failed to enable the \"last-pipeline\" service"
+        (( ret++ ))
+    fi
+    
     return $(( ret ))
 }
 
