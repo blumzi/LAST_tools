@@ -122,7 +122,7 @@ if ${check}; then
         exit 1
     fi
 
-    declare -i errors=0 startup_errors=0
+    declare -i errors=0
     cd "${top_dir}" || exit 1
     for dir in $( sorted_repos ); do
         if [ -d "${dir}" ] && [ -d "${dir}/.git" ]; then
@@ -144,10 +144,6 @@ if ${check}; then
             (( errors++ ))
         fi
     done
-
-    startup_check
-    startup_errors=${?}
-    (( errors += startup_errors ))
 
     exit $(( errors ))
 fi
@@ -244,5 +240,3 @@ for key in $( sorted_repos ); do
         popd >/dev/null || continue
     fi
 done
-
-startup_enforce
