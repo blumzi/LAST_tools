@@ -4,7 +4,7 @@
 # Global environment for the LAST project
 #
 
-export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]}] '
+export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]:-main}] '
 
 export  http_proxy=http://bcproxy.weizmann.ac.il:8080
 export https_proxy=http://bcproxy.weizmann.ac.il:8080
