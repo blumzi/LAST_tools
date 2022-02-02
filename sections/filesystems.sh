@@ -7,6 +7,12 @@ module_include sections/network
 
 sections_register_section "filesystems" "Manages the exporting/mounting of filesystems" "network ubuntu-packages"
 
+export _filesystems_local_hostname
+
+function filesystems_init() {
+    _filesystems_local_hostname="$(macmap_get_local_hostname)"
+}
+
 #
 # Cross mounting of filesystems between sibling machines (belonging to same LAST mount)
 # Example: Mount last1 has two computers last01e and last01w
@@ -21,6 +27,12 @@ sections_register_section "filesystems" "Manages the exporting/mounting of files
 function filesystems_enforce() {
     local local_hostname peer_hostname tmp config_file d
     local -a entry
+
+
+    if macmap_this_is_last0; then
+        message_success "Nothing to do on \"last0\"."
+        return
+    fi
 
     local_hostname=$( macmap_get_local_hostname )
     peer_hostname=$( macmap_get_peer_hostname )
@@ -88,6 +100,11 @@ EOF
 
 function filesystems_check() {
     local -i ret=0
+
+    if macmap_this_is_last0; then
+        message_success "Nothing to check on last0"
+        return 0
+    fi
 
     filesystems_check_config; (( ret += $? ))
     filesystems_check_mounts; (( ret += $? ))

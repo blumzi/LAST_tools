@@ -178,3 +178,10 @@ function macmap_get_peer_ipaddr() {
 
     echo "${words[2]}"
 }
+
+function macmap_this_is_last0() {
+    if [ "$(macmap_get_local_hostname)" = last0 ]; then
+        return 0
+    fi
+    return 1
+}

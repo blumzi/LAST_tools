@@ -77,6 +77,11 @@ function service_enforce() {
     local system_file="/etc/systemd/system/last-pipeline.service"
     local our_file="/usr/local/share/last-tool/files/last-pipeline.service"
 
+    if macmap_this_is_last0; then
+        message_success "No Matlab service on last0"
+        return
+    fi
+    
     if [ ! -r "${system_file}" ]; then
         ln -sf "${our_file}" "${system_file}"
         message_success "Linked \"${our_file}\" to \"${system_file}\"."
@@ -214,6 +219,11 @@ function matlab_check() {
 function service_check() {
     local system_file="/etc/systemd/system/last-pipeline.service"
     local our_file="/usr/local/share/last-tool/files/last-pipeline.service"
+
+    if macmap_this_is_last0; then
+        message_success "No Matlab service ob last0"
+        return 0
+    fi
 
     if [ ! -r "${system_file}" ]; then
         message_failure "Our file \"${our_file}\" is not linked to \"${system_file}\"."
@@ -387,6 +397,11 @@ function matlab_is_installed() {
 function startup_check() {
     declare -i errors=0
 
+    if macmap_this_is_last0; then
+        message_success "No startups on last0"
+        return 0
+    fi
+
     if [ ! -r "${last_startup}" ]; then
         message_failure "Missing \"${last_startup}\""
         (( errors++ ))
@@ -418,6 +433,11 @@ function startup_check() {
 
 function startup_enforce() {
     declare -i errors=0
+
+    if macmap_this_is_last0; then
+        message_success "No startup on last0"
+        return 0
+    fi
 
     if [ ! -r "${last_startup}" ]; then
         message_failure "Missing \"${last_startup}\""

@@ -41,6 +41,11 @@ function catalogs_sync_catalog() {
 function catalogs_enforce() {
     local status
     
+    if macmap_this_is_last0; then
+        message_success "No catalogs on last0"
+        return
+    fi
+
     mkdir -p "${catalogs_local_top}"
 
     for catalog in "${catalogs[@]}"; do
@@ -50,6 +55,11 @@ function catalogs_enforce() {
 }
 
 function catalogs_check() {
+    
+    if macmap_this_is_last0; then
+        message_success "No catalogs on last0"
+        return
+    fi
 
     if [ ! -d "${catalogs_local_top}" ]; then
         message_failure "Missing \"${catalogs_local_top}\""
