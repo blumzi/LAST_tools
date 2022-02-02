@@ -20,7 +20,7 @@ eval user_home=~"${user_last}"
 eval user_matlab_dir="${user_home}"/matlab
 
 # shellcheck disable=SC2154
-export user_startup="${user_matlab_dir}/startup_LAST.m"
+export user_startup="${user_matlab_dir}/startup.m"
 export last_startup="${user_matlab_dir}/AstroPack/matlab/startup/startup_LAST.m"
 
 
