@@ -43,12 +43,17 @@ function user_enforce() {
         useradd -m -G "${user_expected_groups_list}" ${user_last}
     fi
 
-	if [ "${user_home}" = /home/ocs ]; then
-		message_success "The user's home is \"/home/ocs\"."
+	if [ "${user_home}" = "/home/${user_last}" ]; then
+		message_success "The user's home is \"/home/${user_last}\"."
 	else
-		sed -i 's;/home[^:]*/ocs:;/home/ocs:;' /etc/passwd
-		message_success "Changed the user's home from \"${user_home}\" to \"/home/ocs\"."
+		sed -i "s;/home[^:]*/${user_last}:;/home/${user_last}:;" /etc/passwd
+		message_success "Changed the user's home from \"${user_home}\" to \"/home/${user_last}\"."
 	fi
+
+    if [ "$(stat --format '%U.%G' "${user_home}")" != "${user_last}.${user_last}" ]; then
+        chown ${user_last}.${user_last} "${user_home}"
+        message_success "Changed ownership of ${user_home} to ${user_last}.${user_last}"
+    fi
 
 	local bash_profile
 	bash_profile="${user_home}/.bash_profile"
@@ -75,7 +80,7 @@ EOF
         message_success "The directory \"${user_matlab_dir}\" exists"
     else
         mkdir -p "${user_matlab_dir}"
-        chown ocs.ocs "${user_matlab_dir}"
+        chown ${user_last}.${user_last} "${user_matlab_dir}"
         message_success "Created the \"${user_matlab_dir}\" directory."
     fi
 }
@@ -114,10 +119,10 @@ function user_check() {
         (( ret++ ))
     fi
 
-	if [ "${user_home}" = /home/ocs ]; then
-		message_success "The user's home is \"/home/ocs\"."
+	if [ "${user_home}" = /home/${user_last} ]; then
+		message_success "The user's home is \"/home/${user_last}\"."
 	else
-		message_failure "The user's home is NOT \"/home/ocs\" (it is \"${user_home}\")."
+		message_failure "The user's home is NOT \"/home/${user_last}\" (it is \"${user_home}\")."
 	fi
 
     local rcfile
@@ -146,12 +151,12 @@ function user_check() {
 function user_policy() {
     cat <<- EOF
 
-    All the LAST processes and resources are owned by the user "ocs"
+    All the LAST processes and resources are owned by the user "${user_last}"
 
     - The user must exist and be a member of the sudo and dialout groups
-    - The user's home directory should be /home/ocs
-    - The directory ~ocs/matlab must exist
-    - The file ~ocs/.bash_profile should contain code for:
+    - The user's home directory should be /home/${user_last}
+    - The directory ~${user_last}/matlab must exist
+    - The file ~${user_last}/.bash_profile should contain code for:
      - using the Weizmann Institute's HTTP(s) proxies
      - unsetting the bash TMOUT variable, so that sessions will not time out
     
