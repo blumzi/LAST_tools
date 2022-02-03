@@ -32,7 +32,7 @@ declare pids
 case "${1}" in
     start)
 		# The last-pipeline service is set to run as 'ocs'
-        for (( i = 0; i < 3; i++ )); do
+        for (( i = 1; i < 3; i++ )); do
             matlab -nodisplay -batch "startup_LAST(false,true); pipeline.last.runPipeLAST(${i})"  &
         done
         
