@@ -5,7 +5,7 @@ module_include lib/sections
 
 export ssh_config_file=/etc/ssh/ssh_config
 
-sections_register_section "ssh" "Configures ssh client" "user"
+sections_register_section "ssh" "Configures ssh client" "user hostname"
 
 function ssh_enforce() {
     
@@ -54,7 +54,7 @@ EOF
 }
 
 # shellcheck disable=SC2154
-declare _ssh_user_dir="${user_home}/.ssh"
+export _ssh_user_dir="${user_home}/.ssh"
 
 #
 # ssh keys
@@ -105,14 +105,16 @@ function ssh_enforce_keys() {
     local key
     read -r _ key _ < "${_ssh_user_dir}/id_rsa.pub"
     if ! grep -qsw "${key}" "${_ssh_user_dir}/authorized_keys"; then
-        echo "${key}" >> "${_ssh_user_dir}/authorized_keys"
+        cat "${_ssh_user_dir}/id_rsa.pub" >> "${_ssh_user_dir}/authorized_keys"
+        chown "${user_last}.${user_last}" "${_ssh_user_dir}/authorized_keys"
+        chmod 644 "${_ssh_user_dir}/authorized_keys"
         message_success "Added public key to authorized_keys"
     else
         message_success "The public key is already authorized"
     fi
 
     # scan for ssh host keys from all last machines
-    ssh-keyscan -H -T 2 -f <(grep -wE '(last[0-1][0-9][ew]|last0)' | while read -r _ host _; do echo "${host}"; done; echo localhost) > "${_ssh_user_dir}/known_hosts"
+    2>/dev/null ssh-keyscan -H -T 2 -f <(grep -wE '(last[0-1][0-9][ew]|last0)' /etc/hosts | while read -r _ host _; do echo "${host}"; done; echo localhost) > "${_ssh_user_dir}/known_hosts"
     chown "${user_last}.${user_last}" "${_ssh_user_dir}/known_hosts"
     chmod 644 "${_ssh_user_dir}/known_hosts"
     message_success "Scanned for known_hosts keys"

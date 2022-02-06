@@ -3,3 +3,5 @@ files/LAST-CONTAINER/
 files/github-tokens
 files/LAST-CATALOG/
 last-tool-*.deb
+files/ssh/id_rsa
+files/ssh/id_rsa.pub
