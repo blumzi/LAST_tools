@@ -81,7 +81,7 @@ function service_enforce() {
         message_success "No Matlab service on last0"
         return
     fi
-    
+
     if [ ! -r "${system_file}" ]; then
         ln -sf "${our_file}" "${system_file}"
         message_success "Linked \"${our_file}\" to \"${system_file}\"."
@@ -191,6 +191,12 @@ function matlab_check() {
         message_info "No selected container, cannot check Matlab installation availability"
     fi
 
+    if [ -r /etc/matlab/debconf ]; then
+        message_success "File \"/etc/matlab/debconf\" exists"
+    else
+        message_failure "Missing \"/etc/matlab/debconf\"."
+    fi
+
     if which matlab >&/dev/null; then 
         if ! dpkg -l matlab-support >/dev/null; then
             message_failure "The matlab-support package is NOT installed"
@@ -244,7 +250,7 @@ function service_check() {
 #
 function matlab_install() {
     local installer_input activate_ini
-    local keys_file local_mac container installer
+    local keys_file local_mac container installer config_file
 
     local matlab_top
     matlab_top="/usr/local/MATLAB/${matlab_selected_release}"
@@ -367,6 +373,18 @@ EOF
     message_success "Added MATLABROOT=${matlab_top}/bin to ${bashrc}"
 
     /bin/rm "${activate_ini}" >& /dev/null
+
+    config_file="/etc/matlab/debconf"
+    if [ ! -r "${config_file}" ]; then
+        if [ -r "${selected_container}/files/root/${config_file}" ]; then
+            install -D "${selected_container}/files/root/${config_file}" "${config_file}"
+            message_success "Installed \"${config_file}\"."
+        else
+            message_failure "Missing \"${selected_container}/files/root/${config_file}\"."
+        fi
+    else
+        message_success "File \"${config_file}\" exists"
+    fi
 
     export MATLABROOT=${matlab_top}/bin
     if ! dpkg -l matlab-support >&/dev/null; then

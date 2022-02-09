@@ -1,0 +1,15 @@
+#######################################################################
+#                                                                     #
+# Debian Matlab interface configuration                               #
+#                                                                     #
+# Feel free to edit this file.  However, be aware that debconf writes #
+# to (and reads from) this file too.  In case of doubt, only use      #
+# 'dpkg-reconfigure matlab' to modify the configuration.              #
+#                                                                     #
+#######################################################################
+
+# Location of local Matlab installations
+MATLAB_INSTALL_GLOB="/usr/local/MATLAB/R2020b"
+
+# Name of the user account that is used to build MEX files
+MATLAB_MEXBUILD_USER="ocs"
