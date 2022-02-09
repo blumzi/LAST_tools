@@ -26,13 +26,23 @@ function bios_check() {
     if [ "${wakeup_type}" = "Power Switch" ]; then
         message_warning "Wake-up is: $(ansi_bright_red "Power Switch")"
     fi
+
+    local nDIMMs
+    nDIMMs="$(dmidecode -t memory | grep -c '^[[:space:]]*Size: 32 GB')"    # What if it has different DIMMs?
+    if (( nDIMMs == 8 )); then
+        message_success "The machine has 8 DIMMs of 32 GB each (total 256 GB) memory"
+    else
+        message_failure "The machine has only ${nDIMMs} DIMMs of 32 GB each (instead of 8)"
+    fi
 }
 
 function bios_policy() {
     cat <<- EOF
 
-    We would like to be able to make the machine boot Linux after a power failure.
-    At this point-in-time we don't have a method for enforcing that, (still looking)
+    - We would like to be able to make the machine boot Linux after a power failure.
+       At this point-in-time we don't have a method for enforcing that, (still looking)
+    
+    - The machines should have 256 GB of installed RAM (8x32 GB)
 
 EOF
 }
