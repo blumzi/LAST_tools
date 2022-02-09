@@ -5,7 +5,7 @@ module_include lib/sections
 
 export ssh_config_file=/etc/ssh/ssh_config
 
-sections_register_section "ssh" "Configures ssh client" "user hostname"
+sections_register_section "ssh" "Configures ssh client" "user hostname ubuntu-packages"
 
 function ssh_enforce() {
     
