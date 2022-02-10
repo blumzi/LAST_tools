@@ -46,9 +46,14 @@ function user_enforce() {
 	if [ "${user_home}" = "/home/${user_last}" ]; then
 		message_success "The user's home is \"/home/${user_last}\"."
 	else
-		sed -i "s;/home[^:]*/${user_last}:;/home/${user_last}:;" /etc/passwd
+		local old_home
+		eval old_home=~${user_last}
+		sed -i "s;${old_home}:;/home/${user_last}:;" /etc/passwd
+		mv "${old_home}" "/home/${user_last}"
+        rmdir "$(dirname ${old_home})"
 		message_success "Changed the user's home from \"${user_home}\" to \"/home/${user_last}\"."
 	fi
+	eval export user_home=~"${user_last}"
 
     if [ "$(stat --format '%U.%G' "${user_home}")" != "${user_last}.${user_last}" ]; then
         chown ${user_last}.${user_last} "${user_home}"
@@ -76,6 +81,7 @@ EOF
         message_success "${bash_profile} complies"
     fi
 
+    eval export user_matlab_dir="${user_home}/matlab"
     if [ -d "${user_matlab_dir}" ]; then
         message_success "The directory \"${user_matlab_dir}\" exists"
     else
@@ -83,6 +89,8 @@ EOF
         chown ${user_last}.${user_last} "${user_matlab_dir}"
         message_success "Created the \"${user_matlab_dir}\" directory."
     fi
+
+    user_enforce_mozilla_proxy
 }
 
 function user_check() {
@@ -145,7 +153,42 @@ function user_check() {
 		message_failure "The directory \"${user_matlab_dir}\" is missing"
     fi
 
+    user_check_mozilla_proxy; (( ret += ${?} ))
+
     return $(( ret ))
+}
+
+function user_check_mozilla_proxy() {
+    local errors=0
+    local user_js_file
+    eval user_js_file=~"${user_last}/.mozilla/firefox/*.default/user.js"
+
+    if [ ! -r "${user_js_file}" ]; then
+        message_failure "The Mozilla user.js file is missing"
+        return 1
+    else
+        message_success "The Mozilla user.js file exists."
+    fi
+    
+    if (( $(grep -c -E 'user_pref\("network\.proxy\.(type|HTTP|HTTPS)"' "${user_js_file}") == 3 )); then
+        messgage_success "The Mozilla user.js file has entries for network.proxy.(type|HTTP|HTTPS)"
+    else
+        message_failure "The Mozilla user.js file does not have entries for network.proxy.(type|HTTP|HTTPS)"
+        (( errors++ ))
+    fi
+
+    return $(( errors ))
+}
+
+function user_enforce_mozilla_proxy() {
+    local user_js_file
+    eval user_js_file=~"${user_last}/.mozilla/firefox/*.default/user.js"
+    cat <<- EOF > "${user_js_file}"
+    // Weizmann proxy settings
+    user_pref("network.proxy.type", "1");
+    user_pref("network.proxy.HTTP", "http://bcproxy.weizmann.ac.il:8080");
+    user_pref("network.proxy.HTTPS", "http://bcproxy.weizmann.ac.il:8080");
+EOF
 }
 
 function user_policy() {
