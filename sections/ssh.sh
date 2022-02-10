@@ -84,7 +84,7 @@ function ssh_enforce_keys() {
         fi
 
         if [ ! -r "${_ssh_user_dir}/${file}" ]; then
-            if have_container; then
+            if ${have_container}; then
                 # shellcheck disable=SC2154
                 if [ -r "${selected_container}/files/ssh/${file}" ]; then
                     install -m 600 -o "${user_last}" -g "${user_last}" "${selected_container}/files/ssh/${file}" "${_ssh_user_dir}/${file}"
@@ -152,12 +152,12 @@ function ssh_check_keys() {
     fi
 
     local answer status
-    answer=$(timeout 2s ssh localhost id -u)
+    answer=$(timeout 2s su "${user_last}" -c 'ssh localhost id -u')
     status=${?}
-    if [ "${status}" != 0 ] || [ "${answer}" != 0 ]; then
+    if [ "${status}" != 0 ] || [ "${answer}" != "$(su "${user_last}" -c 'id -u')" ]; then
         message_failure "Cannot ssh without password to localhost"
     else
-        message_success "Got my own id via ssh to localhost"
+        message_success "Got ${user_last}'s id via ssh to localhost"
     fi
       
 }
