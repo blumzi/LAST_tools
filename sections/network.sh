@@ -82,14 +82,14 @@ function network_check() {
     fi
 
     # last0 is on the local network, should be pingable
-    if ! ping -4 -q -c 1 -w 1 last0 >/dev/null 2>&1; then
+    if ! ping -4 -q -c 1 -W 1 last0 >/dev/null 2>&1; then
         message_warning "Cannot ping \"last0\"."
     else
         message_success "Can ping \"last0\"."
     fi
 
     # Machines on weizmann.ac.il should be reachable via the HTTP proxy
-    if wget -O - http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep -qs 'large catalog format'; then
+    if wget --output-document=- --timeout=2 --tries=2 http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep -qs 'large catalog format'; then
         message_success "Succeeded reaching the weizmann.ac.il network (got the http://euler1.weizmann.ac.il/catsHTM page)"
     else
         message_warning "Failed reaching the weizmann.ac.il network (could not wget the http://euler1.weizmann.ac.il/catsHTM page)"
