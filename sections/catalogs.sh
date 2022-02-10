@@ -3,7 +3,7 @@
 module_include message
 module_include deploy
 
-sections_register_section "catalogs" "Handles the LAST catalogs" "filesytems"
+sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems"
 
 export catalogs_local_top
 catalogs_local_top="/$(hostname)/data/catsHTM"
