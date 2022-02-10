@@ -57,10 +57,10 @@ function matlab_enforce() {
 
     # shellcheck disable=SC2154
     if [ -d "${user_matlab_dir}/data" ]; then
-        message_success "The script startup_installer in \"AstroPack/matlab/startup\" was invoked"
+        message_success "The script startup_Installer was invoked"
     else
-        message_info "Invoking \"startup_installer\" in \"AstroPack/matlab/startup\" ..."
-        cd "${user_matlab_dir}"/AstroPack/matlab/startup || return; LANG=en_US matlab -batch startup_Installer
+        message_info "Invoking \"startup_Installer\" in \"AstroPack/matlab/startup\" ..."
+        su "${user_last}" -c "cd ~/matlab; LANG=en_US matlab -batch \"%addpath('~matlab/AstroPack/matlab/startup'); startup_Installer\" "
         status=${?}
         if (( status == 0 )); then
             message_success "startup_installer has succeeded"
@@ -103,8 +103,15 @@ function matlab_license_file() {
 }
 
 function matlab_installed_release() {
-    if which matlab >/dev/null; then
-        su "${user_last:?}" -c "LANG=en_US; matlab -batch 'fprintf(\"%s\",matlabRelease.Release)'" 2>/dev/null | tr -d '\n'
+    local status str
+
+    which matlab >& /dev/null
+    status=${?}
+    if (( status == 0 )); then
+        str="$( stat --format '%N' "$(which matlab)" | tr -d "'" | (read -r _ _ file; echo "${file}" ) )"
+        str="${str%/bin/matlab}"
+        str="${str/*\/R/R}"
+        echo "${str}"
     fi
 }
 
@@ -207,7 +214,7 @@ function matlab_check() {
     fi
 
     local msg
-    msg="The script startup_installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was "
+    msg="The script startup_Installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was "
     if [ -d "${user_matlab_dir}/data" ]; then
         message_success "${msg} invoked"
     else
@@ -376,11 +383,11 @@ EOF
 
     config_file="/etc/matlab/debconf"
     if [ ! -r "${config_file}" ]; then
-        if [ -r "${selected_container}/files/root/${config_file}" ]; then
-            install -D "${selected_container}/files/root/${config_file}" "${config_file}"
+        if [ -r "${LAST_TOOL_ROOT}/files/root/${config_file}" ]; then
+            install -D "${LAST_TOOL_ROOT}/files/root/${config_file}" "${config_file}"
             message_success "Installed \"${config_file}\"."
         else
-            message_failure "Missing \"${selected_container}/files/root/${config_file}\"."
+            message_failure "Missing \"${LAST_TOOL_ROOT}/files/root/${config_file}\"."
         fi
     else
         message_success "File \"${config_file}\" exists"
