@@ -80,6 +80,8 @@ EOF
     else
         message_success "${bash_profile} complies"
     fi
+    # shellcheck disable=SC1090
+    source "${bash_profile}"
 
     eval export user_matlab_dir="${user_home}/matlab"
     if [ -d "${user_matlab_dir}" ]; then
