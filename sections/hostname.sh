@@ -39,7 +39,7 @@ function hostname_enforce() {
 
         while read -r _ ipaddr aliases; do
             echo -e "${ipaddr}\t${aliases}"
-        done < <( grep 10.23 "$(macmap_file)")
+        done < <( util_uncomment "$(macmap_file)" | grep 10.23 )
 
         cat <<- EOF
 
