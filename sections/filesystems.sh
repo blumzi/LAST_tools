@@ -70,7 +70,7 @@ EOF
 	chmod 644 "${config_file}"
 
 	declare -a original_mpoints
-	read -r -a original_mpoints <<< "$( find / -maxdepth 2 \( -name data -o -name 'data[12]' \) -type d | grep -vE "(${local_hostname}|${peer_hostname})" ) )"
+	read -r -a original_mpoints <<< "$( find / -maxdepth 2 \( -name data -o -name 'data[12]' \) -type d | grep -vE "(${local_hostname}|${peer_hostname})" )"
 	if (( ${#original_mpoints[*]} != 0 )); then
 		message_info "Unmounting the original filesystems"
 		#
@@ -82,6 +82,7 @@ EOF
 			rmdir "${mpoint}"
 		done
 	fi
+    find / -maxdepth 1 -name 'last*' -empty -type d -delete
 
     message_info "(Re)mounting the local data'*' filesystems"
     mount -all --type ext4
