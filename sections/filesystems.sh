@@ -9,6 +9,8 @@ sections_register_section "filesystems" "Manages the exporting/mounting of files
 
 export _filesystems_local_hostname
 
+export _filesystems_mount_options="rw,no_subtree_check"
+
 function filesystems_init() {
     _filesystems_local_hostname="$(macmap_get_local_hostname)"
 }
@@ -62,8 +64,8 @@ EOF
         grep -v "^/${local_hostname}/data" "${config_file}"
 
         cat <<- EOF > "${tmp}"
-		/${local_hostname}/data1 ${peer_hostname}(rw)
-		/${local_hostname}/data2 ${peer_hostname}(rw)
+		/${local_hostname}/data1 ${peer_hostname}(${_filesystems_mount_options})
+		/${local_hostname}/data2 ${peer_hostname}(${_filesystems_mount_options})
 EOF
     } > "${tmp}"
     mv "${tmp}" "${config_file}"
@@ -94,6 +96,9 @@ EOF
         message_warning "Backgrounding mounting of filesystems from peer machine \"${peer_hostname}\"."
         mount --all --type nfs >/dev/null 2>&1 &
     fi
+
+    message_info "Changing permission to 755 on exported filesystems /${local_hostname}/data* ... "
+    chmod 755 "/${local_hostname}/data*"
 
     message_info "Restarting NFS kernel server"
     service nfs-kernel-server restart
@@ -180,7 +185,7 @@ function filesystems_check_config() {
     # check filesytem export entries
     config_file="/etc/exports"
     for d in /${local_hostname}/data{1,2}; do
-        read -r -a entry <<< "$( grep "^${d}[[:space:]]*${peer_hostname}(rw)" "${config_file}" )"
+        read -r -a entry <<< "$( grep "^${d}[[:space:]]*${peer_hostname}(${_filesystems_mount_options})" "${config_file}" )"
         if [ ${#entry[*]} -eq 2 ]; then
             message_success "Entry for ${d} in ${config_file} exists and is valid"
         else
