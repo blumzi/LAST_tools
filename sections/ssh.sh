@@ -155,9 +155,9 @@ function ssh_check_keys() {
     answer=$(timeout 2s su "${user_last}" -c 'ssh localhost id -u')
     status=${?}
     if [ "${status}" != 0 ] || [ "${answer}" != "$(su "${user_last}" -c 'id -u')" ]; then
-        message_failure "Cannot ssh without password to localhost"
+        message_failure "Passwordless ${user_last} ssh to localhost failed"
     else
-        message_success "Got ${user_last}'s id via ssh to localhost"
+        message_success "Passwordless ${user_last} ssh to localhost works"
     fi
       
 }
