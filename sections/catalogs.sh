@@ -26,9 +26,9 @@ function catalogs_sync_catalog() {
 	rsync -avq --delete "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}"
 	status=$?
 	if (( status == 0 )); then
-		message_warning "Synchronized \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\"."
+		message_success "Synchronized \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\"."
 	else
-		message_success "Failed to synchronize \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\" (status=${status})"
+		message_failure "Failed to synchronize \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\" (status=${status})"
 	fi
 }
 
