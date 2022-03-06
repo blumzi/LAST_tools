@@ -14,8 +14,7 @@ function network_set_defaults() {
     network_peer_ipaddr=$( macmap_get_peer_ipaddr )
 	local -a info
 	read -r -a info <<< "$( ip -o -4 link show | grep ': en' )"
-    network_interface=${info[1]}
-	network_interface=${network_interface%:}
+    network_interface=${info[1]%:}
     network_netmask=255.255.255.0
     network_broadcast=10.23.1.255
     network_netpart=10.23.1.0
