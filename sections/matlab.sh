@@ -60,7 +60,7 @@ function matlab_enforce() {
         message_success "The script startup_Installer was invoked"
     else
         message_info "Invoking \"startup_Installer\" in \"AstroPack/matlab/startup\" ..."
-        su "${user_last}" -c "cd ~/matlab; LANG=en_US matlab -batch \"addpath('~matlab/AstroPack/matlab/startup'); startup_Installer\" "
+        su "${user_last}" -c "cd ~/matlab; LANG=en_US matlab -batch \"addpath('/home/ocs/matlab/AstroPack/matlab/startup'); startup_Installer\" "
         status=${?}
         if (( status == 0 )); then
             message_success "startup_installer has succeeded"
@@ -394,10 +394,10 @@ EOF
     fi
 
     export MATLABROOT=${matlab_top}/bin
-    if ! dpkg -l matlab-support >&/dev/null; then
-        message_info "Installing matlab-support"
-        apt -y install matlab-support
-    fi
+    # if ! dpkg -l matlab-support >&/dev/null; then
+    #     message_info "Installing matlab-support"
+    #     apt -y install matlab-support
+    # fi
 }
 
 function matlab_policy() {
