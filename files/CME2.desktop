@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=CME
+Exec=env WINEPREFIX="/home/ocs/.wine" wine-stable C:\\\\windows\\\\command\\\\start.exe /Unix /home/ocs/.wine/dosdevices/c:/users/Public/Desktop/CME.lnk
+Type=Application
+StartupNotify=true
+Path=/home/ocs/.wine/dosdevices/c:/Program Files/Copley Motion/CME 2
+Icon=EAD6_cme2.0
+StartupWMClass=cme2.exe

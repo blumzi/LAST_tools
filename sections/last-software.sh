@@ -46,6 +46,16 @@ function last_software_enforce() {
         else
             message_failure "Missing ${wine_tgz}"
         fi
+
+        local shortcut
+        shortcut="/home/${user_last}/Desktop/CME2.desktop"
+        if [ -r "${shortcut}" ]; then
+            message_success "The CME2 desktop shortcut exists"
+        else
+            cp "$(module_locate files/CME2.desktop)" "${shortcut}"
+            desktop-file-install "${shortcut}"
+            message_success "Installed the CME2 desktop shortcut"
+        fi
     fi
 
     if ! macmap_this_is_last0; then
@@ -109,6 +119,13 @@ function last_software_check() {
             message_failure "The ${wine_dir} directory does not exist"
             (( ret++ ))
         fi
+
+        if [ -r /home/"${user_last}"/Desktop/CME2.desktop ]; then
+            message_success "The CME2 desktop shortcut exists"
+        else
+            message_failure "The CME2 desktop shortcut is missing"
+        fi
+
 
         local libdir="/usr/local/lib"
         if [ -r "${libdir}/libqhyccd.so.21.7.16.13" ] && [ -L "${libdir}/libqhyccd.so" ] && [ -L "${libdir}/libqhyccd.so.20" ]; then
