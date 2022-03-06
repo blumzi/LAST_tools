@@ -53,7 +53,7 @@ function last_software_enforce() {
             message_success "The CME2 desktop shortcut exists"
         else
             cp "$(module_locate files/CME2.desktop)" "${shortcut}"
-            desktop-file-install "${shortcut}"
+            desktop-file-install --rebuild-mime-info-cache "${shortcut}"
             message_success "Installed the CME2 desktop shortcut"
         fi
     fi
