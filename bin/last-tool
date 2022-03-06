@@ -16,13 +16,12 @@ export PROG
 PROG=$(basename "${0}")
 export LAST_TOOL_PID="${$}"
 
-export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
-export https_proxy="http://bcproxy.weizmann.ac.il:8080"
-
 module_include lib/message
 module_include lib/macmap
 module_include lib/container
 module_include lib/util
+
+util_test_and_set_http_proxy
 
 declare mode
 
