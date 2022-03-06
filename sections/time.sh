@@ -44,17 +44,31 @@ function time_check() {
 		message_warning "NTP is not synchronized"
 	fi
 
+    local tz
+    tz="$(timedatectl show --value -p Timezone)"
+    if [ "${tz}" = UTC ]; then
+        message_success "The timezone is UTC"
+    else
+        message_failure "The timezone is \"${tz}\" instead of UTC"
+        (( ret++ ))
+    fi
+
     return $(( ret ))
 }
 
 function time_policy() {
     cat <<- EOF
 
-    LAST uses an on-site NTP server (by SiTech Inc.) as primary server and the Weizmann Institute's
-     ntp.weizmann.ac.il as the secondary.
+    Time synchronization:
 
-    - The config file ${time_config_file} should reflect this in it's NTP= line
-    - The ${time_service} service should be running
+        LAST uses an on-site NTP server (by SiTech Inc.) as primary server and the Weizmann Institute's
+        ntp.weizmann.ac.il as the secondary.
+
+        - The config file ${time_config_file} should reflect this in it's NTP= line
+        - The ${time_service} service should be running
+
+    Time zone:
+        - UTC
     
 EOF
 }
