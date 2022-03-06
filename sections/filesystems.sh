@@ -45,8 +45,8 @@ function filesystems_enforce() {
     config_file="/etc/fstab"
     {
         grep -vE "(/dev/sd[abc]|${local_hostname}|${peer_hostname})" ${config_file}
-        cat <<- EOF > "${tmp}"
-
+        cat <<- EOF
+        
 		/dev/sda /${local_hostname}/data1 ext4 defaults 0 0
 		/dev/sdb /${local_hostname}/data2 ext4 defaults 0 0
 		/dev/sdc /${local_hostname}/data ext4 defaults 0 0
@@ -91,10 +91,10 @@ EOF
 
     if ping -w 1 -c 1 "${peer_hostname}" >&/dev/null; then
         message_info "Mounting filesystems from peer machine \"${peer_hostname}\"."
-        mount --all --type nfs
+        mount --all --type nfs &
     else
         message_warning "Backgrounding mounting of filesystems from peer machine \"${peer_hostname}\"."
-        mount --all --type nfs >/dev/null 2>&1 &
+        mount --all --type nfs &
     fi
 
     message_info "Changing permission to 755 on exported filesystems /${local_hostname}/data* ... "
@@ -207,7 +207,7 @@ function filesystems_check_mounts() {
 
     # check local filesystems
     for d in /${local_hostname}/{data,data1,data2}; do
-        read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type ext4 | grep " ${d}$" )"
+        read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type ext4 2>/dev/null | grep " ${d}$" )"
         if [ "${dev}" ] && [ "${mpoint}" ]; then
             message_success "Local filesystem ${d} is mounted (used: ${used}, avail: ${avail}, percent: ${pcent})"
         else
@@ -219,7 +219,7 @@ function filesystems_check_mounts() {
     # check remote filesystems
     if ping -c 1 -w 1 "${peer_hostname}" >/dev/null 2>&1; then
         for d in /${peer_hostname}/{data1,data2}; do
-            read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type nfs4 | grep --quiet " ${d}$" )"
+            read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type nfs4 2>/dev/null | grep " ${d}$" )"
             if [ "${dev}" ] && [ "${mpoint}" ]; then
                 message_success "Remote filesystem ${d} is mounted (used: ${used}, avail: ${avail}, percent: ${pcent})"
             else
