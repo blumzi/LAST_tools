@@ -15,7 +15,7 @@ mapfile -t ubuntu_packages_missing < <( util_uncomment "${ubuntu_packages_file}"
 
 function ubuntu_packages_enforce() {
 
-    LAST_TOOL_QUIET=true packages_check
+    LAST_TOOL_QUIET=true ubuntu_packages_check
     message_info "Updating apt ..."
     apt --no-show-upgraded update
     if [ ${#ubuntu_packages_missing[*]} -gt 0 ]; then
