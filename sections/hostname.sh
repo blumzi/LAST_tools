@@ -157,7 +157,7 @@ function hostname_is_valid() {
     local mount_id
     mount_id=${name#last}
     mount_id=${mount_id%[ew]}
-    mount_id=$(( mount_id ))
+    mount_id=$(( ${mount_id##0} ))
 
     if (( mount_id == 20 )); then
         return 0    # dummy for testing
