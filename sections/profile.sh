@@ -2,10 +2,11 @@
 
 module_include lib/message
 module_include lib/sections
+module_include lib/util
 
 sections_register_section "profile" "Manages profile files"
 
-_profile_last=/etc/profile.d/last.sh
+_profile_last="/etc/profile.d/last.sh"
 _env_config_file="/etc/environment"
 
 function profile_enforce() {
@@ -16,8 +17,6 @@ function profile_enforce() {
         # Global environment for the LAST project
         #
 
-        export http_proxy=http://bcproxy.weizmann.ac.il:8080
-        export https_proxy=http://bcproxy.weizmann.ac.il:8080
 
         function append_to_module_include_path() {
             local subpath="\$1"
@@ -36,6 +35,10 @@ function profile_enforce() {
 
         export LAST_TOOL_ROOT=/usr/local/share/last-tool
         append_to_module_include_path \${LAST_TOOL_ROOT}
+
+        module_include lib/util
+
+        util_test_and_set_http_proxy
 
         unset TMOUT
 EOF
@@ -75,8 +78,7 @@ EOF
 
 function etc_environment_check() {
 
-    if grep -qs "^http_proxy=http://bcproxy.weizmann.ac.il:8080$" "${_env_config_file}" && 
-        grep -qs "^https_proxy=http://bcproxy.weizmann.ac.il:8080$" "${_env_config_file}"; then
+    if grep -qs "^util_test_and_set_http_proxy$" "${_env_config_file}" ; then
         message_success "The file \"${_env_config_file}\" has settings for http_proxy and https_proxy"
     else
         message_failure "The file \"${_env_config_file}\" does not have settings for http_proxy and https_proxy"
@@ -89,9 +91,10 @@ function etc_environment_enforce() {
     tmp="$(mktemp)"
 
     {
-        grep -vE '^(http_proxy|https_proxy)=' "${_env_config_file}"
-        echo "http_proxy=http://bcproxy.weizmann.ac.il:8080"
-        echo "https_proxy=http://bcproxy.weizmann.ac.il:8080"
+        grep -vE '^(source /etc/profile.d/last.sh|module_include lib/util|util_test_and_set_http_proxy)=' "${_env_config_file}"
+        echo "source /etc/profile.d/last.sh"
+        echo "module_include lib/util"
+        echo "util_test_and_set_http_proxy"
     } > "${tmp}"
     mv "${tmp}" "${_env_config_file}"
     message_success "Added settings for http_proxy and https_proxy to \"${_env_config_file}\"."

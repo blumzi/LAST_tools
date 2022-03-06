@@ -25,3 +25,14 @@ function util_bashify() {
 
 	echo "${string}" | tr '-' '_'
 }
+
+#
+# Sets the environment variables http_proxy and https_proxy, iff
+#  the proxy server bcproxy.weizmann.ac.il replies to ping.
+#
+function util_test_and_set_http_proxy() {
+	if ping -w 1 -c 1 bcproxy.weizmann.ac.il >/dev/null 2>&1; then
+		export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
+		export https_proxy="http://bcproxy.weizmann.ac.il:8080"
+	fi
+}

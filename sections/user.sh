@@ -50,7 +50,7 @@ function user_enforce() {
 		eval old_home=~${user_last}
 		sed -i "s;${old_home}:;/home/${user_last}:;" /etc/passwd
 		mv "${old_home}" "/home/${user_last}"
-        rmdir "$(dirname ${old_home})"
+        rmdir "$(dirname "${old_home}")"
 		message_success "Changed the user's home from \"${user_home}\" to \"/home/${user_last}\"."
 	fi
 	eval export user_home=~"${user_last}"
@@ -62,14 +62,15 @@ function user_enforce() {
 
 	local bash_profile
 	bash_profile="${user_home}/.bash_profile"
-	if [ ! -r "${bash_profile}" ] || [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' ${bash_profile} )" != 3 ]; then
+	if [ ! -r "${bash_profile}" ] || [ "$( grep -E -c '(source /etc/profile.d/last.sh|module_include lib/util|util_test_and_set_http_proxy|unset TMOUT)' "${bash_profile}" )" != 4 ]; then
 		local tmp
 		tmp=$(mktemp)
 		{
 			cat <<- EOF
 			
-			export http_proxy=http://bcproxy.weizmann.ac.il:8080
-			export https_proxy=http://bcproxy.weizmann.ac.il:8080
+			source /etc/profile.d/last.sh
+			module_include lib/util
+            util_test_and_set_http_proxy
 			unset TMOUT
 EOF
 		} > "${tmp}"
@@ -139,7 +140,7 @@ function user_check() {
     local rcfile
     rcfile="${user_home}/.bash_profile"
 	if [ -r "${rcfile}" ]; then
-		if [ "$( grep -E -c '(export http_proxy=http://bcproxy.weizmann.ac.il:8080|export https_proxy=http://bcproxy.weizmann.ac.il:8080|unset TMOUT)' "${rcfile}" )" = 3 ]; then
+		if [ "$( grep -E -c '(source /etc/profile.d/last.sh|module_include lib/util|util_test_and_set_http_proxy|unset TMOUT)' "${rcfile}" )" = 4 ]; then
 			message_success "${rcfile} complies"
 		else
 			message_failure "${rcfile} does not have all the required code"
