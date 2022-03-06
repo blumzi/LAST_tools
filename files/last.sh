@@ -4,10 +4,8 @@
 # Global environment for the LAST project
 #
 
+# set the debug-mode prompt (set -x)
 export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]:-main}] '
-
-export  http_proxy=http://bcproxy.weizmann.ac.il:8080
-export https_proxy=http://bcproxy.weizmann.ac.il:8080
 
 function append_to_module_include_path() {
     local subpath="${1}"
@@ -37,5 +35,8 @@ for dir in ${LAST_MODULE_INCLUDE_PATH//:/ }; do
     fi
 done
 unset dir file
+
+module_include lib/util
+util_test_and_set_http_proxy
 
 export TMOUT=0
