@@ -23,7 +23,7 @@ function catalogs_sync_catalog() {
 	nfiles=$( rsync -av --dry-run "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | grep -cE '(hdf5|csv)')
 	message_info "Synchronizing \"${catalog}\" (${nfiles} files) ..."
 	mkdir -p "${catalogs_local_top}/${catalog}"
-	rsync -avq --delete "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}"
+	rsync -avq --delete "${catalogs_container_top}/${catalog}/" "${catalogs_local_top}/${catalog}"
 	status=$?
 	if (( status == 0 )); then
 		message_success "Synchronized \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\"."
@@ -46,6 +46,11 @@ function catalogs_enforce() {
         return
     fi
 
+	if [ ! "${catalogs_container_top}" ]; then
+        message_failure "No LAST container, cannot synchronize catalogs (maybe specify one with --catalog=... ?!?)"
+        return
+    fi
+
     mkdir -p "${catalogs_local_top}"
 
     for catalog in "${catalogs[@]}"; do
@@ -58,6 +63,11 @@ function catalogs_check() {
     
     if macmap_this_is_last0; then
         message_success "No catalogs on last0"
+        return
+    fi
+
+	if [ ! "${catalogs_container_top}" ]; then
+        message_failure "No LAST container, cannot synchronize catalogs (maybe specify one with --catalog=... ?!?)"
         return
     fi
 
