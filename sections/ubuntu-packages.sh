@@ -22,6 +22,9 @@ function ubuntu_packages_enforce() {
         message_info "Installing: ${ubuntu_packages_missing[*]}"
         apt install -y "${ubuntu_packages_missing[@]}"    
     fi
+
+    sed -i 's,"1";,"0";,' "${config}"
+    message_success "Disabled apt auto-update"
 }
 
 function ubuntu_packages_check() {
@@ -35,6 +38,16 @@ function ubuntu_packages_check() {
             ubuntu_packages_missing+=( "${package}" )
         fi
     done
+
+    # check auto-update settings
+    local config
+    config="/etc/apt/apt.conf.d/20auto-upgrades"
+    if [ "$(grep -c '"0";' "${config}")" != 2 ]; then
+        message_failure "Apt auto-upgrade is NOT disabled (see ${config})"
+    else
+        message_success "Apt auto-upgrade is disabled"
+    fi
+
 }
 
 function ubuntu_packages_policy() {
@@ -55,6 +68,8 @@ EOF
 
     - $(ansi_underline "${PROG} check packages") - checks if the required packages are installed
     - $(ansi_underline "${PROG} enforce packages") - attempts to install the packages (and dependencies)
+
+    Automatic updates are $(ansi_underline disabled)
 
 EOF
 }
