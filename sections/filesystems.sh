@@ -11,6 +11,16 @@ export _filesystems_local_hostname
 
 export _filesystems_mount_options="rw,no_subtree_check"
 
+#
+# On some machines the filesystem occupies the whole disk, on others
+#  a partition (spanning the whole disk) was created
+#
+export -A _filesystems_devmap=(
+    [/dev/sda]="data1"      # whole device
+    [/dev/sdb]="data2"
+    [/dev/sdc]="data"
+)
+
 function filesystems_init() {
     _filesystems_local_hostname="$(macmap_get_local_hostname)"
 }
@@ -27,8 +37,8 @@ function filesystems_init() {
 #
 
 function filesystems_enforce() {
-    local local_hostname peer_hostname tmp config_file d
-    local -a entry
+    local local_hostname peer_hostname tmp config_file d dev
+    local -a entry key
 
 
     if macmap_this_is_last0; then
@@ -44,12 +54,19 @@ function filesystems_enforce() {
     tmp=$(mktemp)
     config_file="/etc/fstab"
     {
-        grep -vE "(/dev/sd[abc]|${local_hostname}|${peer_hostname})" ${config_file}
+        grep -vE "(/dev/sd[abc]|${local_hostname}|${peer_hostname})" ${config_file} | grep -v '^[[:space:]]*$'		# keep non-related lines
+
+		echo ""
+        for key in ${!_filesystems_devmap[*]}; do                                       # add our lines
+            dev=${key}
+            if lsblk "${dev}1" >/dev/null 2>&1; then
+                dev=${dev}1
+            fi
+            echo "${dev} /${local_hostname}/${_filesystems_devmap[${key}]}  ext4 defaults 0 0"
+        done
+
+        # add cross-mount lines
         cat <<- EOF
-        
-		/dev/sda /${local_hostname}/data1 ext4 defaults 0 0
-		/dev/sdb /${local_hostname}/data2 ext4 defaults 0 0
-		/dev/sdc /${local_hostname}/data ext4 defaults 0 0
 
 		${peer_hostname}:/${peer_hostname}/data1 /${peer_hostname}/data1 nfs defaults 0 0
 		${peer_hostname}:/${peer_hostname}/data2 /${peer_hostname}/data2 nfs defaults 0 0
@@ -98,10 +115,10 @@ EOF
     fi
 
     message_info "Changing permission to 755 on exported filesystems /${local_hostname}/data* ... "
-    chmod 755 "/${local_hostname}/data*"
+    chmod 755 /"${local_hostname}"/data*
 
-    message_info "Restarting NFS kernel server"
-    service nfs-kernel-server restart
+    message_info "Restarting NFS kernel server (background)"
+    service nfs-kernel-server restart &
 }
 
 function filesystems_check() {
