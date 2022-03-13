@@ -8,22 +8,22 @@
 #
 
 # Power switches:
-04:91:62:b7:0a:f0	10.23.2.1	pswitch1e SWITCH1 pswitch1
-04:91:62:c0:48:88	10.23.2.2	pswitch1w SWITCH2 pswitch2
-04:91:62:c0:6b:59	10.23.2.3	pswitch2e SWITCH3 pswitch3
-04:91:62:B6:A7:A3	10.23.2.4	pswitch2w SWITCH4 pswitch4
-04:91:62:c0:86:2A	10.23.2.5	pswitch3e SWITCH5 pswitch5
-04:91:62:c0:2C:ED	10.23.2.6	pswitch3w SWITCH6 pswitch6
-04:91:62:c0:1D:6C	10.23.2.7	pswitch4e SWITCH7 pswitch7
-04:91:62:c0:30:09	10.23.2.8	pswitch4w SWITCH8 pswitch8
-04:91:62:c0:89:EF	10.23.2.9	pswitch5e SWITCH9 pswitch9
-04:91:62:c0:2F:0C	10.23.2.10	pswitch5w SWITCH10 pswitch10
-04:91:62:c0:35:F2	10.23.2.11	pswitch6e SWITCH11 pswitch11
-04:91:62:c0:2E:33	10.23.2.12	pswitch6w SWITCH12 pswitch12
-04:91:62:c0:69:0C	10.23.2.13	pswitch7e SWITCH13 pswitch13
-04:91:62:c0:89:F7	10.23.2.14	pswitch7w SWITCH14 pswitch14
-04:91:62:c0:7F:F3	10.23.2.15	pswitch8e SWITCH15 pswitch15
-04:91:62:c0:8C:7F	10.23.2.16	pswitch8w SWITCH16 pswitch16
+04:91:62:b7:0a:f0	10.23.2.1	pswitch01e SWITCH1 pswitch1
+04:91:62:c0:48:88	10.23.2.2	pswitch01w SWITCH2 pswitch2
+04:91:62:c0:6b:59	10.23.2.3	pswitch02e SWITCH3 pswitch3
+04:91:62:B6:A7:A3	10.23.2.4	pswitch02w SWITCH4 pswitch4
+04:91:62:c0:86:2A	10.23.2.5	pswitch03e SWITCH5 pswitch5
+04:91:62:c0:2C:ED	10.23.2.6	pswitch03w SWITCH6 pswitch6
+04:91:62:c0:1D:6C	10.23.2.7	pswitch04e SWITCH7 pswitch7
+04:91:62:c0:30:09	10.23.2.8	pswitch04w SWITCH8 pswitch8
+04:91:62:c0:89:EF	10.23.2.9	pswitch05e SWITCH9 pswitch9
+04:91:62:c0:2F:0C	10.23.2.10	pswitch05w SWITCH10 pswitch10
+04:91:62:c0:35:F2	10.23.2.11	pswitch06e SWITCH11 pswitch11
+04:91:62:c0:2E:33	10.23.2.12	pswitch06w SWITCH12 pswitch12
+04:91:62:c0:69:0C	10.23.2.13	pswitch07e SWITCH13 pswitch13
+04:91:62:c0:89:F7	10.23.2.14	pswitch07w SWITCH14 pswitch14
+04:91:62:c0:7F:F3	10.23.2.15	pswitch08e SWITCH15 pswitch15
+04:91:62:c0:8C:7F	10.23.2.16	pswitch08w SWITCH16 pswitch16
 
 # Computers:
 D8:5E:D3:04:ED:EC   10.23.1.1   last01e	last1
