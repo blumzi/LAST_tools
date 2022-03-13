@@ -46,34 +46,17 @@ function matlab_init() {
 }
 
 function matlab_enforce() {
-    local installed_release status
-    installed_release=$(matlab_installed_release)
-
-    if [ "${installed_release}" = "${matlab_selected_release}" ]; then
-        message_success "Matlab ${matlab_selected_release} is already installed"
-	else
-		matlab_install
-    fi
-
-    # shellcheck disable=SC2154
-    if [ -d "${user_matlab_dir}/data" ]; then
-        message_success "The script startup_Installer was invoked"
-    else
-        message_info "Invoking \"startup_Installer\" in \"AstroPack/matlab/startup\" ..."
-        su "${user_last}" -c "cd ~/matlab; LANG=en_US matlab -batch \"addpath('/home/ocs/matlab/AstroPack/matlab/startup'); startup_Installer\" "
-        status=${?}
-        if (( status == 0 )); then
-            message_success "startup_installer has succeeded"
-        else
-            message_failure "startup_installer has failed with status: ${status}"
-        fi
-    fi
-
-	startup_enforce
-    service_enforce
+    matlab_installation_enforce
+    astropack_startup_enforce
+    matlab_support_enforce
+	matlab_startup_enforce
+    matlab_service_enforce
 }
 
-function service_enforce() {
+#
+# The Matlab service is responsible for running the LAST pipeline at system startup
+#
+function matlab_service_enforce() {
     local system_file="/etc/systemd/system/last-pipeline.service"
     local our_file="/usr/local/share/last-tool/files/last-pipeline.service"
 
@@ -116,125 +99,23 @@ function matlab_installed_release() {
 }
 
 function matlab_check() {
-    local -i errors ret
-    local release container
+    local -i ret=0
 
-    (( ret = 0 ))
-    release=$(matlab_installed_release)
-    if [ ! "${release}" ]; then
-        message_failure "Matlab is not installed"
-    else
-        message_success "Matlab is installed (release: ${release})"
-    fi
-
-    #
-    # It doesn't seem to be installed, can we install it?
-    #
-    if [ ! "${matlab_local_mac}" ]; then
-        message_failure "Cannot get this machine's MAC address"
-        return 1    # no point in continuing
-    fi
-
-    if [ "${selected_container}" ]; then
-        message_info "Checking available Matlab installations (for mac=${matlab_local_mac})"
-        local msg keys_file license_file
-        container="${selected_container}"
-        for deployable_release in $(cd "${container}/matlab" || exit; echo R*); do
-
-            release_info_dir="${matlab_releases_dir}/${deployable_release}"
-            (( errors = 0 ))
-            if [ "${deployable_release}" = "${matlab_selected_release}" ]; then
-                msg="Release $(ansi_bright_green "${deployable_release}"): "
-            else
-                msg="Release ${deployable_release}"
-            fi
-            
-            # check that we have the installation images for this release
-            msg+=", installer "
-            if [ -x "${container}/matlab/${deployable_release}/install" ]; then
-                msg+="$(ansi_bright_green EXISTS)"
-            else
-                msg+="$(ansi_bright_red MISSING)"
-                (( errors++ ))
-            fi
-
-            keys_file="${release_info_dir}/file-installation-keys"
-            msg+=", keys-file: "
-            if [ -r "${keys_file}" ]; then
-                msg+="$(ansi_bright_green EXISTS)"
-            else
-                msg+="$(ansi_bright_red MISSING)"
-                (( errors++ ))
-            fi
-
-            # check that we have a file installation key for this machine
-            msg+=", key-for-this-machine: "
-            if grep -qwi "^${matlab_local_mac}" "${keys_file}" >/dev/null 2>&1; then
-                msg+="$(ansi_bright_green EXISTS)"
-            else
-                msg+="$(ansi_bright_red MISSING)"
-                (( errors++ ))
-            fi
-
-            # check that we have a license key for this machine
-            license_file="${release_info_dir}/licenses/$(mac_to_file_name "${matlab_local_mac}")"
-
-            msg+=", license-for-this-machine: "
-            if [ -r "${license_file}" ]; then
-                msg+="$(ansi_bright_green EXISTS)"
-            else
-                msg+="$(ansi_bright_red MISSING)"
-                (( errors++ ))
-            fi
-
-            if (( errors == 0 )); then
-                message_success "${msg} (==> installable)"
-            else
-                (( ret++ ))
-                message_failure "${msg} (==> not installable)"
-            fi
-        done
-    else
-        message_info "No selected container, cannot check Matlab installation availability"
-    fi
-
-    if [ -r /etc/matlab/debconf ]; then
-        message_success "File \"/etc/matlab/debconf\" exists"
-    else
-        message_failure "Missing \"/etc/matlab/debconf\"."
-    fi
-
-    if which matlab >&/dev/null; then 
-        if ! dpkg -l matlab-support >/dev/null; then
-            message_failure "The matlab-support package is NOT installed"
-        else
-            message_success "The matlab-support package is installed"
-            (( ret++ ))
-        fi
-    fi
-
-    local msg
-    msg="The script startup_Installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was "
-    if [ -d "${user_matlab_dir}/data" ]; then
-        message_success "${msg} invoked"
-    else
-        message_failure "${msg} NOT invoked"
-        (( ret++ ))
-    fi
-
-    startup_check; (( ret += $? ))
-
-    service_check; (( ret += $? ))
+    matlab_installation_check;  (( ret += $? ))
+    astropack_startup_check;    (( ret += $? ))
+    matlab_support_check;       (( ret += $? ))
+    matlab_startup_check;       (( ret += $? ))
+    matlab_service_check;       (( ret += $? ))
 
     return $(( ret ))
 }
 
-function service_check() {
+function matlab_service_check() {
     local system_file="/etc/systemd/system/last-pipeline.service"
     local our_file="/usr/local/share/last-tool/files/last-pipeline.service"
 
     if macmap_this_is_last0; then
-        message_success "No Matlab service ob last0"
+        message_success "No Matlab service on last0"
         return 0
     fi
 
@@ -255,7 +136,15 @@ function service_check() {
 # At this point-in-time we assume there's only ONE installation image on LAST-CONTAINER
 # TBD: how to choose between more than one
 #
-function matlab_install() {
+function matlab_installation_enforce() {
+    local installed_release
+    installed_release=$(matlab_installed_release)
+
+    if [ "${installed_release}" = "${matlab_selected_release}" ]; then
+        message_success "Matlab ${matlab_selected_release} is already installed"
+        return
+    fi
+
     local installer_input activate_ini
     local keys_file local_mac container installer config_file
 
@@ -383,11 +272,14 @@ EOF
 
     config_file="/etc/matlab/debconf"
     if [ ! -r "${config_file}" ]; then
-        if [ -r "${LAST_TOOL_ROOT}/files/root/${config_file}" ]; then
-            install -D "${LAST_TOOL_ROOT}/files/root/${config_file}" "${config_file}"
+        local our_config_file
+
+        our_config_file=$(module_locate files/root/${config_file})
+        if [ -r "${our_config_file}" ]; then
+            install -D "${our_config_file}" "${config_file}"
             message_success "Installed \"${config_file}\"."
         else
-            message_failure "Missing \"${LAST_TOOL_ROOT}/files/root/${config_file}\"."
+            message_failure "Missing \".../files/root/${config_file}\"."
         fi
     else
         message_success "File \"${config_file}\" exists"
@@ -400,6 +292,92 @@ EOF
     # fi
 }
 
+function matlab_installation_check() {
+    local release container
+    local -i ret=0 errors=0
+
+    release=$(matlab_installed_release)
+    if [ ! "${release}" ]; then
+        message_failure "Matlab is not installed"
+        (( errors++ ))
+    else
+        message_success "Matlab is installed (release: ${release})"
+    fi
+
+    #
+    # It doesn't seem to be installed, can we install it?
+    #
+    if [ ! "${matlab_local_mac}" ]; then
+        message_failure "Cannot get this machine's MAC address"
+        return $(( ++errors ))    # no point in continuing
+    fi
+
+    if [ "${selected_container}" ]; then
+        message_info "Checking available Matlab installations (for mac=${matlab_local_mac})"
+        local msg keys_file license_file
+        container="${selected_container}"
+        for deployable_release in $(cd "${container}/matlab" || exit; echo R*); do
+
+            release_info_dir="${matlab_releases_dir}/${deployable_release}"
+            (( errors = 0 ))
+            if [ "${deployable_release}" = "${matlab_selected_release}" ]; then
+                msg="Release $(ansi_bright_green "${deployable_release}"): "
+            else
+                msg="Release ${deployable_release}"
+            fi
+            
+            # check that we have the installation images for this release
+            msg+=", installer "
+            if [ -x "${container}/matlab/${deployable_release}/install" ]; then
+                msg+="$(ansi_bright_green EXISTS)"
+            else
+                msg+="$(ansi_bright_red MISSING)"
+                (( errors++ ))
+            fi
+
+            keys_file="${release_info_dir}/file-installation-keys"
+            msg+=", keys-file: "
+            if [ -r "${keys_file}" ]; then
+                msg+="$(ansi_bright_green EXISTS)"
+            else
+                msg+="$(ansi_bright_red MISSING)"
+                (( errors++ ))
+            fi
+
+            # check that we have a file installation key for this machine
+            msg+=", key-for-this-machine: "
+            if grep -qwi "^${matlab_local_mac}" "${keys_file}" >/dev/null 2>&1; then
+                msg+="$(ansi_bright_green EXISTS)"
+            else
+                msg+="$(ansi_bright_red MISSING)"
+                (( errors++ ))
+            fi
+
+            # check that we have a license key for this machine
+            license_file="${release_info_dir}/licenses/$(mac_to_file_name "${matlab_local_mac}")"
+
+            msg+=", license-for-this-machine: "
+            if [ -r "${license_file}" ]; then
+                msg+="$(ansi_bright_green EXISTS)"
+            else
+                msg+="$(ansi_bright_red MISSING)"
+                (( errors++ ))
+            fi
+
+            if (( errors == 0 )); then
+                message_success "${msg} (==> installable)"
+            else
+                (( ret++ ))
+                message_failure "${msg} (==> not installable)"
+            fi
+        done
+    else
+        message_info "No selected container, cannot check Matlab installation availability"
+    fi
+
+    return $(( ret ))
+}
+
 function matlab_policy() {
     cat <<- EOF
 
@@ -408,7 +386,7 @@ function matlab_policy() {
     - $(ansi_underline "${PROG} check matlab") - Checks that the relevant Matlab release is properly installed.
     - $(ansi_underline "${PROG} enforce matlab") - Installs the relevant Matlab release from a LAST-CONTAINER.
 
-    If Matlab is installed, the matlab-support package must be installed as well.
+    If Matlab is installed, some of the libraries it fetches must be moved aside.
 
     The file ${last_startup} should be hard linked to ${user_startup}.
 
@@ -419,7 +397,7 @@ function matlab_is_installed() {
     command -v matlab >&/dev/null
 }
 
-function startup_check() {
+function matlab_startup_check() {
     declare -i errors=0
 
     if macmap_this_is_last0; then
@@ -456,7 +434,7 @@ function startup_check() {
     return $(( errors ))
 }
 
-function startup_enforce() {
+function matlab_startup_enforce() {
     declare -i errors=0
 
     if macmap_this_is_last0; then
@@ -473,4 +451,109 @@ function startup_enforce() {
     message_success "Linked \"${last_startup}\" to \"${user_startup}\"."
 
     return $(( errors ))
+}
+
+#
+# The "matlab-support" package doesn't want to be installed non-ineractively.
+# We emulate its behavior, without actually installing it.
+#
+
+#
+# This function was plagiated from the matlab-support's postinst script
+#
+function matlab_support_enforce() {
+    local matlab_alt matlab_path
+    local op="matlab-support"
+
+    for matlab_alt in $(update-alternatives --query matlab | grep 'Alternative:' | cut -d ' ' -f 2,2)
+    do
+        matlab_path=${matlab_alt%*/bin/matlab}
+        # The SONAMEs listed here should be kept in sync with the
+        # “Recommends” field of matlab-support binary package
+        for f in $matlab_path/sys/os/glnx86/libgcc_s.so.1 \
+                    $matlab_path/sys/os/glnx86/libstdc++.so.6 \
+                    $matlab_path/sys/os/glnx86/libgfortran.so.5 \
+                    $matlab_path/sys/os/glnx86/libquadmath.so.0 \
+                    $matlab_path/sys/os/glnxa64/libgcc_s.so.1 \
+                    $matlab_path/sys/os/glnxa64/libstdc++.so.6 \
+                    $matlab_path/sys/os/glnxa64/libgfortran.so.5 \
+                    $matlab_path/sys/os/glnxa64/libquadmath.so.0
+        do
+            if [ -e "${f}" ]; then
+                if mv "${f}" "${f}.bak"; then
+                    message_success "${op}: Moved ${f} to ${f}.bak"
+                else
+                    message_failure "${op}: Failed to move ${f} to ${f}.bak"
+                fi
+            fi
+        done
+    done
+}
+
+function matlab_support_check() {
+    local matlab_alt matlab_path
+    local op="matlab-support"
+    local -i errors=0
+
+    for matlab_alt in $(update-alternatives --query matlab | grep 'Alternative:' | cut -d ' ' -f 2,2)
+    do
+        matlab_path=${matlab_alt%*/bin/matlab}
+        # The SONAMEs listed here should be kept in sync with the
+        # “Recommends” field of matlab-support binary package
+        for f in $matlab_path/sys/os/glnx86/libgcc_s.so.1 \
+                    $matlab_path/sys/os/glnx86/libstdc++.so.6 \
+                    $matlab_path/sys/os/glnx86/libgfortran.so.5 \
+                    $matlab_path/sys/os/glnx86/libquadmath.so.0 \
+                    $matlab_path/sys/os/glnxa64/libgcc_s.so.1 \
+                    $matlab_path/sys/os/glnxa64/libstdc++.so.6 \
+                    $matlab_path/sys/os/glnxa64/libgfortran.so.5 \
+                    $matlab_path/sys/os/glnxa64/libquadmath.so.0
+        do
+            if [ -e "${f}" ]; then
+                message_failure "${op}: ${f} still exists"
+                (( errors++ ))
+            elif [ -e "${f}.bak" ]; then
+                message_success "${op}: ${f} was moved aside"
+            fi
+        done
+    done
+    return $(( errors ))
+}
+
+
+#
+# AstroPack
+#
+
+function astropack_startup_check() {
+    local msg
+    local -i ret=0
+
+    msg="The script startup_Installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was "
+    if [ -d "${user_matlab_dir}/data" ]; then
+        message_success "${msg} invoked"
+    else
+        message_failure "${msg} NOT invoked"
+        (( ret++ ))
+    fi
+    return $(( ret ))
+}
+
+function astropack_startup_enforce() {
+    local script
+    script="startup_Installer"
+
+    # shellcheck disable=SC2154
+    if [ -d "${user_matlab_dir}/data" ]; then
+        message_success "The script ${script} was invoked"
+    else
+        message_info "Invoking \"${script}\" in \"AstroPack/matlab/startup\" ..."
+        su "${user_last}" -c "cd ~/matlab; LANG=en_US matlab -batch \"addpath('/home/ocs/matlab/AstroPack/matlab/startup'); ${script}\" "
+        status=${?}
+        if (( status == 0 )); then
+            message_success "${script} has succeeded"
+        else
+            message_failure "${script} has failed with status: ${status}"
+        fi
+    fi
 }
