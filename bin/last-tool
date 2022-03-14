@@ -33,8 +33,7 @@ function list_sections() {
     done | sort
 }
 
-
-function help() {
+function global_help() {
     # shellcheck disable=SC2154
     cat << EOF
 
@@ -44,7 +43,7 @@ function help() {
     This tool either checks or enforces the LAST installation policy.
 
     Usage: ${PROG} [-q|--quiet] [-n|--nodeps] [-c|--container <path>] <mode> [[section] ...] 
-           ${PROG} -h|--help
+           ${PROG} -h|--help [[section] ...]
 
      -q|--quiet:       be silent (default: verbose)
      -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
@@ -66,6 +65,22 @@ function help() {
          after the running <mode> (default: run all the defined sections)
 
 EOF
+}
+
+function help() {
+    if [ ${#selected_sections[*]} -ne 0 ]; then
+        local section section_helper
+
+        for section in "${selected_sections[@]}"; do
+            eval section_helper="${section}_helper"
+            if typeset -f "${section_helper}" >/dev/null 2>&1; then
+                message_section "${section}"
+                ${section_helper}
+            fi
+        done
+    else
+        global_help
+    fi
 }
 
 function show_environment() {
@@ -214,7 +229,8 @@ if [ ! "${mode}" ]; then
     exit 1
 fi
 
-selected_sections=( "${@}" )
+#selected_sections=( "${@}" )
+declare -a argv=( "${@}" )
 
 #
 # These modules will register sections
@@ -232,11 +248,6 @@ module_include sections/catalogs
 module_include sections/last-software
 module_include sections/ssh
 
-if [ "${mode}" = help ]; then
-    help
-    exit 0
-fi
-
 if [ "${mode}" = sections ]; then
 	sections_registered_sections
 	exit 0
@@ -249,19 +260,40 @@ fi
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 
-declare known
-for section in "${selected_sections[@]}"; do
-	known=false
-	for s in "${registered_sections[@]}"; do
-		if [ "${s}" = "${section}" ]; then
-			known=true
-			break
-		fi
-	done
-	if ! ${known}; then
-		message_fatal "Unknown section \"${section}\""
-	fi
+#
+# We allow each section to have an argument parser. The parser should consume the arguments
+#  it has used and return the remaining ones.
+#
+#  For each known section
+#    If it has a parser; 
+#     remaining_args=$( section-arg-parser current-args )
+#    End if
+#  End for
+#
+declare -a subargv
+declare parser
+while [ "${#argv[@]}" -gt 0 ]; do
+    for section in "${registered_sections[@]}"; do
+        if [ "${argv[0]}" = "${section}" ]; then
+            selected_sections+=( "${argv[0]}" )
+            subargv=()
+            for ((i = 1; i < ${#argv[@]}; i++)); do
+                subargv+=( "${argv[${i}]}" )
+            done
+            eval parser="${section}_arg_parser"
+            if typeset -f "${parser}" >/dev/null 2>&1; then
+                read -r -a argv <<< "$(${parser} "${subargv[@]}")"
+            else
+                argv=( "${subargv[@]}" )
+            fi
+        fi
+    done        
 done
+
+if [ "${mode}" = help ]; then
+    help
+    exit 0
+fi
 
 # No sections were specified, use all those defined
 if [ ${#selected_sections[*]} -eq 0 ]; then

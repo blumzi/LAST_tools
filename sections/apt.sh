@@ -93,6 +93,51 @@ function apt_check() {
     fi
 }
 
+function dummy_apt_arg_parser() {
+    declare OPTS
+    OPTS=$( getopt -o "a:bc:" --long "aaa:,bbb,ccc:" -n "${PROG}" -- "$@")
+    eval set -- "${OPTS}"
+
+    while true; do
+        case "${1}" in
+
+        -a|--aaa)
+            message_debug "${FUNCNAME[0]}: -a ${2}"
+            shift 2
+            ;;
+
+        -b|--bbb)
+            message_debug "${FUNCNAME[0]}: -b"
+            shift 1
+            ;;
+
+        -c|--ccc)
+            message_debug "${FUNCNAME[0]}: -c ${2}"
+            shift 2
+            ;;
+
+        --)
+            shift 1
+            break
+            ;;
+        esac
+    done
+    echo "${@}"
+}
+
+function dummy_apt_helper() {
+    cat <<- EOF
+
+    This is a dummy helper
+
+    Arguments:
+     -a|--aaa: The -a arg (with value)
+     -b|--bbb: A boolean argument
+     -c|--ccc: The -c arg with value
+
+EOF
+}
+
 function apt_policy() {
     cat <<- EOF
 

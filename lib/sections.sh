@@ -3,16 +3,16 @@
 export -A _sections_registered=()
 export -A _sections_descriptions=()
 export -A _sections_required=()
-export -A _sections_flags=()
+export -A _sections_short_flags=()
+export -A _sections_long_flags=()
 
 #
 # Register a section, with description, requirements and flags
 #
 function sections_register_section() {
-    local name="${1}"
+    local        name="${1}"
     local description="${2}"
-    local requires="${3}"
-    local flags="${4}"
+    local    requires="${3}"
 
     if [ "${_sections_registered[${name}]}" ]; then # already registered
         return
@@ -21,7 +21,6 @@ function sections_register_section() {
       _sections_registered[${name}]="${name}"
     _sections_descriptions[${name}]="${description}"
         _sections_required[${name}]="${requires}"
-           _sections_flags[${name}]="${flags}"
 }
 
 function sections_section_requires() {
@@ -78,10 +77,4 @@ function sections_section_has_method() {
     else
         return 1
     fi
-}
-
-function sections_section_flags() {
-    local section="${1}"
-
-    echo "${_sections_flags[${section}]}"
 }

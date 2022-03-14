@@ -83,3 +83,12 @@ function message_fatal() {
         message_log "[FATAL] ${*}"
     fi
 }
+
+# plain message
+function message_debug {
+    echo "[DBUG] ${*}" >&2
+
+    if ! ${LAST_TOOL_DONTLOG}; then
+        message_log "[DBUG] ${*}"
+    fi
+}
