@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# vim:se ai terse nows ts=4 sts=4 sw=4 expandtab nohlsearch:
+
+PROG=$(basename "${0}")
+
+function usage() {
+    cat <<- EOF
+
+    Usage:
+        ${PROG} <switch> [[-s|--socket <socket>] ... ]
+            - Gets the values of the specified socket(s) (default: all sockets)
+        ${PROG} <switch> [[-s|--socket <socket>] ... ] --on|--off
+            - Sets the value of the specified socket(s)
+        ${PROG} <switch> [[-s|--socket] <socket> ... ] -t|--toggle <socket>
+            - Toggles the value of the specified socket(s)
+
+    Notes:
+        - Power switches may be addressed either by their hostname or ip-address.
+        - Sockets are in the range 0..5
+
+EOF
+}
+
+
+declare pswitch
+declare sockets
+declare value
+declare toggle=false
+
+if [ "${1}" = '-h' ] || [ "${1}" = "--help" ]; then
+    usage
+    exit 0
+fi
+
+# valid pswitch names: "{pswitch}0[1-9][ew] {pswitch}1[0-2][ew]"
+ 
+name=${1,,}
+name=${name#pswitch}
+if [[ "${name}" == [1-9][ew] ]]; then
+    name=pswitch0${name}
+elif [[ "${name}" == 0[1-9][ew] ]]; then
+    name=pswitch${name}
+elif [[ "${name}" == 1[0-2][ew] ]]; then
+    name=pswitch${name}
+else
+    echo "${PROG}: Invalid power switch name \"${name}\""
+    exit 1
+fi
+pswitch="${name}"
+shift 1
+
+OPTS=$( getopt -o 's:v:oOt' --long "socket:,value:,on,off,toggle" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+
+check=false
+while true; do
+	case "${1}" in
+
+    -s|--socket)
+        if [[ ! "${2}" == [0-5] ]]; then
+            echo "${PROG}: Wrong socket \"${2}\", must be in the 0..5 range"
+            exit 1
+        fi
+        sockets+="${2}"
+        shift 2
+        ;;
+
+    -o|--on)
+        value=1
+        shift 1
+        ;;
+
+    -O|--off)
+        value=0
+        shift 1
+        ;;
+
+    -t|--toggle)
+        toggle=true
+        shift 1
+        ;;
+
+	--)
+		shift 1
+		break
+		;;
+	esac
+done
+
+unset http_proxy
+unset https_proxy
+
+url_root=http://admin:admin@${pswitch}
+
+if ! ${toggle} && [ ! "${value}" ]; then
+    if [ ${#sockets} -eq 0 ]; then
+        sockets='0-5'
+    fi
+    wget --quiet -O - ${url_root}/st0.xml | grep "out[${sockets}]" | sed -e "s;<out\([${sockets}]\)>;socket\1=;" -e 's;</out.*;;'
+    exit 0
+fi
+
+if ! ${toggle} && [ ! "${value}" ]; then
+    echo "${PROG}: Must supply --on, --off or --toggle"
+    exit 1
+fi
+
+# toggle sockets
+if ${toggle}; then
+    wget --quiet -O - "${url_root}/outs.cgi?out=${sockets}"
+    exit 0
+fi
+
+# turn sockets on|off
+for (( i = 0; i < ${#sockets}; i++ )); do
+    sock=${sockets:i:1}
+    echo wget --quiet -O - "${url_root}/outs.cgi?out${sock}=${value}"
+done
