@@ -249,7 +249,7 @@ function last_software_policy() {
      contain git clones of the relevant software repositories (on github).
     
     The list of repositories is maintained in "${last_software_github_repos_file}"
-    The Github tokens are maintained in "$(module_lookup files/github-tokens)"
+    The Github tokens are maintained in "$(module_locate files/github-tokens)"
 
     Caveat:
         The github-tokens MUST be ignored by git (see gitignore(5))
