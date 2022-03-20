@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# shellcheck disable=SC1091
 source /etc/profile.d/last.sh
 
 module_include lib/message
@@ -16,6 +17,8 @@ export github_repos_file
 github_repos_file="$(module_locate files/github-repos)"
 
 declare -A git_repo git_checkout_info git_token_name
+declare -a selected_repos
+declare reclone=false
 
 # shellcheck disable=SC2154
 eval top_dir=~"${user_last}"/matlab
@@ -40,6 +43,20 @@ function sorted_repos() {
     echo "${sorted[@]}"
 }
 
+function repo_was_selected() {
+    local repo="${1}" r
+
+    if [ ${#selected_repos[*]} -eq 0 ]; then
+        return 0
+    fi
+
+    for r in "${selected_repos[@]}"; do
+        if [ "${r}" = "${repo}" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 function help() {
     # shellcheck disable=SC2154
@@ -47,13 +64,15 @@ function help() {
 
     This tool clones (or pulls) the LAST software from github.
 
-    Usage: ${PROG} [-d|--dir dir] [-c|--check] [-t|--token-file dir]
+    Usage: ${PROG} [[-r|--repo <repo>] ...] [-R|--reclone] [-d|--dir dir] [-c|--check] [-t|--token-file dir]
            ${PROG} --help
 
      -c|--check:         check only, don't enforce
      -d|--dir <dir>:     fetch into the specified dir (default: current directory)
      -t|--token-file:    specify a file containing the github tokens (default: ${default_tokens_file})
      -h|--help:          show this help
+     -r|--repo <repo>:   specify repositories (default: all repositories)
+     -R|--reclone:       discard local changes and re-clone the selected repositories (default: all) - DANGEROUS!!!
 
      NOTE: This tool must be run as ${user_last}
 
@@ -73,7 +92,7 @@ function list_repos() {
     done
 }
 
-OPTS=$( getopt -o 'hd:clt:' --long "help,dir:,check,list,token-file:" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'hd:clt:r:R' --long "help,dir:,check,list,token-file:,repo:,reclone" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 check=false
@@ -109,6 +128,16 @@ while true; do
         shift 2
         ;;
 
+    -r|--repo)
+        selected_repos+=( "${2}" )
+        shift 2
+        ;;
+
+    -R|--reclone)
+        reclone=true
+        shift 1
+        ;;
+
 	--)
 		shift 1
 		break
@@ -125,6 +154,10 @@ if ${check}; then
     declare -i errors=0
     cd "${top_dir}" || exit 1
     for dir in $( sorted_repos ); do
+        if ! repo_was_selected "${dir}"; then
+            continue
+        fi
+
         if [ -d "${dir}" ] && [ -d "${dir}/.git" ]; then
             #
             # TBD: check branch and tag
@@ -179,20 +212,30 @@ for key in $( sorted_repos ); do
           repo="${git_repo[${key}]}"
            dir="${key}"
 
+    if ! repo_was_selected "${dir}"; then
+        continue
+    fi
+
     if [ ! "${token}" ]; then
         message_fatal "Github token \"${token_name}\" for repo \"${repo}\" not found in \"${tokens_file}\""
     fi
 
     declare checkout_args tag branch msg
 
+    if ${reclone} && [ -d "${dir}/.git" ]; then
+        message_info "Removing ${top_dir}/${dir} (to be recloned) ..."
+        /bin/rm -rf "${dir}"
+    fi
+
     if [ ! -d "${dir}/.git" ]; then
         mkdir -p "${dir}"
         pushd "$(dirname "${dir}")" >/dev/null || continue
         url="${repo/github/${token}@github}"
+        message_info "Cloning from ${repo} into \"${top_dir}/${dir}\" ..."
         git clone "${url}" >/dev/null 2>&1
         status=$?
         if [ "${status}" -eq 0 ]; then
-            message_success "Cloned \"${repo}\" into \"${dir}\"."
+            message_success "Cloned \"${repo}\" into \"${top_dir}/${dir}\"."
             if [ "${checkout_info}" ] && [ "${checkout_info}" != "none" ]; then
                 declare -a info
                 read -r -a info <<< "${checkout_info//,/ }"
@@ -218,24 +261,25 @@ for key in $( sorted_repos ); do
                 git checkout ${checkout_args} >/dev/null 2>&1
                 status=$?
                 if (( status == 0 )); then
-                    message_success "Checked out with ${msg} in \"${dir}\"."
+                    message_success "Checked out with ${msg} in \"${top_dir}/${dir}\"."
                 else
-                    message_failure "Could not checkout with ${msg} in \"${dir}\" (status: ${status})"
+                    message_failure "Could not checkout with ${msg} in \"${top_dir}/${dir}\" (status: ${status})"
                 fi
                 popd >/dev/null || true
             fi
         else
-            message_failure "Could not clone \"${repo}\" into \"${dir}\" (status: ${status})"
+            message_failure "Could not clone \"${repo}\" into \"${top_dir}/${dir}\" (status: ${status})"
         fi
         popd >/dev/null || continue
     else
         pushd "${dir}" >/dev/null || continue
+        message_info "Pulling from ${repo} into \"${top_dir}/${dir}\" ..."
         git pull --all --tags >/dev/null
         status=$?
         if (( status == 0 )); then
-            message_success "Pulled from \"${repo}\" into \"${dir}\"."
+            message_success "Pulled from \"${repo}\" into \"${top_dir}/${dir}\"."
         else
-            message_failure "Could not pull from \"${repo}\" into \"${dir}\" (status: ${status})"
+            message_failure "Could not pull from \"${repo}\" into \"${top_dir}/${dir}\" (status: ${status})"
         fi
         popd >/dev/null || continue
     fi

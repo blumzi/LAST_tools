@@ -72,7 +72,7 @@ function help() {
         local section section_helper
 
         for section in "${selected_sections[@]}"; do
-            eval section_helper="${section}_helper"
+            eval section_helper="$(util_bashify "${section}")_helper"
             if typeset -f "${section_helper}" >/dev/null 2>&1; then
                 message_section "${section}"
                 ${section_helper}
@@ -229,9 +229,6 @@ if [ ! "${mode}" ]; then
     exit 1
 fi
 
-#selected_sections=( "${@}" )
-declare -a argv=( "${@}" )
-
 #
 # These modules will register sections
 #
@@ -260,6 +257,17 @@ fi
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 
+function shiftARGV() {
+    local -i n="${1}"
+    local -a argv=()
+    local -i i
+
+    for (( i = n; i < ${#ARGV[*]}; i++)); do
+        argv+=( "${ARGV[${i}]}" )
+    done
+    ARGV=( "${argv[@]}" )
+}
+
 #
 # We allow each section to have an argument parser. The parser should consume the arguments
 #  it has used and return the remaining ones.
@@ -270,21 +278,19 @@ read -r -a registered_sections <<< "$( sections_registered_sections )"
 #    End if
 #  End for
 #
-declare -a subargv
+
+declare -a ARGV=()
+ARGV=( "${@}" )
+
 declare parser
-while [ "${#argv[@]}" -gt 0 ]; do
+while [ "${#ARGV[@]}" -gt 0 ]; do
     for section in "${registered_sections[@]}"; do
-        if [ "${argv[0]}" = "${section}" ]; then
-            selected_sections+=( "${argv[0]}" )
-            subargv=()
-            for ((i = 1; i < ${#argv[@]}; i++)); do
-                subargv+=( "${argv[${i}]}" )
-            done
-            eval parser="${section}_arg_parser"
+        if [ "${ARGV[0]}" = "${section}" ]; then
+            selected_sections+=( "${ARGV[0]}" )
+            shiftARGV 1
+            eval parser="$(util_bashify "${section}")_arg_parser"
             if typeset -f "${parser}" >/dev/null 2>&1; then
-                read -r -a argv <<< "$(${parser} "${subargv[@]}")"
-            else
-                argv=( "${subargv[@]}" )
+                ${parser}
             fi
         fi
     done        

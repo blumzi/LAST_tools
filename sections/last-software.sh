@@ -1,29 +1,112 @@
 #!/bin/bash
 
 module_include lib/container
+module_include lib/util
 
 sections_register_section "last-software" "Manages our own LAST software" "user ubuntu-packages"
 
 export fetcher last_software_github_repos_file
 fetcher="$(module_locate /bin/last-fetch-from-github)"
+if [[ "${-}" == *x* ]]; then
+    fetcher="bash -x ${fetcher}"
+fi
 last_software_github_repos_file="$(module_locate files/github-repos)"
 
-function last_software_enforce() {
+declare -a last_software_selected_repos=()
+declare -g last_software_reclone=false
+declare -g -x last_software_list_only=false
 
+function last_software_helper() {
+    cat <<- EOF
+
+    Usage:
+        ${PROG} enforce|check|policy last-software -l|--list
+            - lists the managed LAST software repositories
+
+        ${PROG} enforce last-software [[-r|--repo <repo>] ...] [-R|--reclone]
+            - clones or pulls the specified repos (default: all repos).
+            - with --reclone, discards local changes and re-clones the repository(ies) - DANGEROUS
+
+    Flags:
+        -l|--list         - list the LAST software repositories
+        -r|--repo <repo>  - add <repo> to the selected listed (default: all repositories)
+        -R|--reclone      - discard local changes and re-clone the (selected) repositories - OUCH!
+
+EOF
+}
+
+function last_software_arg_parser() {
+    declare OPTS
+    OPTS=$( getopt -o "lr:R" --long "list,repo:,reclone" -n "${PROG}" -- "${ARGV[@]}")
+    eval set -- "${OPTS}"
+
+    while true; do
+        case "${1}" in
+
+        -r|--repo)
+            export last_software_selected_repos+=( "${2}" )
+            shift 2
+            shiftARGV 2
+            ;;
+
+        -R|--reclone)
+            export last_software_reclone=true
+            shift 1
+            shiftARGV 1
+            ;;
+
+        -l|--list)
+            export last_software_list_only=true
+            shift 1
+            shiftARGV 1
+            ;;
+
+        --)
+            shift 1
+            shiftARGV 1
+            break
+            ;;
+        esac
+    done
+    # message_debug "selected: ${last_software_selected_repos[*]@Q}"
+    # message_debug "reclone: ${last_software_reclone@Q}"
+    # message_debug "list-only: ${last_software_list_only@Q}"
+}
+
+function last_software_list_repos() {
+    echo ""
+    printf " %-40s %-70s %s\n" "Repository" "URL" "Flags"
+    printf " %-40s %-70s %s\n" "==========" "===" "====="
+    while read -r repo url flags _; do
+        printf " %-40s %-70s %s\n" "${repo}" "${url}" "${flags}"
+    done < <(util_uncomment "$(module_locate files/github-repos)")    
+}
+
+function last_software_enforce() {
+    if ${last_software_list_only}; then
+        last_software_list_repos
+        return
+    fi
+    
     message_info "Fetching the LAST software from github ..."
+
+    local args=""
+    if ${last_software_reclone}; then
+        args+="--reclone "
+    fi
+    for repo in "${last_software_selected_repos[@]}"; do
+        args+="--repo=${repo} "
+    done
     # shellcheck disable=SC2154
-    su "${user_last}" -c "${fetcher} --dir ~${user_last}/matlab"
+    su "${user_last}" -c "${fetcher} ${args} --dir ~${user_last}/matlab"
 
     #
     # Frome here on we need a LAST container
     #
 
-    if [ ! "${selected_container}" ]; then
-        message_fatal "Could not find a LAST container, please select one with --container=<path>"
-    fi
-
-    if [ ! -d "${selected_container}" ]; then
-        message_fatal "The LAST container \"${selected_container}\" is not a directory."
+    if [ ! "${selected_container}" ] || [ ! -d "${selected_container}" ]; then
+        message_warning "No LAST-CONTAINER.  Only the github repositories were enforced"
+        return
     fi
     
     #
@@ -109,7 +192,20 @@ function last_software_check() {
     local -i ret=0
     local wine_dir="${user_home}/.wine"
 
-    su "${user_last}" -c "${fetcher} --dir ~${user_last}/matlab --check"
+    if ${last_software_list_only}; then
+        last_software_list_repos
+        return
+    fi
+
+    local args=""
+    if ${last_software_reclone}; then
+        args+="--reclone "
+    fi
+    for repo in "${last_software_selected_repos[@]}"; do
+        args+="--repo=${repo} "
+    done
+
+    su "${user_last}" -c "${fetcher} ${args} --dir ~${user_last}/matlab --check"
     (( ret += $? ))
 
     if ! macmap_this_is_last0; then
