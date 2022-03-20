@@ -61,6 +61,11 @@ function apt_enforce() {
 
 	message_info "Updating apt ..."
 	apt update
+
+    local config
+    config="/etc/apt/apt.conf.d/20auto-upgrades"
+    sed -i 's,"1";,"0";,' "${config}"
+    message_success "Disabled apt auto-update (${config})"
 }
 
 function apt_check() {
@@ -90,6 +95,15 @@ function apt_check() {
         message_success "We have Google's apt source list (${apt_google_source_list})"
     else
         message_failure "Missing Google's apt source list (${apt_google_source_list})"
+    fi
+
+    # check auto-update settings
+    local config
+    config="/etc/apt/apt.conf.d/20auto-upgrades"
+    if [ "$(grep -c '"0";' "${config}")" != 2 ]; then
+        message_failure "Apt auto-upgrade is NOT disabled (see ${config})"
+    else
+        message_success "Apt auto-upgrade is disabled (${config})"
     fi
 }
 
@@ -146,5 +160,6 @@ function apt_policy() {
     - We need Google's "Linux Package Signing Keys" in order to 'apt install' google packages.
     - We need Google's apt sources list (${apt_google_source_list})
 
+    Automatic updates are $(ansi_underline disabled)
 EOF
 }
