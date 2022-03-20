@@ -8,7 +8,7 @@ ifeq ($(shell mapfile -t type < <(df --output=fstype .); echo $${type[1]}),fuse.
 	VMWARE = true
 endif
 
-package: clean
+package: clean check-for-github-tokens
 	mkdir -m 755 -p ${PACKAGE_DIR}/usr/local/share/last-tool ${PACKAGE_DIR}/usr/local/bin ${PACKAGE_DIR}/etc/profile.d
 	tar cf - --exclude=LAST-CONTAINER ./bin ./lib ./files ./sections | (cd ${PACKAGE_DIR}/usr/local/share/last-tool ; tar xf -)
 	chmod 755 ${PACKAGE_DIR}/usr/local/share/last-tool/*	
@@ -36,3 +36,6 @@ endif
 
 clean:
 	/bin/rm -rf packaging
+
+check-for-github-tokens:
+	test -r files/github-tokens
