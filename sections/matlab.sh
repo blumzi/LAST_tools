@@ -47,9 +47,9 @@ function matlab_init() {
 
 function matlab_enforce() {
     matlab_installation_enforce
+	matlab_startup_enforce
     astropack_startup_enforce
     matlab_support_enforce
-	matlab_startup_enforce
     matlab_service_enforce
 }
 
@@ -102,9 +102,9 @@ function matlab_check() {
     local -i ret=0
 
     matlab_installation_check;  (( ret += $? ))
+    matlab_startup_check;       (( ret += $? ))
     astropack_startup_check;    (( ret += $? ))
     matlab_support_check;       (( ret += $? ))
-    matlab_startup_check;       (( ret += $? ))
     matlab_service_check;       (( ret += $? ))
 
     return $(( ret ))
