@@ -36,3 +36,17 @@ function util_test_and_set_http_proxy() {
 		export https_proxy="http://bcproxy.weizmann.ac.il:8080"
 	fi
 }
+
+#
+# Converts boolean keywords into status codes
+#
+function util_convert_to_boolean() {
+	case "${1}" in
+		[Oo]n|[Tt]rue|[Yy]es)
+			return 0
+			;;
+		[Oo]ff|[Ff]alse|[Nn]o)
+			return 1
+			;;
+	esac
+}
