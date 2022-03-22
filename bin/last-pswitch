@@ -32,6 +32,20 @@ function usage() {
 EOF
 }
 
+function GET() {
+    local url="${1}"
+    local tmp
+    local -i ret
+
+    tmp=$(mktemp "/tmp/${PROG}.XXXXXX")
+    timeout 2 wget --quiet -O - "${url}" > "${tmp}"
+    ret=${?}
+    if (( ret == 0 )) && [ -s "${tmp}" ]; then
+	    cat "${tmp}"
+    fi
+    /bin/rm "${tmp}"
+    return ${ret}
+}
 
 declare pswitch
 declare sockets
@@ -142,9 +156,10 @@ function set_sockets() {
             numerical_value=0
             ;;
     esac
+
     for (( i = 0; i < ${#numeric_sockets}; i++ )); do
         sock=${numeric_sockets:i:1}
-        wget --quiet -O - "${url_root}/outs.cgi?out${sock}=${numerical_value}"
+        GET "${url_root}/outs.cgi?out${sock}=${numerical_value}" || return ${?}
     done
 }
 
@@ -155,10 +170,11 @@ url_root=http://admin:admin@${pswitch}
 
 case ${op} in
     show)
-        wget --quiet -O - "${url_root}/st0.xml" | \
+        GET "${url_root}/st0.xml" | \
             grep "out[${numeric_sockets}]" | \
             sed -e "s;<out\([${numeric_sockets}]\)>;socket\1=;" -e 's;</out.*;;' -e 's;=0;=off;' -e 's;=1;=on;' | \
             map_socket_names
+        exit "${PIPESTATUS[0]}"
         ;;
 
     on|off)
@@ -166,6 +182,6 @@ case ${op} in
         ;;
 
     toggle)
-        wget --quiet -O - "${url_root}/outs.cgi?out=${numeric_sockets}"
+        GET "${url_root}/outs.cgi?out=${numeric_sockets}"
         ;;
 esac
