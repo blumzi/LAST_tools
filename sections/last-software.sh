@@ -135,7 +135,7 @@ function last_software_enforce() {
         if [ -r "${shortcut}" ]; then
             message_success "The CME2 desktop shortcut exists"
         else
-            cp "$(module_locate files/CME2.desktop)" "${shortcut}"
+            cp "$(module_locate files/root/usr/share/applications/CME2.desktop)" "${shortcut}"
             desktop-file-install --rebuild-mime-info-cache "${shortcut}"
             message_success "Installed the CME2 desktop shortcut"
         fi
