@@ -22,7 +22,7 @@ function time_enforce() {
     if [ "${tz}" = UTC ]; then
         message_success "The timezone is UTC"
     else
-		timedatectl set-timezone UTC
+        timedatectl set-timezone UTC
         message_success "The timezone was set to UTC"
     fi
 
