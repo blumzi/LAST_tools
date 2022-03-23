@@ -17,6 +17,15 @@ function time_enforce() {
         return
     fi
 
+    local tz
+    tz="$(timedatectl show --value -p Timezone)"
+    if [ "${tz}" = UTC ]; then
+        message_success "The timezone is UTC"
+    else
+		timedatectl set-timezone UTC
+        message_success "The timezone was set to UTC"
+    fi
+
     systemctl restart ${time_service}
 }
 
