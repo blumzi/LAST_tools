@@ -465,7 +465,7 @@ function matlab_support_enforce() {
     local matlab_alt matlab_path
     local op="matlab-support"
 
-    for matlab_alt in $(update-alternatives --query matlab | grep 'Alternative:' | cut -d ' ' -f 2,2)
+    for matlab_alt in $(update-alternatives --query matlab 2>/dev/null | grep 'Alternative:' | cut -d ' ' -f 2,2)
     do
         matlab_path=${matlab_alt%*/bin/matlab}
         # The SONAMEs listed here should be kept in sync with the
@@ -495,7 +495,7 @@ function matlab_support_check() {
     local op="matlab-support"
     local -i errors=0
 
-    for matlab_alt in $(update-alternatives --query matlab | grep 'Alternative:' | cut -d ' ' -f 2,2)
+    for matlab_alt in $(update-alternatives --query matlab 2>/dev/null | grep 'Alternative:' | cut -d ' ' -f 2,2)
     do
         matlab_path=${matlab_alt%*/bin/matlab}
         # The SONAMEs listed here should be kept in sync with the
