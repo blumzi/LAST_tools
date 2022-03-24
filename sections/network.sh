@@ -10,8 +10,10 @@ export network_broadcast network_prefix
 function network_set_defaults() {
     network_local_hostname=$( macmap_get_local_hostname )
     network_local_ipaddr=$( macmap_get_local_ipaddr )
-    network_peer_hostname=$( macmap_get_peer_hostname )
-    network_peer_ipaddr=$( macmap_get_peer_ipaddr )
+    if ! macmap_this_is_last0; then
+        network_peer_hostname=$( macmap_get_peer_hostname )
+        network_peer_ipaddr=$( macmap_get_peer_ipaddr )
+    fi
 	local -a info
 	read -r -a info <<< "$( ip -o -4 link show | grep ': en' )"
     network_interface=${info[1]%:}
