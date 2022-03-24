@@ -150,7 +150,11 @@ function hostname_is_valid() {
         return 1
     fi
 
-    if [ "${name}" != last0 ] && [[ "${name}" != last[012][0-9][ew] ]]; then
+    if [ "${name}" = last0 ]; then
+        return 0
+    fi
+
+    if [[ "${name}" != last[012][0-9][ew] ]]; then
         return 1
     fi
 
