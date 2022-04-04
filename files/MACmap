@@ -47,13 +47,10 @@ D8:5E:D3:05:0A:FC	10.23.1.21	last11e	last21
 D8:5E:D3:05:0B:41	10.23.1.22	last11w	last22
 D8:5E:D3:05:04:CD	10.23.1.23	last12e	last23
 D8:5E:D3:04:14:D3	10.23.1.24	last12w	last24
+B4:2E:99:A8:6B:C6   10.23.1.25  last0
 
 #	TBD:	last0
 ff:ff:ff:ff:ff:ff	10.23.1.25	last0
-
-#	Dummies	for	last-tool	testing	last27
-30:5a:3a:47:39:61	my-machine	x.y.z.0
-00:0c:29:58:94:e2	last20e	192.168.129.128	last28
 
 #	Controllers
 7c:16:0d:01:a8:88	10.23.2.101	roofcontrol roof
