@@ -462,61 +462,78 @@ function matlab_startup_enforce() {
 # This function was plagiated from the matlab-support's postinst script
 #
 function matlab_support_enforce() {
-    local matlab_alt matlab_path
+    local matlab_alt matlab_alts matlab_path mpath
     local op="matlab-support"
 
-    for matlab_alt in $(update-alternatives --query matlab | grep 'Alternative:' | cut -d ' ' -f 2,2)
-    do
-        matlab_path=${matlab_alt%*/bin/matlab}
-        # The SONAMEs listed here should be kept in sync with the
-        # “Recommends” field of matlab-support binary package
-                    # $matlab_path/sys/os/glnxa64/libgfortran.so.5
-        for f in $matlab_path/sys/os/glnx86/libgcc_s.so.1 \
-                    $matlab_path/sys/os/glnx86/libstdc++.so.6 \
-                    $matlab_path/sys/os/glnx86/libgfortran.so.5 \
-                    $matlab_path/sys/os/glnx86/libquadmath.so.0 \
-                    $matlab_path/sys/os/glnxa64/libgcc_s.so.1 \
-                    $matlab_path/sys/os/glnxa64/libstdc++.so.6 \
-                    $matlab_path/sys/os/glnxa64/libquadmath.so.0
+    mpath=/usr/local/MATLAB/R2020b
+    update-alternatives --install \
+        /usr/bin/matlab matlab $mpath/bin/matlab -1 \
+        --slave /usr/bin/matlab-mex matlab-mex $mpath/bin/mex  \
+        --slave /usr/bin/matlab-mbuild matlab-mbuild $mpath/bin/mbuild
+    message_success "${op}: Installed the matlab alternatives"
+
+    matlab_alts="$(update-alternatives --query matlab 2>/dev/null | grep 'Alternative:' | cut -d ' ' -f 2,2)"
+    if [ "${matlab_alts}" ]; then
+        for matlab_alt in ${matlab_alts}
         do
-            if [ -e "${f}" ]; then
-                if mv "${f}" "${f}.bak"; then
-                    message_success "${op}: Moved ${f} to ${f}.bak"
-                else
-                    message_failure "${op}: Failed to move ${f} to ${f}.bak"
+            matlab_path=${matlab_alt%*/bin/matlab}
+            # The SONAMEs listed here should be kept in sync with the
+            # “Recommends” field of matlab-support binary package
+                        # $matlab_path/sys/os/glnxa64/libgfortran.so.5
+            for f in $matlab_path/sys/os/glnx86/libgcc_s.so.1 \
+                        $matlab_path/sys/os/glnx86/libstdc++.so.6 \
+                        $matlab_path/sys/os/glnx86/libgfortran.so.5 \
+                        $matlab_path/sys/os/glnx86/libquadmath.so.0 \
+                        $matlab_path/sys/os/glnxa64/libgcc_s.so.1 \
+                        $matlab_path/sys/os/glnxa64/libstdc++.so.6 \
+                        $matlab_path/sys/os/glnxa64/libquadmath.so.0
+            do
+                if [ -e "${f}" ]; then
+                    if mv "${f}" "${f}.bak"; then
+                        message_success "${op}: Moved ${f} to ${f}.bak"
+                    else
+                        message_failure "${op}: Failed to move ${f} to ${f}.bak"
+                    fi
                 fi
-            fi
+            done
         done
-    done
+    else
+        message_warning "${op}: The matlab alternative links were not created"
+    fi
 }
 
 function matlab_support_check() {
-    local matlab_alt matlab_path
+    local matlab_alt matlab_alts matlab_path
     local op="matlab-support"
     local -i errors=0
 
-    for matlab_alt in $(update-alternatives --query matlab | grep 'Alternative:' | cut -d ' ' -f 2,2)
-    do
-        matlab_path=${matlab_alt%*/bin/matlab}
-        # The SONAMEs listed here should be kept in sync with the
-        # “Recommends” field of matlab-support binary package
-        for f in $matlab_path/sys/os/glnx86/libgcc_s.so.1 \
-                    $matlab_path/sys/os/glnx86/libstdc++.so.6 \
-                    $matlab_path/sys/os/glnx86/libgfortran.so.5 \
-                    $matlab_path/sys/os/glnx86/libquadmath.so.0 \
-                    $matlab_path/sys/os/glnxa64/libgcc_s.so.1 \
-                    $matlab_path/sys/os/glnxa64/libstdc++.so.6 \
-                    $matlab_path/sys/os/glnxa64/libgfortran.so.5 \
-                    $matlab_path/sys/os/glnxa64/libquadmath.so.0
+    matlab_alts="$(update-alternatives --query matlab 2>/dev/null | grep 'Alternative:' | cut -d ' ' -f 2,2)"
+    if [ "${matlab_alts}" ]; then
+        for matlab_alt in ${matlab_alts}
         do
-            if [ -e "${f}" ]; then
-                message_failure "${op}: ${f} still exists"
-                (( errors++ ))
-            elif [ -e "${f}.bak" ]; then
-                message_success "${op}: ${f} was moved aside"
-            fi
+            matlab_path=${matlab_alt%*/bin/matlab}
+            # The SONAMEs listed here should be kept in sync with the
+            # “Recommends” field of matlab-support binary package
+            for f in $matlab_path/sys/os/glnx86/libgcc_s.so.1 \
+                        $matlab_path/sys/os/glnx86/libstdc++.so.6 \
+                        $matlab_path/sys/os/glnx86/libgfortran.so.5 \
+                        $matlab_path/sys/os/glnx86/libquadmath.so.0 \
+                        $matlab_path/sys/os/glnxa64/libgcc_s.so.1 \
+                        $matlab_path/sys/os/glnxa64/libstdc++.so.6 \
+                        $matlab_path/sys/os/glnxa64/libgfortran.so.5 \
+                        $matlab_path/sys/os/glnxa64/libquadmath.so.0
+            do
+                if [ -e "${f}" ]; then
+                    message_failure "${op}: ${f} still exists"
+                    (( errors++ ))
+                elif [ -e "${f}.bak" ]; then
+                    message_success "${op}: ${f} was moved aside"
+                fi
+            done
         done
-    done
+    else
+        message_warning "${op}: The matlab alternative links were not created"
+    fi
     return $(( errors ))
 }
 
