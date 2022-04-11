@@ -1,0 +1,47 @@
+#!/bin/bash
+
+function kill_ds9s() {
+    kill %1 %2 %3 %4
+}
+
+trap kill_ds9s SIGTERM
+
+east_host=$(find / -maxdepth 1 -type d -name "last[0-1][0-9]e")
+west_host=$(find / -maxdepth 1 -type d -name "last[0-1][0-9]w")
+
+declare -A tops=(
+    [ne]=${east_host}/data1
+    [se]=${east_host}/data2
+    [nw]=${west_host}/data1
+    [sw]=${west_host}/data2
+)
+
+declare -A geometry=(
+    [ne]=640x480+100+100
+    [se]=640x480+100+800
+    [nw]=640x480+800+100
+    [sw]=640x480+800+600
+)
+
+function watch_for_fits() {
+    local quadrant="${1}"
+
+    if [ "$(xpaacess -n "${quadrant}" g)" != 1 ]; then
+        ds9 -title "${quadrant}" -geometry "${geometry[${quadrant}]}" &
+    fi
+
+    while read -r dir file; do
+        if [[ "${file}" != *.fits ]]; then
+            continue
+        fi
+        echo "${dir}/${file}"
+    done < <(inotifywait --event close_write --monitor --recursive --format "%w %f" "${tops[${quadrant}]}")
+}
+
+# TBD: open ds9 viewers
+
+for quad in ${!tops[*]}; do
+    watch_for_fits "${quad}" &
+done
+
+wait
