@@ -465,6 +465,7 @@ function matlab_support_enforce() {
     local matlab_alt matlab_alts matlab_path mpath
     local op="matlab-support"
 
+<<<<<<< HEAD
     mpath=/usr/local/MATLAB/R2020b
     update-alternatives --install \
         /usr/bin/matlab matlab $mpath/bin/matlab -1 \
@@ -475,6 +476,21 @@ function matlab_support_enforce() {
     matlab_alts="$(update-alternatives --query matlab 2>/dev/null | grep 'Alternative:' | cut -d ' ' -f 2,2)"
     if [ "${matlab_alts}" ]; then
         for matlab_alt in ${matlab_alts}
+=======
+    for matlab_alt in $(update-alternatives --query matlab 2>/dev/null | grep 'Alternative:' | cut -d ' ' -f 2,2)
+    do
+        matlab_path=${matlab_alt%*/bin/matlab}
+        # The SONAMEs listed here should be kept in sync with the
+        # “Recommends” field of matlab-support binary package
+                    # $matlab_path/sys/os/glnxa64/libgfortran.so.5
+        for f in $matlab_path/sys/os/glnx86/libgcc_s.so.1 \
+                    $matlab_path/sys/os/glnx86/libstdc++.so.6 \
+                    $matlab_path/sys/os/glnx86/libgfortran.so.5 \
+                    $matlab_path/sys/os/glnx86/libquadmath.so.0 \
+                    $matlab_path/sys/os/glnxa64/libgcc_s.so.1 \
+                    $matlab_path/sys/os/glnxa64/libstdc++.so.6 \
+                    $matlab_path/sys/os/glnxa64/libquadmath.so.0
+>>>>>>> 0fdfae69e4972647f132c5c647dccce403df860c
         do
             matlab_path=${matlab_alt%*/bin/matlab}
             # The SONAMEs listed here should be kept in sync with the
