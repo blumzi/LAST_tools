@@ -31,7 +31,7 @@ function util_bashify() {
 #  the proxy server bcproxy.weizmann.ac.il replies to ping.
 #
 function util_test_and_set_http_proxy() {
-	if ping -w 1 -c 1 bcproxy.weizmann.ac.il >/dev/null 2>&1; then
+	if timeout 2 ping -w 1 -c 1 bcproxy.weizmann.ac.il >/dev/null 2>&1; then
 		export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
 		export https_proxy="http://bcproxy.weizmann.ac.il:8080"
 	fi

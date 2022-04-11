@@ -106,7 +106,7 @@ EOF
     message_info "(Re)mounting the local data'*' filesystems"
     mount -all --type ext4
 
-    if ping -w 1 -c 1 "${peer_hostname}" >&/dev/null; then
+    if timeout 2 ping -w 1 -c 1 "${peer_hostname}" >&/dev/null; then
         message_info "Mounting filesystems from peer machine \"${peer_hostname}\"."
         mount --all --type nfs &
     else
@@ -234,7 +234,7 @@ function filesystems_check_mounts() {
     done
 
     # check remote filesystems
-    if ping -c 1 -w 1 "${peer_hostname}" >/dev/null 2>&1; then
+    if timeout 2 ping -c 1 -w 1 "${peer_hostname}" >/dev/null 2>&1; then
         for d in /${peer_hostname}/{data1,data2}; do
             read -r dev _ used avail pcent mpoint <<< "$( df --human-readable --type nfs4 2>/dev/null | grep " ${d}$" )"
             if [ "${dev}" ] && [ "${mpoint}" ]; then
