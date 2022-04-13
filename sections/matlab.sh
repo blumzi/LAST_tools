@@ -514,13 +514,13 @@ function matlab_support_check() {
             matlab_path=${matlab_alt%*/bin/matlab}
             # The SONAMEs listed here should be kept in sync with the
             # “Recommends” field of matlab-support binary package
+                #  $matlab_path/sys/os/glnx86/libgfortran.so.5
+                # $matlab_path/sys/os/glnxa64/libgfortran.so.5
             for f in $matlab_path/sys/os/glnx86/libgcc_s.so.1 \
                         $matlab_path/sys/os/glnx86/libstdc++.so.6 \
-                        $matlab_path/sys/os/glnx86/libgfortran.so.5 \
                         $matlab_path/sys/os/glnx86/libquadmath.so.0 \
                         $matlab_path/sys/os/glnxa64/libgcc_s.so.1 \
                         $matlab_path/sys/os/glnxa64/libstdc++.so.6 \
-                        $matlab_path/sys/os/glnxa64/libgfortran.so.5 \
                         $matlab_path/sys/os/glnxa64/libquadmath.so.0
             do
                 if [ -e "${f}" ]; then
