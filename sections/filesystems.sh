@@ -82,8 +82,11 @@ EOF
 
         cat <<- EOF > "${tmp}"
 		/${local_hostname}/data1 ${peer_hostname}(${_filesystems_mount_options})
-		/${local_hostname}/data2 ${peer_hostname}(${_filesystems_mount_options})
+		/${local_hostname}/data2 ${peer_hostname}(${_filesystems_mount_options})        
 EOF
+        if macmap_this_is_last0; then
+            echo "/usr/local/LAST-CONTAINER 10.23.1.0/24(rw,sync,no_subtree_check) 10.23.3.0/24(rw,sync,no_subtree_check)"
+        fi
     } > "${tmp}"
     mv "${tmp}" "${config_file}"
 	chmod 644 "${config_file}"
