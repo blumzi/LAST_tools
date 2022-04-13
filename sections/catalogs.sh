@@ -67,7 +67,7 @@ function catalogs_check() {
     fi
 
 	if [ ! "${catalogs_container_top}" ]; then
-        message_failure "No LAST container, cannot synchronize catalogs (maybe specify one with --catalog=... ?!?)"
+        message_failure "No LAST-CONTAINER, cannot synchronize catalogs (maybe specify one with --catalog=... ?!?)"
         return
     fi
 
