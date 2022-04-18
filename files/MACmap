@@ -31,7 +31,7 @@ D8:5E:D3:04:DC:23	10.23.1.2	last01w	last2
 D8:5E:D3:04:E0:E0	10.23.1.3	last02e	last3
 18:C0:4D:82:1E:1F	10.23.1.4	last02w	last4
 18:C0:4D:82:1D:FF	10.23.3.5	last03e	last5
-D8:5E:D3:04:DC:31	10.23.1.6	last03w	last6
+18:C0:4D:80:19:63	10.23.1.6	last03w	last6
 D8:5E:D3:03:D9:B6	10.23.1.9	last05e	last9
 D8:5E:D3:03:D9:C7	10.23.1.10	last05w	last10
 D8:5E:D3:03:D9:B5	10.23.1.11	last06e	last11
