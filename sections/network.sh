@@ -34,11 +34,12 @@ function network_init() {
 # The only configured (and active interface) should be enp67s0
 #
 function network_enforce() {
-    local plan="etc/netplan/99_last_network.yaml"
+    local plan="/etc/netplan/99_last_network.yaml"
+    local tmp=$(mktemp)
 
     network_set_defaults
 
-    cat <<- EOF > "${plan}"
+    cat <<- EOF > "${tmp}"
     network:
         version: 2
         renderer: networkd
@@ -52,7 +53,18 @@ function network_enforce() {
               addresses: [132.77.4.1, 132.77.22.1]
               search: [wisdom.weizmann.ac.il, wismain.weizmann.ac.il, weizmann.ac.il]
 EOF
-    message_success "Created netplan \"${plan}\""
+	if [ -e "${plan}" ]; then
+		if cmp --silent "${tmp}" "${plan}"; then
+			message_success "Netplan \"${plan}\" is already valid."
+		else
+			cp "${tmp}" "${plan}"
+			message_success "Overwritten plan \"${plan}\""
+		fi
+	else
+		cp "${tmp}" "${plan}"
+		message_success "Created netplan \"${plan}\""
+	fi
+	/bin/rm "${tmp}"
 
     netplan apply
     message_success "Applied netplan \"${plan}\""
