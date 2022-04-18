@@ -91,6 +91,8 @@ EOF
     mv "${tmp}" "${config_file}"
 	chmod 644 "${config_file}"
 
+	systemctl stop autofs
+	systemctl disable autofs
 	declare -a original_mpoints
 	read -r -a original_mpoints <<< "$( find / -maxdepth 2 \( -name data -o -name 'data[12]' \) -type d | grep -vE "(${local_hostname}|${peer_hostname})" )"
 	if (( ${#original_mpoints[*]} != 0 )); then
