@@ -78,7 +78,7 @@ EOF
 
 function etc_environment_check() {
 
-    if grep -qs "^util_test_and_set_http_proxy$" "${_env_config_file}" ; then
+    if grep -qs "export[[:space:]]*http.*_proxy=" "${_env_config_file}" ; then
         message_success "The file \"${_env_config_file}\" has settings for http_proxy and https_proxy"
     else
         message_failure "The file \"${_env_config_file}\" does not have settings for http_proxy and https_proxy"
@@ -90,12 +90,17 @@ function etc_environment_enforce() {
     local tmp
     tmp="$(mktemp)"
 
-    {
-        grep -vE '^(source /etc/profile.d/last.sh|module_include lib/util|util_test_and_set_http_proxy)=' "${_env_config_file}"
-        echo "source /etc/profile.d/last.sh"
-        echo "module_include lib/util"
-        echo "util_test_and_set_http_proxy"
-    } > "${tmp}"
+    cat <<- EOF > "${tmp}"
+#!/bin/sh
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+
+if http_proxy=http://bcproxy.weizmann.ac.il:8080 timeout 2 wget --quiet -O - http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep --quiet 'The HDF5/HTM large catalog format'; then
+    export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
+    export https_proxy="http://bcproxy.weizmann.ac.il:8080"
+fi
+EOF
     mv "${tmp}" "${_env_config_file}"
     message_success "Added settings for http_proxy and https_proxy to \"${_env_config_file}\"."
 }
+
