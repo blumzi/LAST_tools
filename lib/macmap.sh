@@ -185,3 +185,7 @@ function macmap_this_is_last0() {
     fi
     return 1
 }
+
+function macmap_last_networks() {
+    echo "10.23.1.0/24 10.23.3.0/24"
+}
