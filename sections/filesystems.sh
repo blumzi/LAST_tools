@@ -87,9 +87,14 @@ function filesystems_enforce() {
     tmp=$(mktemp)
     config_file="/etc/exports"
     {
+        local line="/usr/local/LAST-CONTAINER " net
+        
+        for net in $(macmap_last_networks); do
+            line+=" ${net}(${_filesystems_mount_options})"
+        done
         if ${_filesystems_last0}; then
             grep -v "LAST-CONTAINER" "${config_file}"
-            echo "/usr/local/LAST-CONTAINER 10.23.1.0/24(${_filesystems_mount_options}) 10.23.3.0/24(${_filesystems_mount_options})"
+            echo "${line}"
         else
             grep -v "^/${local_hostname}/data" "${config_file}"
 
@@ -99,6 +104,7 @@ function filesystems_enforce() {
     } > "${tmp}"
     mv "${tmp}" "${config_file}"
 	chmod 644 "${config_file}"
+    message_success "Updated \"${config_file}\"."
 
 	systemctl stop autofs
 	declare -a original_mpoints
@@ -115,13 +121,17 @@ function filesystems_enforce() {
 		done
 	fi
 
+    # shellcheck disable=SC2044
     for i in $(find / -maxdepth 1 -name 'last*[0-9]' -type d); do
-        find ${i} -maxdepth 2 -name 'data*' -empty -type d -delete
+        find "${i}" -maxdepth 2 -name 'data*' -empty -type d -delete
     done
     find / -maxdepth 1 -name 'last*' -empty -type d -delete
 
-    message_info "(Re)mounting the local data'*' filesystems"
-    mount --all --type ext4
+    if mount --all --type ext4; then
+        message_success "(Re)mounted the local filesystems"
+    else
+        message_failure "Failed to (re)mount the local filesystems"
+    fi
 
     if timeout 2 ping -w 1 -c 1 "${peer_hostname}" >&/dev/null; then
         message_info "Mounting filesystems from peer machine \"${peer_hostname}\"."
@@ -131,11 +141,11 @@ function filesystems_enforce() {
         mount --all --type nfs &
     fi
 
-    message_info "Changing permission to 755 on exported filesystems /${local_hostname}/data* ... "
     chmod 755 /"${local_hostname}"/data*
+    message_success "Changed permission to 755 on exported filesystems /${local_hostname}/data* ... "
 
-    message_info "Restarting NFS kernel server (background)"
     service nfs-kernel-server restart &
+    message_success "Restarted NFS kernel server (background)"
 
     if ! ${_filesystems_last0}; then
         tmp=$(mktemp)
