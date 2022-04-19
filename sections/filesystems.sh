@@ -9,7 +9,7 @@ sections_register_section "filesystems" "Manages the exporting/mounting of files
 
 export _filesystems_local_hostname
 
-export _filesystems_mount_options="rw,no_subtree_check"
+export _filesystems_mount_options="rw,sync,no_root_squash,no_subtree_check"
 
 #
 # On some machines the filesystem occupies the whole disk, on others
@@ -23,6 +23,11 @@ export -A _filesystems_devmap=(
 
 function filesystems_init() {
     _filesystems_local_hostname="$(macmap_get_local_hostname)"
+    if macmap_this_is_last0; then
+        _filesystems_last0=true
+    else
+        _filesystems_last0=false
+    fi
 }
 
 #
@@ -40,59 +45,62 @@ function filesystems_enforce() {
     local local_hostname peer_hostname tmp config_file d dev
     local -a entry key
 
-
-    if macmap_this_is_last0; then
-        message_success "Nothing to do on \"last0\"."
-        return
-    fi
-
-    local_hostname=$( macmap_get_local_hostname )
-    peer_hostname=$( macmap_get_peer_hostname )
-
-    mkdir -p /"${local_hostname}"/{data,data1,data2} /"${peer_hostname}"/{data1,data2}
-
+    #
+    # Handle local filesystems
+    #
     tmp=$(mktemp)
     config_file="/etc/fstab"
-    {
-        grep -vE "(/dev/sd[abc]|${local_hostname}|${peer_hostname})" ${config_file} | grep -v '^[[:space:]]*$'		# keep non-related lines
+    if ${_filesystems_last0}; then
+        {
+            grep -v "/dev/sd[ab]" "${config_file}"
+			echo "/dev/sda /last0/data1  ext4 defaults 0 0"
+			echo "/dev/sdb /last0/data2  ext4 defaults 0 0"
+        } > "${tmp}"
+    else
+        local_hostname=$( macmap_get_local_hostname )
+         peer_hostname=$( macmap_get_peer_hostname  )
 
-		echo ""
-        for key in ${!_filesystems_devmap[*]}; do                                       # add our lines
-            dev=${key}
-            if lsblk "${dev}1" >/dev/null 2>&1; then
-                dev=${dev}1
-            fi
-            echo "${dev} /${local_hostname}/${_filesystems_devmap[${key}]}  ext4 defaults 0 0"
-        done
+        mkdir -p /"${local_hostname}"/{data,data1,data2} /"${peer_hostname}"/{data1,data2}
 
-        # add cross-mount lines
-        cat <<- EOF
+        {
+            grep -vE "(/dev/sd[abc]|${local_hostname}|${peer_hostname})" ${config_file} | grep -v '^[[:space:]]*$'		# keep non-related lines
 
-		${peer_hostname}:/${peer_hostname}/data1 /${peer_hostname}/data1 nfs defaults 0 0
-		${peer_hostname}:/${peer_hostname}/data2 /${peer_hostname}/data2 nfs defaults 0 0
-EOF
-    } > "${tmp}"
+            echo ""
+            for key in ${!_filesystems_devmap[*]}; do                                       # add our lines
+                dev=${key}
+                if lsblk "${dev}1" >/dev/null 2>&1; then
+                    dev=${dev}1
+                fi
+                echo "${dev} /${local_hostname}/${_filesystems_devmap[${key}]}  ext4 defaults 0 0"
+            done
+
+            # add cross-mount lines
+            echo ""
+            echo "${peer_hostname}:/${peer_hostname}/data1 /${peer_hostname}/data1 nfs defaults 0 0"
+            echo "${peer_hostname}:/${peer_hostname}/data2 /${peer_hostname}/data2 nfs defaults 0 0"
+        } > "${tmp}"
+    fi
     mv "${tmp}" "${config_file}"
-	chmod 644 "${config_file}"
+    chmod 644 "${config_file}"
+    message_success "Updated \"${config_file}\"."
 
     tmp=$(mktemp)
     config_file="/etc/exports"
     {
-        grep -v "^/${local_hostname}/data" "${config_file}"
+        if ${_filesystems_last0}; then
+            grep -v "LAST-CONTAINER" "${config_file}"
+            echo "/usr/local/LAST-CONTAINER 10.23.1.0/24(${_filesystems_mount_options}) 10.23.3.0/24(${_filesystems_mount_options})"
+        else
+            grep -v "^/${local_hostname}/data" "${config_file}"
 
-        cat <<- EOF > "${tmp}"
-		/${local_hostname}/data1 ${peer_hostname}(${_filesystems_mount_options})
-		/${local_hostname}/data2 ${peer_hostname}(${_filesystems_mount_options})        
-EOF
-        if macmap_this_is_last0; then
-            echo "/usr/local/LAST-CONTAINER 10.23.1.0/24(rw,sync,no_subtree_check) 10.23.3.0/24(rw,sync,no_subtree_check)"
+            echo "/${local_hostname}/data1 ${peer_hostname}(${_filesystems_mount_options})"
+            echo "/${local_hostname}/data2 ${peer_hostname}(${_filesystems_mount_options})"
         fi
     } > "${tmp}"
     mv "${tmp}" "${config_file}"
 	chmod 644 "${config_file}"
 
 	systemctl stop autofs
-	systemctl disable autofs
 	declare -a original_mpoints
 	read -r -a original_mpoints <<< "$( find / -maxdepth 2 \( -name data -o -name 'data[12]' \) -type d | grep -vE "(${local_hostname}|${peer_hostname})" )"
 	if (( ${#original_mpoints[*]} != 0 )); then
@@ -106,10 +114,14 @@ EOF
 			rmdir "${mpoint}"
 		done
 	fi
+
+    for i in $(find / -maxdepth 1 -name 'last*[0-9]' -type d); do
+        find ${i} -maxdepth 2 -name 'data*' -empty -type d -delete
+    done
     find / -maxdepth 1 -name 'last*' -empty -type d -delete
 
     message_info "(Re)mounting the local data'*' filesystems"
-    mount -all --type ext4
+    mount --all --type ext4
 
     if timeout 2 ping -w 1 -c 1 "${peer_hostname}" >&/dev/null; then
         message_info "Mounting filesystems from peer machine \"${peer_hostname}\"."
@@ -124,12 +136,27 @@ EOF
 
     message_info "Restarting NFS kernel server (background)"
     service nfs-kernel-server restart &
+
+    if ! ${_filesystems_last0}; then
+        tmp=$(mktemp)
+        config_file="/etc/auto.master.d/auto.last0"
+        {
+            grep -v last0 "${config_file}"
+            echo "/mnt/last0/LAST-CONTAINER -rw,hard,bg last0:/last0/data2/LAST-CONTAINER"
+        } > "${tmp}"
+        mv "${tmp}" "${config_file}"
+        chmod 644 "${config_file}"
+        mkdir -p /mnt/last0/LAST-CONTAINER
+
+        message_success "Updated autofs (${config_file})."
+        systemctl start autofs
+    fi
 }
 
 function filesystems_check() {
     local -i ret=0
 
-    if macmap_this_is_last0; then
+    if ${_filesystems_last0}; then
         message_success "Nothing to check on last0"
         return 0
     fi
@@ -147,17 +174,23 @@ function filesystems_policy() {
     - Each LAST machine has three data areas: data, data1 and data2, mounted from local disks.
     - The data1 and data2 areas are NFS cross mounted between the sibling machines
     
-        machine:          lastXXe                      lastXXw
+        machine:          lastXXe                                lastXXw
 
-        local mounts:   /lastXXe/data               /lastXXw/data
-                        /lastXXe/data1              /lastXXw/data1
-                        /lastXXe/data2              /lastXXw/data2
+        local mounts:   /lastXXe/data                         /lastXXw/data
+                        /lastXXe/data1                        /lastXXw/data1
+                        /lastXXe/data2                        /lastXXw/data2
 
         NFS mounts:
-                        /lastXXe/data1     NFS->    /lastXXe/data1
-                        /lastXXe/data2     NFS->    /lastXXe/data2
-                        /lastXXw/data1     <-NFS    /lastXXw/data1
-                        /lastXXw/data2     <-NFS    /lastXXw/data2
+                        /lastXXe/data1               NFS->    /lastXXe/data1
+                        /lastXXe/data2               NFS->    /lastXXe/data2
+                        /lastXXw/data1               <-NFS    /lastXXw/data1
+                        /lastXXw/data2               <-NFS    /lastXXw/data2
+
+
+        machine:          last0                                lastXX[ew]
+
+        autofs mounts:
+                        /last0/data2/LAST-CONTAINER  NFS->    /mnt/last0/LAST-CONTAINER
 
 EOF
 
