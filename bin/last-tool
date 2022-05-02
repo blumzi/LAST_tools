@@ -42,9 +42,10 @@ function global_help() {
 
     This tool either checks or enforces the LAST installation policy.
 
-    Usage: ${PROG} [-q|--quiet] [-n|--nodeps] [-c|--container <path>] <mode> [[section] ...] 
-           ${PROG} -h|--help [[section] ...]
+    Usage: ${PROG} [[flag] ...] <mode> [[section] ...] 
 
+     Flags:
+     -h|--help:        show this help and exit
      -q|--quiet:       be silent (default: verbose)
      -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
      -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH, currently "$(container_path)"))
@@ -167,7 +168,12 @@ function root_or_die() {
     fi
 }
 
+declare mode
 declare nodeps=false
+declare selected_container
+
+OPTS=$( getopt -o 'hqnc:' --long "help,quiet,nodeps,container:" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
 
 while true; do
     case "${1}" in
@@ -176,22 +182,6 @@ while true; do
             shift 1
             ;;
         
-        check|enforce|list-sections)
-            mode="${1}"
-            shift 1
-            break
-            ;;
-
-        show-env|env)
-            mode=show
-            shift 1
-            ;;
-
-        show-policy|policy)
-            mode=policy
-            shift 1
-            ;;
-
         -q|--quiet)
             export LAST_TOOL_QUIET=true
             shift 1
@@ -207,17 +197,40 @@ while true; do
             shift 2
             ;;
 
-		-s|--sections)      # for bash completion
-			mode=sections
-			shift 1
-			;;
-
-		*)
+        --)
+            shift 1
 			break
 			;;
 
     esac
 done
+
+if [ "${mode}" != help ]; then
+    while true; do
+        case "${1}" in
+            check|enforce|list-sections)
+                mode="${1}"
+                shift 1
+                break
+                ;;
+
+            show-env|env)
+                mode=show
+                shift 1
+                ;;
+
+            show-policy|policy)
+                mode=policy
+                shift 1
+                ;;
+
+            *)
+                break
+                ;;
+
+        esac
+    done
+fi
 
 if [ ! "${selected_container}" ]; then
     selected_container="$( container_lookup )"

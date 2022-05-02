@@ -2,6 +2,7 @@
 
 module_include lib/macmap
 module_include lib/sections
+module_include lib/ipv4
 
 export network_local_hostname network_local_ipaddr network_peer_hostname network_peer_ipaddr
 export network_netpart network_netmask network_interface network_gateway network_gateway
@@ -17,11 +18,12 @@ function network_set_defaults() {
 	local -a info
 	read -r -a info <<< "$( ip -o -4 link show | grep ': en' )"
     network_interface=${info[1]%:}
-    network_netmask=255.255.255.0
-    network_broadcast=10.23.1.255
-    network_netpart=10.23.1.0
-    network_gateway=10.23.1.254
+
     network_prefix=24
+    network_broadcast=$(ipv4_broadcast "${network_local_ipaddr}" ${network_prefix})
+      network_netmask=$(ipv4_netpart   255.255.255.255           ${network_prefix})
+      network_netpart=$(ipv4_netpart   "${network_local_ipaddr}" ${network_prefix})
+      network_gateway=$(ipv4_gateway   "${network_local_ipaddr}" ${network_prefix})
 }
 
 function network_init() {
@@ -34,10 +36,12 @@ function network_init() {
 # The only configured (and active interface) should be enp67s0
 #
 function network_enforce() {
+    local plan="/etc/netplan/99_last_network.yaml"
+    local tmp=$(mktemp)
 
     network_set_defaults
 
-    cat <<- EOF > /etc/netplan/99_last_network.yaml
+    cat <<- EOF > "${tmp}"
     network:
         version: 2
         renderer: networkd
@@ -51,8 +55,21 @@ function network_enforce() {
               addresses: [132.77.4.1, 132.77.22.1]
               search: [wisdom.weizmann.ac.il, wismain.weizmann.ac.il, weizmann.ac.il]
 EOF
+	if [ -e "${plan}" ]; then
+		if cmp --silent "${tmp}" "${plan}"; then
+			message_success "Netplan \"${plan}\" is already valid."
+		else
+			cp "${tmp}" "${plan}"
+			message_success "Overwritten plan \"${plan}\""
+		fi
+	else
+		cp "${tmp}" "${plan}"
+		message_success "Created netplan \"${plan}\""
+	fi
+	/bin/rm "${tmp}"
 
     netplan apply
+    message_success "Applied netplan \"${plan}\""
 }
 
 function network_check() {
@@ -83,7 +100,7 @@ function network_check() {
     fi
 
     # last0 is on the local network, should be pingable
-    if ! ping -4 -q -c 1 -W 1 last0 >/dev/null 2>&1; then
+    if ! timeout 2 ping -4 -q -c 1 -W 1 last0 >/dev/null 2>&1; then
         message_warning "Cannot ping \"last0\"."
     else
         message_success "Can ping \"last0\"."
