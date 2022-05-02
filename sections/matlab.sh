@@ -546,7 +546,12 @@ function astropack_startup_check() {
     local msg
     local -i ret=0
 
-    msg="The script startup_Installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was "
+    if macmap_this_is_last0; then
+        message_success "No startup checks on last0"
+        return 0
+    fi
+
+    msg="The script startup_Installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was"
     if [ -d "${user_matlab_dir}/data" ]; then
         message_success "${msg} invoked"
     else
@@ -559,6 +564,11 @@ function astropack_startup_check() {
 function astropack_startup_enforce() {
     local script
     script="startup_Installer"
+
+    if macmap_this_is_last0; then
+        message_success "No startup scripts on last0 (yet?)"
+        return
+    fi
 
     # shellcheck disable=SC2154
     if [ -d "${user_matlab_dir}/data" ]; then

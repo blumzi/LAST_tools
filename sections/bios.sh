@@ -1,6 +1,7 @@
 #!/bin/bash
 
 module_include lib/message
+module_include lib/macmap
 module_include lib/sections
 
 sections_register_section "bios" "Manages the machine's BIOS settings"
@@ -12,6 +13,11 @@ function bios_enforce() {
 function bios_check() {
     local wakeup_type
     
+    if macmap_this_is_last0; then
+        message_success "No memory size check on last0"
+        return 0
+    fi
+
     if [ "$(id -un)" != root ]; then
         message_failure "Must be root to read BIOS info"
         return
