@@ -149,16 +149,21 @@ function filesystems_enforce() {
 
     if ! ${_filesystems_last0}; then
         tmp=$(mktemp)
-        config_file="/etc/auto.master.d/auto.last0"
+        config_file="/etc/auto.master.d/last0.autofs"
         {
-            grep -v last0 "${config_file}"
-            echo "/mnt/last0/LAST-CONTAINER -rw,hard,bg last0:/last0/data2/LAST-CONTAINER"
+            grep -v last0 "${config_file}" 2> /dev/null
+            echo "/last0 /etc/auto.last0"
         } > "${tmp}"
         mv "${tmp}" "${config_file}"
         chmod 644 "${config_file}"
-        mkdir -p /mnt/last0/LAST-CONTAINER
+        message_success "Updated autofs master map (${config_file})."
 
-        message_success "Updated autofs (${config_file})."
+        config_file="/etc/auto.last0"
+        echo "LAST-CONTAINER -rw,hard,bg last0:/last0/data2/LAST-CONTAINER" > ${config_file}
+        chmod 644 ${config_file}
+        message_success "Updated autofs last0 map (${config_file})."
+
+        mkdir -p /last0
         systemctl start autofs
     fi
 }
