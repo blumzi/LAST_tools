@@ -95,6 +95,7 @@ EOF
     fi
 
     user_enforce_mozilla_proxy
+    user_enforce_pulseaudio
 }
 
 function user_check() {
@@ -158,6 +159,7 @@ function user_check() {
     fi
 
     user_check_mozilla_proxy; (( ret += ${?} ))
+    user_check_pulseaudio;    (( ret += ${?} ))
 
     return $(( ret ))
 }
@@ -196,6 +198,27 @@ function user_enforce_mozilla_proxy() {
     user_pref("network.proxy.HTTPS", "http://bcproxy.weizmann.ac.il:8080");
 EOF
 }
+
+function user_enforce_pulseaudio() {
+    local config_file="~${user_last}/.config/pulse/default.pa"
+
+    mkdir -p $(dirname ${config_file})
+    echo "load-module module-loopback latency_msec=1" > "${config_file}"
+    message_success "pulseaudio: added load module-loopback (${config_file})"
+}
+
+function user_check_pulseaudio() {
+    local config_file="~${user_last}/.config/pulse/default.pa"
+
+    if grep -q "load-module module-loopback latency_msec=1" "${config_file}" 2>/dev/null ; then
+        message_success "pulseaudio: module-loopback is loaded by \"${config_file}\""
+        return 0
+    else
+        message_failure "pulseaudio: module-loopback is NOT loaded by \"${config_file}\""
+        return 1
+    fi
+}
+
 
 function user_policy() {
     cat <<- EOF
