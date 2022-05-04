@@ -17,6 +17,11 @@ read -r _ _ mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
 if [ "${mpoint}" ]; then
     LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${mpoint}")"
 fi
+
+mpoint=/last0/LAST-CONTAINER
+if [ -d ${mpoint}/catalogs ]; then
+    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${mpoint}")"
+fi
 unset mpoint
 
 function container_path() {
