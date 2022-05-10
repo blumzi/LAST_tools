@@ -204,7 +204,7 @@ EOF
 function user_enforce_pulseaudio() {
     local config_file="~${user_last}/.config/pulse/default.pa"
 
-    mkdir -p $(dirname ${config_file})
+    mkdir -p "$(dirname ${config_file})"
     echo "load-module module-loopback latency_msec=1" > "${config_file}"
     message_success "pulseaudio: added load module-loopback (${config_file})"
 }
