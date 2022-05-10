@@ -51,6 +51,7 @@ function matlab_enforce() {
     astropack_startup_enforce
     matlab_support_enforce
     matlab_service_enforce
+    matlab_shortcut_enforce
 }
 
 #
@@ -106,6 +107,7 @@ function matlab_check() {
     astropack_startup_check;    (( ret += $? ))
     matlab_support_check;       (( ret += $? ))
     matlab_service_check;       (( ret += $? ))
+    matlab_shortcut_check;      (( ret += $? ))
 
     return $(( ret ))
 }
@@ -397,6 +399,9 @@ function matlab_is_installed() {
     command -v matlab >&/dev/null
 }
 
+#
+# Startup
+#
 function matlab_startup_check() {
     declare -i errors=0
 
@@ -582,5 +587,48 @@ function astropack_startup_enforce() {
         else
             message_failure "${script} has failed with status: ${status}"
         fi
+    fi
+}
+
+#
+# Shortcut
+#
+function matlab_shortcut_enforce() {
+    local global_shortcut="/usr/share/applications/matlab.desktop"
+    local our_shortcut
+    our_shortcut="$( module_locate files/root/usr/share/applications/matlab.desktop)"
+
+    if [ -x "${global_shortcut}" ]; then
+        message_success "shortcut: already installed"
+    else
+        cp "${our_shortcut}" "${global_shortcut}"
+        chmod +x "${global_shortcut}"
+        message_success "shortcut: installed"
+    fi
+
+    local favorites
+    favorites="$( su - "${user_last}" -c "dconf read /org/gnome/shell/favorite-apps" )"
+    if [[ "${favorites}" != *matlab.desktop* ]]; then
+        favorites="${favorites%]}, 'matlab.desktop']"
+        su - "${user_last}" -c "dconf write /org/gnome/shell/favorite-apps \"${favorites}\""
+        message_success "shortcut: added to favorites"
+    else
+        message_success "shortcut: already a favorite"
+    fi
+}
+
+function matlab_shortcut_check() {
+    local global_shortcut="/usr/share/applications/matlab.desktop"
+
+    if [ -x "${global_shortcut}" ]; then
+        message_success "shortcut: is installed"
+    fi
+
+    local favorites
+    favorites="$( su - "${user_last}" -c "dconf read /org/gnome/shell/favorite-apps" )"
+    if [[ "${favorites}" == *matlab.desktop* ]]; then
+        message_success "shortcut: is a favorite"
+    else
+        message_failure "shortcut: is NOT a favorite"
     fi
 }
