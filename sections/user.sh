@@ -1,6 +1,7 @@
 #!/bin/bash
 
 module_include lib/message
+module_include lib/util
 module_include lib/sections
 
 export user_last="ocs"
@@ -95,8 +96,8 @@ EOF
     fi
 
     user_enforce_mozilla_proxy
-    user_enforce_pulseaudio
-    user_enforce_chrome
+    user_enforce_pulseaudio    
+    util_enforce_shortcut --override --favorite google-chrome
 }
 
 function user_check() {
@@ -159,9 +160,9 @@ function user_check() {
 		message_failure "The directory \"${user_matlab_dir}\" is missing"
     fi
 
-    user_check_mozilla_proxy; (( ret += ${?} ))
-    user_check_pulseaudio;    (( ret += ${?} ))
-    user_check_chrome;        (( ret += ${?} ))
+    user_check_mozilla_proxy;                       (( ret += ${?} ))
+    user_check_pulseaudio;                          (( ret += ${?} ))
+    util_check_shortcut --favorite google-chrome;   (( ret += ${?} ))
 
     return $(( ret ))
 }
@@ -222,58 +223,10 @@ function user_check_pulseaudio() {
 }
 
 function user_enforce_chrome() {
-    local shortcut="/usr/share/applications/google-chrome.desktop"
-
-    if [ ! -e "${shortcut}" ]; then
-        message_failure "chrome: google-chrome seems NOT to be installed. use \"${PROG} enforce ubuntu-packages\"!"
-        return
-    fi
-
-    if [ "$(grep -c '^Exec=.*8080' "${shortcut}")" = 3 ]; then
-        message_success "chrome: Weizmann proxy already enforced"
-    else
-        sed -i "${shortcut}" -e 's;^\(Exec=.*[^0]\)$;\1 --proxy-server=bcproxy.weizmann.ac.il:8080;'
-        message_success "chrome: enforced Weizmann proxy"
-    fi
-
-    local favorites
-    favorites="$( su - "${user_last}" -c "dconf read /org/gnome/shell/favorite-apps" )"
-    if [[ "${favorites}" != *google-chrome.desktop* ]]; then
-        favorites="${favorites%]}, 'google-chrome.desktop']"
-        su - "${user_last}" -c "dconf write /org/gnome/shell/favorite-apps \"${favorites}\""
-        message_success "chrome: added to favorites"
-    else
-        message_success "chrome: already a favorite"
-    fi
+    util_enforce_shortcut --override --favorite google-chrome
 }
 
-function user_check_chrome() {
-    local shortcut="/usr/share/applications/google-chrome.desktop"
-    local ret=0
-
-    if [ ! -e "${shortcut}" ]; then
-        message_failure "chrome: google-chrome seems NOT to be installed. use \"${PROG} enforce ubuntu-packages\"!"
-        return 1
-    fi
-    
-    if [ "$(grep -c '^Exec=.*8080' "${shortcut}")" = 3 ]; then
-        message_success "chrome: Weizmann proxy already enforced"
-    else
-        message_failure "chrome: Weizmann proxy NOT enforced"
-        (( ret++ ))
-    fi
-
-    local favorites
-    favorites="$( su - "${user_last}" -c "dconf read /org/gnome/shell/favorite-apps" )"
-    if [[ "${favorites}" == *google-chrome.desktop* ]]; then
-        message_success "chrome: is added to favorites"
-    else
-        message_failure "chrome: is NOT a favorite"
-        (( ret++ ))
-    fi
-
-    return $(( ret ))
-}
+funct
 
 function user_policy() {
     cat <<- EOF
