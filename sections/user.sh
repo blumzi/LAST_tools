@@ -16,8 +16,11 @@ sections_register_section "user" "Manages the \"${user_last}\" user"
 
 function user_enforce() {
     if grep "^${user_last}:" /etc/passwd >/dev/null; then
+
+        # the user exists
         message_success "User ${user_last} exists"
 
+        # make sure the user belongs to the expected groups
         local expected found
         local -a missing
         read -r -a groups <<< "$( groups ${user_last} 2>/dev/null | sed -e 's;^.*:.;;' )"
@@ -40,10 +43,12 @@ function user_enforce() {
 			message_success "User ${user_last} is a member of groups: ${user_expected_groups_list}"
         fi
     else
+        # the user does not exist, make it
         message_info "Creating user \"${user_last}\" ..."
         useradd -m -G "${user_expected_groups_list}" ${user_last}
     fi
 
+    # enforce the user's home to /home/ocs
 	if [ "${user_home}" = "/home/${user_last}" ]; then
 		message_success "The user's home is \"/home/${user_last}\"."
 	else
@@ -56,24 +61,23 @@ function user_enforce() {
 	fi
 	eval export user_home=~"${user_last}"
 
+    # make sure the user owns it's home
     if [ "$(stat --format '%U.%G' "${user_home}")" != "${user_last}.${user_last}" ]; then
         chown ${user_last}.${user_last} "${user_home}"
         message_success "Changed ownership of ${user_home} to ${user_last}.${user_last}"
     fi
 
+    # add the HTTP proxy incantations to the .bash_profile
 	local bash_profile
 	bash_profile="${user_home}/.bash_profile"
 	if [ ! -r "${bash_profile}" ] || [ "$( grep -E -c '(source /etc/profile.d/last.sh|module_include lib/util|util_test_and_set_http_proxy|unset TMOUT)' "${bash_profile}" )" != 4 ]; then
 		local tmp
 		tmp=$(mktemp)
 		{
-			cat <<- EOF
-			
-			source /etc/profile.d/last.sh
-			module_include lib/util
-            util_test_and_set_http_proxy
-			unset TMOUT
-EOF
+			echo "source /etc/profile.d/last.sh"
+			echo "module_include lib/util"
+            echo "util_test_and_set_http_proxy"
+			echo "unset TMOUT"
 		} > "${tmp}"
 		install -D --mode 644 --owner "${user_last}" --group "${user_last}" "${tmp}" "${bash_profile}"
 		rm -f "${tmp}"
@@ -86,6 +90,7 @@ EOF
     # shellcheck disable=SC1090
     source "${bash_profile}"
 
+    # take care of ~/matlab
     eval export user_matlab_dir="${user_home}/matlab"
     if [ -d "${user_matlab_dir}" ]; then
         message_success "The directory \"${user_matlab_dir}\" exists"
@@ -104,6 +109,7 @@ function user_check() {
     local ret=0
     local -a groups
 
+    # does the user exist?
     if grep "^${user_last}:" /etc/passwd >/dev/null; then
         message_success "User \"${user_last}\" exists"
     else
@@ -111,7 +117,8 @@ function user_check() {
         (( ret++ ))
     fi
 
-    local found
+    # does the user belong to the expected groups
+    local found expected
     local -a missing
     read -r -a groups <<< "$( groups ${user_last} 2>/dev/null | sed -e 's;^.*:.;;' )"
     for expected in "${user_expected_groups[@]}"; do
@@ -134,12 +141,14 @@ function user_check() {
         (( ret++ ))
     fi
 
+    # is the user's home where we expect it to be?
 	if [ "${user_home}" = /home/${user_last} ]; then
 		message_success "The user's home is \"/home/${user_last}\"."
 	else
 		message_failure "The user's home is NOT \"/home/${user_last}\" (it is \"${user_home}\")."
 	fi
 
+    # does the user's .bash_profile include the code that sets the WIS http proxy?
     local rcfile
     rcfile="${user_home}/.bash_profile"
 	if [ -r "${rcfile}" ]; then
@@ -154,6 +163,7 @@ function user_check() {
 		(( ret++ ))
 	fi
 
+    # does the user have a ~/matlab directory?
     if [ -d "${user_matlab_dir}" ]; then
 		message_success "The directory \"${user_matlab_dir}\" exists"
     else
@@ -194,12 +204,12 @@ function user_enforce_mozilla_proxy() {
     eval user_js_file=~"${user_last}/.mozilla/firefox/*.default/user.js"
     mkdir -p "$(dirname "${user_js_file}" )"
 
-    cat <<- EOF > "${user_js_file}"
-    // Weizmann proxy settings
-    user_pref("network.proxy.type", "1");
-    user_pref("network.proxy.HTTP", "http://bcproxy.weizmann.ac.il:8080");
-    user_pref("network.proxy.HTTPS", "http://bcproxy.weizmann.ac.il:8080");
-EOF
+    {
+        echo '// Weizmann proxy settings'
+        echo 'user_pref("network.proxy.type", "1");'
+        echo 'user_pref("network.proxy.HTTP", "http://bcproxy.weizmann.ac.il:8080");'
+        echo 'user_pref("network.proxy.HTTPS", "http://bcproxy.weizmann.ac.il:8080");'
+    } > "${user_js_file}"
 }
 
 function user_enforce_pulseaudio() {
@@ -225,8 +235,6 @@ function user_check_pulseaudio() {
 function user_enforce_chrome() {
     util_enforce_shortcut --override --favorite google-chrome
 }
-
-funct
 
 function user_policy() {
     cat <<- EOF
