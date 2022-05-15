@@ -8,7 +8,7 @@ sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems"
 export catalogs_local_top
 catalogs_local_top="/$(hostname)/data/catsHTM"
 export catalogs_container_top
-export -a catalogs=( GAIA/DRE3  MergedCat )
+export -a catalogs=( GAIA/DRE3  MergedCat/V1 )
 
 function catalogs_init() {
 	if [ "${selected_container}" ]; then
@@ -19,12 +19,13 @@ function catalogs_init() {
 function catalogs_sync_catalog() {
 	local catalog="${1}"
 	local -i nfiles files_per_chunk=1000
-    local files_list
+    local files_list no_slashes_catalog
 
-    files_list=$(mktemp rsync-"${catalog}".XXXXXXXX)	
+    no_slashes_catalog=$( echo ${catalog} | tr / _)
+    files_list=/tmp/rsync-"${no_slashes_catalog}".${$}
     rsync -av --info=STATS0 --info=FLIST0 --itemize-changes --dry-run \
-        "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | \
-        grep -v '.d..t...... ./' > "${files_list}"
+        "${catalogs_container_top}/${catalog}/" "${catalogs_local_top}/${catalog}" | \
+	grep -v '\.\/' | cut -d ' ' -f2 > "${files_list}"
     nfiles=$(wc -l < "${files_list}")
 
     if (( nfiles == 0 )); then
@@ -35,12 +36,14 @@ function catalogs_sync_catalog() {
 	mkdir -p "${catalogs_local_top}/${catalog}"
     local dir status
 
-    dir=$(mktemp -d rsync-"${catalog}".d.XXXXXXXX)
-    pushd "${dir}" || true
-    split --lines=${files_per_chunk} < "${files_list}"
+    dir=${files_list}.d
+    mkdir -p ${dir}
+    pushd "${dir}" >&/dev/null || true
+    cat ${files_list} | split --lines=${files_per_chunk}
+    local chunk_no=0
     for chunk in x??; do
-        message_info "Synchronizing chunk ${chunk} of \"${catalog}\" ($(wc -l < "${chunk}") files) ..."
-        rsync -avq --delete --files-from="${chunk}" "${catalogs_container_top}/${catalog}/" "${catalogs_local_top}/${catalog}" &
+	    message_info "Synchronizing chunk #$((chunk_no++)) of \"${catalog}\" ($(wc -l < "${chunk}") files) ..."
+        rsync -avq --delete --info=STATS0 --info=FLIST0 --itemize-changes --files-from="${chunk}" "${catalogs_container_top}/${catalog}/" "${catalogs_local_top}/${catalog}" &
     done
     wait -fn
     status=${?}
@@ -99,9 +102,9 @@ function catalogs_check() {
     for catalog in "${catalogs[@]}"; do
         local -i nfiles
 
-        nfiles=$( rsync -av --info=STATS0 --info=FLIST0 --itemize-changes --dry-run \
+        nfiles=$( rsync -a --info=STATS0 --info=FLIST0 --itemize-changes --dry-run \
             "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | \
-            grep -vc '.d..t...... ./'
+	    grep -v '\.\/'| cut -d' ' -f2 | wc -l
             )
         
         if (( nfiles > 0 )); then
