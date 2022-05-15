@@ -103,6 +103,11 @@ function user_enforce() {
     user_enforce_mozilla_proxy
     user_enforce_pulseaudio    
     util_enforce_shortcut --override --favorite google-chrome
+
+    local aries_aliases="$(module_locate files/root/home/ocs/.bash_aliases.arie)"
+    if  [ -r "${aries_aliases}" ]; then
+        cp "${aries_aliases}" "${user_home}"
+    fi
 }
 
 function user_check() {
