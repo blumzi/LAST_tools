@@ -18,18 +18,38 @@ function catalogs_init() {
 
 function catalogs_sync_catalog() {
 	local catalog="${1}"
-	local -i nfiles
+	local -i nfiles files_per_chunk=1000
+    local files_list
 
-	nfiles=$( rsync -av --dry-run "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | grep -cE '(hdf5|csv)')
-	message_info "Synchronizing \"${catalog}\" (${nfiles} files) ..."
+    files_list=$(mktemp rsync-"${catalog}".XXXXXXXX)	
+    rsync -av --info=STATS0 --info=FLIST0 --itemize-changes --dry-run \
+        "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | \
+        grep -v '.d..t...... ./' > "${files_list}"
+    nfiles=$(wc -l < "${files_list}")
+
+    if (( nfiles == 0 )); then
+        message_success "Catalog ${catalog} is synchronized"
+        return
+    fi
+
 	mkdir -p "${catalogs_local_top}/${catalog}"
-	rsync -avq --delete "${catalogs_container_top}/${catalog}/" "${catalogs_local_top}/${catalog}"
-	status=$?
-	if (( status == 0 )); then
-		message_success "Synchronized \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\"."
-	else
-		message_failure "Failed to synchronize \"${catalogs_local_top}/${catalog}\" with \"${catalogs_container_top}/${catalog}\" (status=${status})"
-	fi
+    local dir status
+
+    dir=$(mktemp -d rsync-"${catalog}".d.XXXXXXXX)
+    pushd "${dir}" || true
+    split --lines=${files_per_chunk} < "${files_list}"
+    for chunk in x??; do
+        message_info "Synchronizing chunk ${chunk} of \"${catalog}\" ($(wc -l < "${chunk}") files) ..."
+        rsync -avq --delete --files-from="${chunk}" "${catalogs_container_top}/${catalog}/" "${catalogs_local_top}/${catalog}" &
+    done
+    wait -fn
+    status=${?}
+    if (( status == 0 )); then
+        message_success "Synchronized ${catalogs_local_top}/${catalog} with ${catalogs_container_top}/${catalog}"
+    else
+        message_failure "Failed to synchronize ${catalogs_local_top}/${catalog} with ${catalogs_container_top}/${catalog} (status: ${status})"
+    fi
+    /bin/rm -rf "${dir}" "${files_list}"
 }
 
 #
@@ -67,7 +87,7 @@ function catalogs_check() {
     fi
 
 	if [ ! "${catalogs_container_top}" ]; then
-        message_failure "No LAST-CONTAINER, cannot synchronize catalogs (maybe specify one with --catalog=... ?!?)"
+        message_failure "No LAST-CONTAINER, cannot synchronize catalogs (maybe specify one with --container=... ?!?)"
         return
     fi
 
@@ -79,7 +99,11 @@ function catalogs_check() {
     for catalog in "${catalogs[@]}"; do
         local -i nfiles
 
-        nfiles=$(rsync -avn "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | grep -c hdf5 )
+        nfiles=$( rsync -av --info=STATS0 --info=FLIST0 --itemize-changes --dry-run \
+            "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | \
+            grep -vc '.d..t...... ./'
+            )
+        
         if (( nfiles > 0 )); then
             message_warning "Catalog ${catalogs_local_top}/${catalog}: ${nfiles} files differ (with ${catalogs_container_top}/${catalog})"
         else
