@@ -40,11 +40,11 @@ function util_test_and_set_http_proxy() {
 # Converts boolean keywords into status codes
 #
 function util_convert_to_boolean() {
-	case "${1}" in
-		[Oo]n|[Tt]rue|[Yy]es)
+	case "${1,,}" in
+		on|true|yes|aye|yep)
 			return 0
 			;;
-		[Oo]ff|[Ff]alse|[Nn]o)
+		off|false|no|nope|nay)
 			return 1
 			;;
 	esac
@@ -98,7 +98,7 @@ function util_enforce_shortcut() {
     fi
 }
 
-function user_check_shortcut() {
+function util_check_shortcut() {
     local should_be_favorite=false
     if [ "${1}" = "--favorite" ] || [ "${1}" = "-f" ]; then
         should_be_favorite=true
