@@ -295,18 +295,24 @@ function shiftARGV() {
 declare -a ARGV=()
 ARGV=( "${@}" )
 
-declare parser
+declare parser valid_section
 while [ "${#ARGV[@]}" -gt 0 ]; do
+    valid_section=false
     for section in "${registered_sections[@]}"; do
         if [ "${ARGV[0]}" = "${section}" ]; then
+            valid_section=true
             selected_sections+=( "${ARGV[0]}" )
             shiftARGV 1
             eval parser="$(util_bashify "${section}")_arg_parser"
             if typeset -f "${parser}" >/dev/null 2>&1; then
                 ${parser}
+                break # for loop
             fi
         fi
-    done        
+    done
+    if ! ${valid_section}; then
+        message_fatal "Unknown section \"${ARGV[0]}\"."
+    fi
 done
 
 if [ "${mode}" = help ]; then
