@@ -108,35 +108,13 @@ function apt_check() {
 }
 
 function dummy_apt_arg_parser() {
-    declare OPTS
-    OPTS=$( getopt -o "a:bc:" --long "aaa:,bbb,ccc:" -n "${PROG}" -- "$@")
-    eval set -- "${OPTS}"
+	case "${ARGV[0]}" in
 
-    while true; do
-        case "${1}" in
-
-        -a|--aaa)
-            message_debug "${FUNCNAME[0]}: -a ${2}"
-            shift 2
-            ;;
-
-        -b|--bbb)
-            message_debug "${FUNCNAME[0]}: -b"
-            shift 1
-            ;;
-
-        -c|--ccc)
-            message_debug "${FUNCNAME[0]}: -c ${2}"
-            shift 2
-            ;;
-
-        --)
-            shift 1
-            break
-            ;;
-        esac
-    done
-    echo "${@}"
+	-h|--help)
+		apt_helper
+		shiftARGV 1
+		;;
+	esac
 }
 
 function dummy_apt_helper() {

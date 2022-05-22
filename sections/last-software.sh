@@ -36,41 +36,30 @@ EOF
 }
 
 function last_software_arg_parser() {
-    declare OPTS
-    OPTS=$( getopt -o "lr:R" --long "list,repo:,reclone" -n "${PROG}" -- "${ARGV[@]}")
-    eval set -- "${OPTS}"
 
     while true; do
-        case "${1}" in
+        case "${ARGV[0]}" in
 
         -r|--repo)
             export last_software_selected_repos+=( "${2}" )
-            shift 2
             shiftARGV 2
             ;;
 
         -R|--reclone)
             export last_software_reclone=true
-            shift 1
             shiftARGV 1
             ;;
 
         -l|--list)
             export last_software_list_only=true
-            shift 1
             shiftARGV 1
             ;;
 
-        --)
-            shift 1
-            shiftARGV 1
-            break
+        *)
+            return
             ;;
         esac
     done
-    # message_debug "selected: ${last_software_selected_repos[*]@Q}"
-    # message_debug "reclone: ${last_software_reclone@Q}"
-    # message_debug "list-only: ${last_software_list_only@Q}"
 }
 
 function last_software_list_repos() {

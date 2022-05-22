@@ -69,19 +69,25 @@ EOF
 }
 
 function help() {
-    if [ ${#selected_sections[*]} -ne 0 ]; then
-        local section section_helper
+	local -a sections
 
-        for section in "${selected_sections[@]}"; do
-            eval section_helper="$(util_bashify "${section}")_helper"
-            if typeset -f "${section_helper}" >/dev/null 2>&1; then
-                message_section "${section}"
-                ${section_helper}
-            fi
-        done
-    else
-        global_help
-    fi
+    if [ ${#selected_sections[*]} -ne 0 ]; then
+		sections=( "${selected_sections[@]}" )
+	else
+		sections=( "${registered_sections[@]}" )
+	fi
+
+	message_section "Global help"
+	global_help
+
+	for section in "${sections[@]}"; do
+		eval section_helper="$(util_bashify "${section}")_helper"
+        # shellcheck disable=SC2154
+		if typeset -f "${section_helper}" >/dev/null 2>&1; then
+			message_section "${section}"
+			${section_helper}
+		fi
+	done
 }
 
 function show_environment() {
@@ -172,76 +178,6 @@ declare mode
 declare nodeps=false
 declare selected_container
 
-OPTS=$( getopt -o 'hqnc:' --long "help,quiet,nodeps,container:" -n "${PROG}" -- "$@" )
-eval set -- "${OPTS}"
-
-while true; do
-    case "${1}" in
-        -h|--help)
-            mode=help
-            shift 1
-            ;;
-        
-        -q|--quiet)
-            export LAST_TOOL_QUIET=true
-            shift 1
-            ;;
-
-        -n|--nodeps)
-            nodeps=true
-            shift 1
-            ;;
-
-        -c|--container)
-            selected_container="${2}"
-            shift 2
-            ;;
-
-        --)
-            shift 1
-			break
-			;;
-
-    esac
-done
-
-if [ "${mode}" != help ]; then
-    while true; do
-        case "${1}" in
-            check|enforce|list-sections)
-                mode="${1}"
-                shift 1
-                break
-                ;;
-
-            show-env|env)
-                mode=show
-                shift 1
-                ;;
-
-            show-policy|policy)
-                mode=policy
-                shift 1
-                ;;
-
-            *)
-                break
-                ;;
-
-        esac
-    done
-fi
-
-if [ ! "${selected_container}" ]; then
-    selected_container="$( container_lookup )"
-fi
-
-if [ ! "${mode}" ]; then
-    message_failure "No running mode (check|enforce|show|policy) was selected, see help below!"
-    help
-    exit 1
-fi
-
 #
 # These modules will register sections
 #
@@ -258,15 +194,73 @@ module_include sections/catalogs
 module_include sections/last-software
 module_include sections/ssh
 
-if [ "${mode}" = sections ]; then
-	sections_registered_sections
-	exit 0
-fi
+#OPTS=$( getopt -o 'hqnc:' --long "help,quiet,nodeps,container:" -n "${PROG}" -- "$@" )
+#eval set -- "${OPTS}"
 
-if [ "${mode}" = "list-sections" ]; then
-    list_sections
-    exit 0
-fi
+#while true; do
+#    case "${1}" in
+#        -h|--help)
+#            mode=help
+#            shift 1
+#            ;;
+#        
+#        -q|--quiet)
+#            export LAST_TOOL_QUIET=true
+#            shift 1
+#            ;;
+#
+#        -n|--nodeps)
+#            nodeps=true
+#            shift 1
+#            ;;
+#
+#        -c|--container)
+#            selected_container="${2}"
+#            shift 2
+#            ;;
+#
+#        --)
+#            shift 1
+#			break
+#			;;
+#
+#    esac
+#done
+
+#if [ "${mode}" != help ]; then
+#    while true; do
+#        case "${1}" in
+#            check|enforce|list-sections)
+#                mode="${1}"
+#                shift 1
+#                break
+#                ;;
+#
+#            show-env|env)
+#                mode=show
+#                shift 1
+#                ;;
+#
+#            show-policy|policy)
+#                mode=policy
+#                shift 1
+#                ;;
+#
+#            *)
+#                break
+#                ;;
+#
+#        esac
+#    done
+#fi
+
+
+#if [ ! "${mode}" ]; then
+#    message_failure "No running mode (check|enforce|show|policy) was selected, see help below!"
+#    help
+#    exit 1
+#fi
+
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 
@@ -297,7 +291,81 @@ ARGV=( "${@}" )
 
 declare parser valid_section
 while [ "${#ARGV[@]}" -gt 0 ]; do
+	case "${ARGV[0]}" in
+		-h|--help)
+			help
+			exit 0
+			;;
+		
+		-q|--quiet)
+			export LAST_TOOL_QUIET=true
+			shiftARGV 1
+			continue
+			;;
+
+		-n|--nodeps)
+			nodeps=true
+			shiftARGV 1
+			continue
+			;;
+
+		-c|--container)
+			selected_container="${2}"
+			shiftARGV 2
+			continue
+			;;
+
+		*)
+			break
+			;;
+	esac
+done
+
+if [ ! "${selected_container}" ]; then
+	selected_container="$( container_lookup )"
+fi
+
+# done with global flags, expect the mode
+case "${ARGV[0]}" in
+	check|enforce)
+		mode="${1}"
+		shiftARGV 1
+		;;
+
+	show-env|env)
+		show_environment
+		exit 0
+		;;
+
+	show-policy|policy)
+		mode=policy
+		shiftARGV 1
+		;;
+
+	sections)
+		sections_registered_sections
+		exit 0
+		;;
+
+	list-sections)
+		list_sections
+		exit 0
+		;;
+
+esac
+
+if [ ! "${mode}" ]; then
+	help
+	message_fatal "No mode was selected"
+fi
+
+echo "selected mode: ${mode}" >&2
+
+# mode was selected, this starts the sections and their flags
+
+while [ ${#ARGV[*]} -ne 0 ]; do
     valid_section=false
+	echo "main: looking for section \"${ARGV[0]}\""
     for section in "${registered_sections[@]}"; do
         if [ "${ARGV[0]}" = "${section}" ]; then
             valid_section=true
@@ -305,7 +373,7 @@ while [ "${#ARGV[@]}" -gt 0 ]; do
             shiftARGV 1
             eval parser="$(util_bashify "${section}")_arg_parser"
             if typeset -f "${parser}" >/dev/null 2>&1; then
-                ${parser}
+                ${parser} "${ARGV[@]}"
                 break # for loop
             fi
         fi
@@ -314,11 +382,6 @@ while [ "${#ARGV[@]}" -gt 0 ]; do
         message_fatal "Unknown section \"${ARGV[0]}\"."
     fi
 done
-
-if [ "${mode}" = help ]; then
-    help
-    exit 0
-fi
 
 # No sections were specified, use all those defined
 if [ ${#selected_sections[*]} -eq 0 ]; then
@@ -336,11 +399,6 @@ else
 fi
 
 case "${mode}" in
-show)
-    show_environment
-    exit 0
-    ;;
-
 check)
     export LAST_TOOL_DONTLOG=true
     ;;
