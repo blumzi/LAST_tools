@@ -242,7 +242,7 @@ while [ "${#ARGV[@]}" -gt 0 ]; do
 			;;
 
 		-c|--container)
-			selected_container="${2}"
+			selected_container="${ARGV[1]}"
 			shiftARGV 2
 			continue
 			;;
@@ -260,7 +260,7 @@ fi
 # done with global flags, expect the mode
 case "${ARGV[0]}" in
 	check|enforce)
-		mode="${1}"
+		mode="${ARGV[0]}"
 		shiftARGV 1
 		;;
 
