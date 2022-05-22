@@ -25,6 +25,13 @@ else
 	ln -sf /usr/local/share/last-tool/bin/last-fetch-from-github ${PACKAGE_DIR}/usr/local/bin/last-fetch-from-github
 	ln -sf /usr/local/share/last-tool/files/last.sh ${PACKAGE_DIR}/etc/profile.d/last.sh
 endif
+	@( \
+		echo "Git-repo:     $$(git remote show -n origin | grep Fetch | cut -d: -f2- | sed -e 's;//.*@;//;')"; \
+		echo "Git-branch:    $$(git branch --show-current)"; \
+		echo "Git-commit:    $$(git rev-parse --short HEAD)"; \
+		echo "Build-time:    $$(date)"; \
+		echo "Build-machine: $$(hostname)"\
+	) > ${PACKAGE_DIR}/usr/local/share/last-tool/files/info 
 	mkdir -m 755 ${PACKAGE_DIR}/DEBIAN
 	install -m 644 debian/control ${PACKAGE_DIR}/DEBIAN/control
 	install -m 644 debian/changelog ${PACKAGE_DIR}/DEBIAN/changelog
