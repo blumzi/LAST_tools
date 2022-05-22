@@ -37,7 +37,9 @@ function network_init() {
 #
 function network_enforce() {
     local plan="/etc/netplan/99_last_network.yaml"
-    local tmp=$(mktemp)
+    local tmp
+    
+    tmp=$(mktemp)
 
     network_set_defaults
 
@@ -101,16 +103,25 @@ function network_check() {
 
     # last0 is on the local network, should be pingable
     if ! timeout 2 ping -4 -q -c 1 -W 1 last0 >/dev/null 2>&1; then
-        message_warning "Cannot ping \"last0\"."
+        message_warning "last-network: Cannot ping \"last0\"."
+        (( errors++ ))
     else
-        message_success "Can ping \"last0\"."
+        message_success "last-network: Can ping \"last0\"."
     fi
 
     # Machines on weizmann.ac.il should be reachable via the HTTP proxy
     if wget --output-document=- --timeout=2 --tries=2 http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep -qs 'large catalog format'; then
-        message_success "Succeeded reaching the weizmann.ac.il network (got the http://euler1.weizmann.ac.il/catsHTM page)"
+        message_success "WIS-network:  Succeeded reaching the weizmann.ac.il network (got the http://euler1.weizmann.ac.il/catsHTM page)"
     else
-        message_warning "Failed reaching the weizmann.ac.il network (could not wget the http://euler1.weizmann.ac.il/catsHTM page)"
+        message_warning "WIS-network:  Failed reaching the weizmann.ac.il network (could not wget the http://euler1.weizmann.ac.il/catsHTM page)"
+        (( errors++ ))
+    fi
+
+    # Machines OUTSIDE weizmann.ac.il should be reachable via the HTTP proxy
+    if wget --output-document=- --timeout=2 --tries=2 http://google.com 2>/dev/null | grep -qs '<!doctype html>'; then
+        message_success "Internet:     Succeeded reaching the Internet (got the http://google.com page)"
+    else
+        message_warning "Internet:     Failed reaching the Internet (could not wget the http://google.com page)"
         (( errors++ ))
     fi
 
