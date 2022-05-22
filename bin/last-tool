@@ -194,74 +194,6 @@ module_include sections/catalogs
 module_include sections/last-software
 module_include sections/ssh
 
-#OPTS=$( getopt -o 'hqnc:' --long "help,quiet,nodeps,container:" -n "${PROG}" -- "$@" )
-#eval set -- "${OPTS}"
-
-#while true; do
-#    case "${1}" in
-#        -h|--help)
-#            mode=help
-#            shift 1
-#            ;;
-#        
-#        -q|--quiet)
-#            export LAST_TOOL_QUIET=true
-#            shift 1
-#            ;;
-#
-#        -n|--nodeps)
-#            nodeps=true
-#            shift 1
-#            ;;
-#
-#        -c|--container)
-#            selected_container="${2}"
-#            shift 2
-#            ;;
-#
-#        --)
-#            shift 1
-#			break
-#			;;
-#
-#    esac
-#done
-
-#if [ "${mode}" != help ]; then
-#    while true; do
-#        case "${1}" in
-#            check|enforce|list-sections)
-#                mode="${1}"
-#                shift 1
-#                break
-#                ;;
-#
-#            show-env|env)
-#                mode=show
-#                shift 1
-#                ;;
-#
-#            show-policy|policy)
-#                mode=policy
-#                shift 1
-#                ;;
-#
-#            *)
-#                break
-#                ;;
-#
-#        esac
-#    done
-#fi
-
-
-#if [ ! "${mode}" ]; then
-#    message_failure "No running mode (check|enforce|show|policy) was selected, see help below!"
-#    help
-#    exit 1
-#fi
-
-
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 
 function shiftARGV() {
@@ -359,13 +291,10 @@ if [ ! "${mode}" ]; then
 	message_fatal "No mode was selected"
 fi
 
-echo "selected mode: ${mode}" >&2
-
 # mode was selected, this starts the sections and their flags
 
 while [ ${#ARGV[*]} -ne 0 ]; do
     valid_section=false
-	echo "main: looking for section \"${ARGV[0]}\""
     for section in "${registered_sections[@]}"; do
         if [ "${ARGV[0]}" = "${section}" ]; then
             valid_section=true
