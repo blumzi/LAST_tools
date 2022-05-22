@@ -46,6 +46,7 @@ function global_help() {
 
      Flags:
      -h|--help:        show this help and exit
+     -v|--version:     show version info and exit
      -q|--quiet:       be silent (default: verbose)
      -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
      -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH, currently "$(container_path)"))
@@ -77,8 +78,10 @@ function help() {
 		sections=( "${registered_sections[@]}" )
 	fi
 
-	message_section "Global help"
-	global_help
+    if [ ${#sections[*]} -eq 0 ]; then
+        message_section "Global help"
+        global_help
+    fi
 
 	for section in "${sections[@]}"; do
 		eval section_helper="$(util_bashify "${section}")_helper"
