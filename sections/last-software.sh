@@ -25,12 +25,12 @@ function last_software_helper() {
 
         ${PROG} enforce last-software [[-r|--repo <repo>] ...] [-R|--reclone]
             - clones or pulls the specified repos (default: all repos).
-            - with --reclone, discards local changes and re-clones the repository(ies) - DANGEROUS
+            - with --reclone, discards local changes and re-clones the repository(ies) - $(ascii_red DANGEROUS)
 
     Flags:
-        -l|--list         - list the LAST software repositories
-        -r|--repo <repo>  - add <repo> to the selected listed (default: all repositories)
-        -R|--reclone      - discard local changes and re-clone the (selected) repositories - OUCH!
+        -l|--list         - list the LAST software repos
+        -r|--repo <repo>  - add <repo> to the selected list (default: all repos)
+        -R|--reclone      - discard local changes and re-clone the (selected) repos - $(ascii_red OUCH)!
 
 EOF
 }
