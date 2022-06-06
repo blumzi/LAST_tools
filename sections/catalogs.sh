@@ -2,18 +2,51 @@
 
 module_include message
 module_include deploy
+module_include container
 
-sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems"
+sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems network"
 
 export catalogs_local_top
 catalogs_local_top="/$(hostname)/data/catsHTM"
 export catalogs_container_top
-export -a catalogs=( GAIA/DRE3  MergedCat/V1 )
+#export -a catalogs=( GAIA/DRE3  MergedCat/V1 )
+export -a catalogs=( GAIA/DRE3  )
+export _catalogs_source=""
 
 function catalogs_init() {
-	if [ "${selected_container}" ]; then
-		catalogs_container_top="${selected_container}/catalogs"
-	fi
+    source $(module_locate sections/network.sh)
+    network_set_defaults
+    local container
+
+    if [ "${selected_container}" ]; then
+        container="${selected_container}"
+    else
+        container="$(container_lookup)"
+        if [ ! "${container}" ]; then
+            return
+        fi
+    fi
+
+    catalogs_container_top="${container}/catalogs"
+}
+
+#
+# _catalogs_rsync_command GAIA/DRE3 --dry-run
+#
+function _catalogs_rsync_command() {
+    local catalog="${1}"
+    shift
+    local -a args="${@}"
+    local src
+
+    if [[ "${network_netpart}" == 10.23.3.* ]]; then
+        src="blumzi@euler1:/var/www/html/data/catsHTM/${catalog}/"
+        echo "su ocs -c \"rsync ${args[@]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}\""
+    else
+        src="${catalogs_container_top}/${catalog}/"
+        echo "rsync ${args[@]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}"
+    fi
+    echo "${src}" > /tmp/_catalogs_rsync_command.src
 }
 
 function catalogs_sync_catalog() {
@@ -23,9 +56,7 @@ function catalogs_sync_catalog() {
 
     no_slashes_catalog=$( echo ${catalog} | tr / _)
     files_list=/tmp/rsync-"${no_slashes_catalog}".${$}
-    rsync -av --info=STATS0 --info=FLIST0 --itemize-changes --dry-run \
-        "${catalogs_container_top}/${catalog}/" "${catalogs_local_top}/${catalog}" | \
-	grep -v '\.\/' | cut -d ' ' -f2 > "${files_list}"
+    eval $(_catalogs_rsync_command ${catalog}/ -av --dry-run) | grep -v '\.\/' | cut -d ' ' -f2 > "${files_list}"
     nfiles=$(wc -l < "${files_list}")
 
     if (( nfiles == 0 )); then
@@ -43,14 +74,14 @@ function catalogs_sync_catalog() {
     local chunk_no=0
     for chunk in x??; do
 	    message_info "Synchronizing chunk #$((chunk_no++)) of \"${catalog}\" ($(wc -l < "${chunk}") files) ..."
-        rsync -avq --delete --info=STATS0 --info=FLIST0 --itemize-changes --files-from="${chunk}" "${catalogs_container_top}/${catalog}/" "${catalogs_local_top}/${catalog}" &
+        eval $(_catalogs_rsync_command ${catalog} -avq --files-from="${chunk}" ) &
     done
     wait -fn
     status=${?}
     if (( status == 0 )); then
-        message_success "Synchronized ${catalogs_local_top}/${catalog} with ${catalogs_container_top}/${catalog}"
+        message_success "Synchronized $(< /tmp/_catalogs_rsync_command.src) with ${catalogs_container_top}/${catalog}"
     else
-        message_failure "Failed to synchronize ${catalogs_local_top}/${catalog} with ${catalogs_container_top}/${catalog} (status: ${status})"
+        message_failure "Failed to synchronize $(< /tmp/_catalogs_rsync_command.src) with ${catalogs_container_top}/${catalog} (status: ${status})"
     fi
     /bin/rm -rf "${dir}" "${files_list}"
 }
@@ -83,14 +114,12 @@ function catalogs_enforce() {
 }
 
 function catalogs_check() {
-    
+    local tmp_nfiles=$(mktemp)
+    local tmp_source=$(mktemp)
+    local src
+
     if macmap_this_is_last0; then
         message_success "No catalogs on last0"
-        return
-    fi
-
-	if [ ! "${catalogs_container_top}" ]; then
-        message_failure "No LAST-CONTAINER, cannot synchronize catalogs (maybe specify one with --container=... ?!?)"
         return
     fi
 
@@ -101,18 +130,21 @@ function catalogs_check() {
 
     for catalog in "${catalogs[@]}"; do
         local -i nfiles
+        local cmd
 
-        nfiles=$( rsync -a --info=STATS0 --info=FLIST0 --itemize-changes --dry-run \
-            "${catalogs_container_top}/${catalog}" "${catalogs_local_top}/${catalog}" | \
-	    grep -v '\.\/'| cut -d' ' -f2 | wc -l
-            )
+        cmd="$(_catalogs_rsync_command ${catalog}  -a --dry-run) | grep -v '\.\/' | wc -l"
+        eval ${cmd} > "${tmp_nfiles}"
+
+        nfiles="$(< ${tmp_nfiles})"
+        src="$(< /tmp/_catalogs_rsync_command.src)"
         
         if (( nfiles > 0 )); then
-            message_warning "Catalog ${catalogs_local_top}/${catalog}: ${nfiles} files differ (with ${catalogs_container_top}/${catalog})"
+            message_warning "Catalog ${src%/}: ${nfiles} files differ (with ${catalogs_container_top}/${catalog})"
         else
-            message_success "Catalog ${catalogs_local_top}/${catalog} is up-to-date (with ${catalogs_container_top}/${catalog})"
+            message_success "Catalog ${src%/} is up-to-date (with ${catalogs_container_top}/${catalog})"
         fi
     done
+    /bin/rm "${tmp_nfiles}" /tmp/_catalogs_rsync_command.src
 }
 
 function catalogs_policy() {
