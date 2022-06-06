@@ -35,10 +35,16 @@ set -b
 #
 # Some convenience shortcuts
 #
+this_site="01"
 this_mount=$(hostname -s | sed -e 's;last;;' -e 's;[ew]$;;')
-read -r -a cameras <<< "$(find /last0* -maxdepth 3 -name "LAST.01.${this_mount}.*" -type d 2>/dev/null | sort -t . -n)"
-for (( i = 1 ; i <= ${#cameras[*]}; i++ )); do
-    eval "alias cdcam${i}=\"cd ${cameras[${i}-1]}\""
+cameras=(
+    "/last${this_mount}e/data1/archive/LAST.${this_site}.${this_mount}.01"
+    "/last${this_mount}e/data2/archive/LAST.${this_site}.${this_mount}.02"
+    "/last${this_mount}w/data1/archive/LAST.${this_site}.${this_mount}.03"
+    "/last${this_mount}w/data2/archive/LAST.${this_site}.${this_mount}.04"
+)
+for (( i = 0 ; i < ${#cameras[*]}; i++ )); do
+    eval "alias cdcam$(( i + 1 ))=\"cd ${cameras[${i}]}\""
 done
 
-unset cameras this_mount
+unset cameras this_mount this_site
