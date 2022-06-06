@@ -2,6 +2,7 @@
 
 module_include lib/container
 module_include lib/util
+module_include lib/ansi
 
 sections_register_section "last-software" "Manages our own LAST software" "user ubuntu-packages"
 
@@ -25,12 +26,12 @@ function last_software_helper() {
 
         ${PROG} enforce last-software [[-r|--repo <repo>] ...] [-R|--reclone]
             - clones or pulls the specified repos (default: all repos).
-            - with --reclone, discards local changes and re-clones the repository(ies) - $(ascii_red DANGEROUS)
+            - with --reclone, discards local changes and re-clones the repository(ies) - $(ansi_bright_red DANGEROUS)
 
     Flags:
         -l|--list         - list the LAST software repos
         -r|--repo <repo>  - add <repo> to the selected list (default: all repos)
-        -R|--reclone      - discard local changes and re-clone the (selected) repos - $(ascii_red OUCH)!
+        -R|--reclone      - discard local changes and re-clone the (selected) repos - $(ansi_bright_red OUCH)!
 
 EOF
 }
