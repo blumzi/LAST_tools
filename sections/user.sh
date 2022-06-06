@@ -70,7 +70,7 @@ function user_enforce() {
     # add the HTTP proxy incantations to the .bash_profile
 	local bash_profile
 	bash_profile="${user_home}/.bash_profile"
-	if [ ! -r "${bash_profile}" ] || [ "$( grep -E -c '(source /etc/profile.d/last.sh|module_include lib/util|util_test_and_set_http_proxy|unset TMOUT)' "${bash_profile}" )" != 4 ]; then
+	if [ ! -r "${bash_profile}" ] || [ "$( grep -E -c '(source /etc/profile.d/last.sh|module_include lib/util|util_test_and_set_http_proxy|unset TMOUT|source)' "${bash_profile}" )" != 5 ]; then
 		local tmp
 		tmp=$(mktemp)
 		{
@@ -78,6 +78,10 @@ function user_enforce() {
 			echo "module_include lib/util"
             echo "util_test_and_set_http_proxy"
 			echo "unset TMOUT"
+            echo ""
+            echo "if [ -r ~/.bash_aliases ]; then"
+            echo "  source ~/.bash_aliases"
+            echo "fi"
 		} > "${tmp}"
 		install -D --mode 644 --owner "${user_last}" --group "${user_last}" "${tmp}" "${bash_profile}"
 		rm -f "${tmp}"
