@@ -104,11 +104,11 @@ function user_enforce() {
     user_enforce_pulseaudio    
     util_enforce_shortcut --override --favorite google-chrome
 
-    local aries_aliases
-    aries_aliases="$(module_locate files/root/home/ocs/.bash_aliases.arie)"
-    if  [ -r "${aries_aliases}" ]; then
-        cp "${aries_aliases}" "${user_home}"
-        chown ${user_last}.${user_last} "${user_home}/$(basename "${aries_aliases}")"
+    local bash_aliases
+    bash_aliases="$(module_locate files/root/home/ocs/.bash_aliases)"
+    if  [ -r "${bash_aliases}" ]; then
+        cp "${bash_aliases}" "${user_home}"
+        chown ${user_last}.${user_last} "${user_home}/$(basename "${bash_aliases}")"
     fi
 }
 
