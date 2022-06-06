@@ -38,7 +38,7 @@ set -b
 this_mount=$(hostname -s | sed -e 's;last;;' -e 's;[ew]$;;')
 #shellcheck disable=SC2034
 paths=( /last"${this_mount}"{e,w}/data{1,2}/archive )
-pattern="$( IFS=: ; echo "{paths[*]}" )"
+pattern="$( IFS=: ; echo "${paths[*]}" )"
 if [[ ${CDPATH} != *${pattern}* ]]; then
     if [ ! "${CDPATH}" ]; then
         CDPATH=${pattern}
