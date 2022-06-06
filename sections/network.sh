@@ -127,8 +127,8 @@ function network_check() {
 
     local -a targets=( last0 last0{1,2,8}{e,w} pswitch0{1,2,8}{e,w} )
     local target
-    for target in ${targets[*]}; do
-        if timeout 2 ping -4 -q -c 1 -W 1 ${target} >/dev/null 2>&1; then
+    for target in "${targets[@]}"; do
+        if timeout 2 ping -4 -q -c 1 -W 1 "${target}" >/dev/null 2>&1; then
             message_success "${target} is reachable (ping)"
         else
             message_failure "${target} is NOT reachable (ping)"
