@@ -125,13 +125,25 @@ function network_check() {
         (( errors++ ))
     fi
 
-    local -a targets=( last0 last0{1,2,8}{e,w} pswitch0{1,2,8}{e,w} )
-    local target
-    for target in "${targets[@]}"; do
+    local target this_host
+    this_host="$(hostname -s)"
+    for target in last0 last0{1,2,8}{e,w}; do
+        if [ "${target}" = "${this_host}" ]; then
+            continue
+        fi
         if timeout 2 ping -4 -q -c 1 -W 1 "${target}" >/dev/null 2>&1; then
             message_success "${target} is reachable (ping)"
         else
             message_failure "${target} is NOT reachable (ping)"
+            (( errors++ ))
+        fi
+    done
+
+    for target in pswitch0{1,2,8}{e,w}; do
+        if http_proxy='' timeout 2 wget -O - "http://admin:admin@${target}/st0.xml" >/dev/null 2>&1; then
+            message_success "${target} is reachable (wget st0.xml)"
+        else
+            message_failure "${target} is NOT reachable (wget st0.xml)"
             (( errors++ ))
         fi
     done
