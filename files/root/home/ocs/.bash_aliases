@@ -29,28 +29,16 @@ else
     alias s='%sudo'
 fi
 
-# let sattus change of background jobs be displayed immediately
+# let status change of background jobs be displayed immediately
 set -b
 
 #
 # Some convenience shortcuts
 #
 this_mount=$(hostname -s | sed -e 's;last;;' -e 's;[ew]$;;')
-#shellcheck disable=SC2034
-paths=( /last"${this_mount}"{e,w}/data{1,2}/archive )
-pattern="$( IFS=: ; echo "${paths[*]}" )"
-if [[ ${CDPATH} != *${pattern}* ]]; then
-    if [ ! "${CDPATH}" ]; then
-        CDPATH=${pattern}
-    else
-        CDPATH=${CDPATH}:${pattern}
-    fi
-fi
-
-eval "alias cdcam1=\"cd /last${this_mount}e/data1\""
-eval "alias cdcam2=\"cd /last${this_mount}e/data2\""
-eval "alias cdcam3=\"cd /last${this_mount}w/data1\""
-eval "alias cdcam4=\"cd /last${this_mount}w/data2\""
+read -r -a cameras <<< "$(find /last0* -name "LAST.01.${this_mount}.*" -type d 2>/dev/null | sort -t . -n)"
+for (( i = 1 ; i <= ${#cameras[*]}; i++ )); do
+        eval "alias cdcam${i}=\"cd ${cameras[${i}-1]}\""
+done
 
 unset paths pattern this_mount
-
