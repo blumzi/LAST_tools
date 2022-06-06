@@ -9,12 +9,12 @@ sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems ne
 export catalogs_local_top
 catalogs_local_top="/$(hostname)/data/catsHTM"
 export catalogs_container_top
-#export -a catalogs=( GAIA/DRE3  MergedCat/V1 )
-export -a catalogs=( GAIA/DRE3  )
+export -a catalogs=( GAIA/DRE3 MergedCat/V1 )
 export _catalogs_source=""
 
 function catalogs_init() {
-    source $(module_locate sections/network.sh)
+    # shellcheck disable=SC1090
+    source "$(module_locate sections/network.sh)"
     network_set_defaults
     local container
 
@@ -36,15 +36,16 @@ function catalogs_init() {
 function _catalogs_rsync_command() {
     local catalog="${1}"
     shift
-    local -a args="${@}"
+    local -a args=( "${@}" )
     local src
 
+    # shellcheck disable=SC2154
     if [[ "${network_netpart}" == 10.23.3.* ]]; then
         src="blumzi@euler1:/var/www/html/data/catsHTM/${catalog}/"
-        echo "su ocs -c \"rsync ${args[@]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}\""
+        echo "su ocs -c \"rsync ${args[*]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}\""
     else
         src="${catalogs_container_top}/${catalog}/"
-        echo "rsync ${args[@]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}"
+        echo "rsync ${args[*]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}"
     fi
     echo "${src}" > /tmp/_catalogs_rsync_command.src
 }
@@ -54,9 +55,9 @@ function catalogs_sync_catalog() {
 	local -i nfiles files_per_chunk=1000
     local files_list no_slashes_catalog
 
-    no_slashes_catalog=$( echo ${catalog} | tr / _)
+    no_slashes_catalog=$( echo "${catalog}" | tr / _)
     files_list=/tmp/rsync-"${no_slashes_catalog}".${$}
-    eval $(_catalogs_rsync_command ${catalog}/ -av --dry-run) | grep -v '\.\/' | cut -d ' ' -f2 > "${files_list}"
+    eval "$(_catalogs_rsync_command "${catalog}"/ -av --dry-run) | grep -v '\.\/' | cut -d ' ' -f2 > ${files_list}"
     nfiles=$(wc -l < "${files_list}")
 
     if (( nfiles == 0 )); then
@@ -68,13 +69,13 @@ function catalogs_sync_catalog() {
     local dir status
 
     dir=${files_list}.d
-    mkdir -p ${dir}
+    mkdir -p "${dir}"
     pushd "${dir}" >&/dev/null || true
-    cat ${files_list} | split --lines=${files_per_chunk}
+    split --lines=${files_per_chunk} < "${files_list}"
     local chunk_no=0
     for chunk in x??; do
 	    message_info "Synchronizing chunk #$((chunk_no++)) of \"${catalog}\" ($(wc -l < "${chunk}") files) ..."
-        eval $(_catalogs_rsync_command ${catalog} -avq --files-from="${chunk}" ) &
+        eval "$(_catalogs_rsync_command ${catalog} -avq --files-from="${chunk}" )" &
     done
     wait -fn
     status=${?}
@@ -114,8 +115,8 @@ function catalogs_enforce() {
 }
 
 function catalogs_check() {
-    local tmp_nfiles=$(mktemp)
-    local tmp_source=$(mktemp)
+    local tmp_nfiles
+    tmp_nfiles=$(mktemp)
     local src
 
     if macmap_this_is_last0; then
@@ -132,10 +133,10 @@ function catalogs_check() {
         local -i nfiles
         local cmd
 
-        cmd="$(_catalogs_rsync_command ${catalog}  -a --dry-run) | grep -v '\.\/' | wc -l"
-        eval ${cmd} > "${tmp_nfiles}"
+        cmd="$(_catalogs_rsync_command "${catalog}"  -a --dry-run) | grep -v '\.\/' | wc -l"
+        eval "${cmd} > ${tmp_nfiles}"
 
-        nfiles="$(< ${tmp_nfiles})"
+        nfiles="$(< "${tmp_nfiles}")"
         src="$(< /tmp/_catalogs_rsync_command.src)"
         
         if (( nfiles > 0 )); then
