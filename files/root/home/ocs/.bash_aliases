@@ -37,14 +37,27 @@ set -b
 #
 this_site="01"
 this_mount=$(hostname -s | sed -e 's;last;;' -e 's;[ew]$;;')
-cameras=(
-    "/last${this_mount}e/data1/archive/LAST.${this_site}.${this_mount}.01"
-    "/last${this_mount}e/data2/archive/LAST.${this_site}.${this_mount}.02"
-    "/last${this_mount}w/data1/archive/LAST.${this_site}.${this_mount}.03"
-    "/last${this_mount}w/data2/archive/LAST.${this_site}.${this_mount}.04"
+declare -A cameras_by_quadrant=(
+    [NE]="/last${this_mount}e/data1/archive/LAST.${this_site}.${this_mount}.01"
+    [SE]="/last${this_mount}e/data2/archive/LAST.${this_site}.${this_mount}.02"
+    [SW]="/last${this_mount}w/data1/archive/LAST.${this_site}.${this_mount}.03"
+    [NW]="/last${this_mount}w/data2/archive/LAST.${this_site}.${this_mount}.04"
 )
-for (( i = 0 ; i < ${#cameras[*]}; i++ )); do
-    eval "alias cdcam$(( i + 1 ))=\"cd ${cameras[${i}]}\""
+
+for key in ${!cameras_by_quadrant[*]}; do
+    eval "alias cdcam${key}=\"cd ${cameras_by_quadrant[${key}]}\""
+    eval "alias cdcam${key,,}=\"cd ${cameras_by_quadrant[${key}]}\""
 done
 
-unset cameras this_mount this_site
+declare -A cameras_by_number=(
+    [1]="/last${this_mount}e/data1/archive/LAST.${this_site}.${this_mount}.01"
+    [2]="/last${this_mount}e/data2/archive/LAST.${this_site}.${this_mount}.02"
+    [3]="/last${this_mount}w/data1/archive/LAST.${this_site}.${this_mount}.03"
+    [4]="/last${this_mount}w/data2/archive/LAST.${this_site}.${this_mount}.04"
+)
+
+for key in ${!cameras_by_number[*]}; do
+    eval "alias cdcam${key}=\"cd ${cameras_by_number[${key}]}\""
+done
+
+unset cameras_by_quadrant cameras_by_number this_mount this_site key
