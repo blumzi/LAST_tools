@@ -5,3 +5,7 @@ files/LAST-CATALOG/
 last-tool-*.deb
 files/ssh/id_rsa
 files/ssh/id_rsa.pub
+.vscode/configurationCache.log
+.vscode/dryrun.log
+.vscode/settings.json
+.vscode/targets.log
