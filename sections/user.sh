@@ -224,15 +224,15 @@ function user_enforce_mozilla_proxy() {
 }
 
 function user_enforce_pulseaudio() {
-    local config_file="~${user_last}/.config/pulse/default.pa"
+    local config_file="${user_home}/.config/pulse/default.pa"
 
-    mkdir -p "$(dirname ${config_file})"
+    mkdir -p "$(dirname "${config_file}")"
     echo "load-module module-loopback latency_msec=1" > "${config_file}"
     message_success "pulseaudio: added load module-loopback (${config_file})"
 }
 
 function user_check_pulseaudio() {
-    local config_file="~${user_last}/.config/pulse/default.pa"
+    local config_file="${user_home}/.config/pulse/default.pa"
 
     if grep -q "load-module module-loopback latency_msec=1" "${config_file}" 2>/dev/null ; then
         message_success "pulseaudio: module-loopback is loaded by \"${config_file}\""
