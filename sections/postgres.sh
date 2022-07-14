@@ -8,6 +8,17 @@ sections_register_section "postgres" "Maintains PostgreSQL on last0" "network"
 
 postgres_local_hostname=$( macmap_get_local_hostname )
 
+function postgres_psql() {
+    local ask_pass
+    
+    ask_pass=$(mktemp)
+    echo -e '#!/bin/bash\necho physics\n' > "${ask_pass}"
+    chmod 700 "${ask_pass}"
+
+    SUDO_ASKPASS=${ask_pass} sudo -A -u postgres psql -t --command "${@}"
+    /bin/rm "${ask_pass}"
+}
+
 function postgres_check() {
 
     if ! macmap_this_is_last0; then
@@ -68,6 +79,15 @@ function postgres_check() {
         message_success "The pgadmin4 packages are installed"
     else
         message_failure "The pgadmin4 packages are not installed"
+        (( ret++ ))
+    fi
+
+    local line
+    line="$(postgres_psql 'select version();')"
+    if [[ "${line}" == PostgreSQL* ]]; then
+        message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3) server is alive"
+    else
+        message_failure "The Postgresql server is NOT alive"
         (( ret++ ))
     fi
 
@@ -161,6 +181,15 @@ function postgres_enforce() {
         apt update
         apt install -y pgadmin4 pgadmin4-server pgadmin4-desktop
         message_success "Installed the pgadmin4 packages"
+    fi
+    # end pgadmin
+
+    local line
+    line="$(postgres_psql 'select version();')"
+    if [[ "${line}" == PostgreSQL* ]]; then
+        message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3) server is alive"
+    else
+        message_failure "The Postgresql server is NOT alive"
     fi
 }
 
