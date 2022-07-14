@@ -207,6 +207,7 @@ module_include sections/time
 module_include sections/catalogs
 module_include sections/last-software
 module_include sections/ssh
+module_include sections/postgres
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 
