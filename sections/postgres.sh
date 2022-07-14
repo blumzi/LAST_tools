@@ -28,28 +28,28 @@ function postgres_check() {
 
     local ret=0
 
-    if apt-key list | grep -q 'PostgreSQL Debian Repository' 2> /dev/null; then
-        message_success 'The "PostgreSQL Debian Repository" apt-key already installed'
+    if apt-key list 2>/dev/null | grep -q 'PostgreSQL Debian Repository' 2> /dev/null; then
+        message_success 'The "PostgreSQL Debian Repository" apt-key is already installed'
     else
         message_failure 'The "PostgreSQL Debian Repository" apt-key is NOT installed'
         (( ret++ ))
     fi
 
-    if [ -r /etc/apt/sources.list/pgdg.list ]; then
+    if [ -r /etc/apt/sources.list.d/pgdg.list ]; then
         message_success "The PostgreSQL apt source exists"
     else
         message_failure 'The PostgreSQL apt source does not exist'
         (( ret++ ))
     fi
 
-    if  [ "$(dpkg --list | grep -cE '(postgresql|postgresql-contrib)-')" = 5 ]; then
+    if  [ "$(dpkg --list | grep -Ec '(postgresql|postgresql-14|postgresql-client-14|postgresql-client-common|postgresql-common)')" -ge 5 ]; then
         message_success "The postgresql and postgresql-contrib packages are installed"
     else
         message_failure "Some of the postgresql and postgresql-contrib packages are missing"
         (( ret++ ))
     fi
 
-    if [ "$(systemctl is-active postresql)" = active ]; then
+    if [ "$(systemctl is-active postgresql)" = active ]; then
         message_success "The Postgresql service is active"
     else
         message_failure "The Postgresql service is NOT active"
@@ -60,18 +60,18 @@ function postgres_check() {
     local line
     
     line="$(grep 'listen_address =' ${conf} )"
-    if [[ ${line} == '#listen_aggresses'* ]]; then
-        message_failure "The PostgreSQL server is not configured to listen to the world"
+    if [[ ${line} == '#listen_addresses'* ]]; then
+        message_failure "The PostgreSQL server is not configured to listen to the world (${conf})"
         (( ret++ ))
     else
-        message_success "The Postgresql server is configured to listen to the world"
+        message_success "The Postgresql server is configured to listen to the world (${conf})"
     fi
 
     conf="/etc/postgresql/14/main/pg_hba.conf"
-    if grep -q 'host all all 0.0.0.0/0 md5' ${conf}; then
-        message_success "The Postgresql server has the proper connection policy"
+    if grep -q 'host[[:space:]]*all[[:space:]]*all[[:space:]]*0\.0\.0\.0/0[[:space:]]*md5' ${conf}; then
+        message_success "The Postgresql server has the proper connection policy (${conf})"
     else
-        message_failure "The Postgresql server does NOT have the proper connection policy"
+        message_failure "The Postgresql server does NOT have the proper connection policy (${conf})"
         (( ret++ ))
     fi
 
@@ -84,8 +84,8 @@ function postgres_check() {
 
     local line
     line="$(postgres_psql 'select version();')"
-    if [[ "${line}" == PostgreSQL* ]]; then
-        message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3) server is alive"
+    if [[ "${line}" == ?PostgreSQL* ]]; then
+        message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3)) server is alive"
     else
         message_failure "The Postgresql server is NOT alive"
         (( ret++ ))
@@ -101,7 +101,7 @@ function postgres_enforce() {
         return
     fi
 
-    if apt-key list | grep -q 'PostgreSQL Debian Repository' 2> /dev/null; then
+    if apt-key list 2>/dev/null | grep -q 'PostgreSQL Debian Repository' 2> /dev/null; then
         message_success 'The "PostgreSQL Debian Repository" apt-key already installed'
     else
         if wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - >/dev/null; then
@@ -117,17 +117,17 @@ function postgres_enforce() {
         message_success 'Added the PostgreSQL apt-source list'
     fi
 
-    if  [ "$(dpkg --list | grep -cE '(postgresql|postgresql-contrib)-')" != 5 ]; then
+    if  [ "$(dpkg --list | grep -Ec '(postgresql|postgresql-14|postgresql-client-14|postgresql-client-common|postgresql-common)')" -ge 5 ]; then
+        message_success "The postgresql and postgresql-contrib packages are installed"
+    else
         apt update
         apt install -y postgresql postgresql-contrib
         message_success "Installed the packages postgresql and postgresql-contrib"
-    else
-        message_success "The postgresql and postgresql-contrib packages are installed"
     fi
 
     local needs_restart
     needs_restart=false
-    if [ "$(systemctl is-active postresql)" = active ]; then
+    if [ "$(systemctl is-active postgresql)" = active ]; then
         message_success "The Postgresql service is active"
     else
         message_failure "The Postgresql service needs to be restarted"
@@ -138,20 +138,20 @@ function postgres_enforce() {
     local line
     
     line="$(grep 'listen_address =' ${conf} )"
-    if [[ ${line} == '#listen_aggresses'* ]]; then
+    if [[ ${line} == '#listen_addresses'* ]]; then
         sed -i -e "s;^#listen_addresses ='localhost';listen_addresses = '*';" ${conf}
-        message_success "Configured the Postgresql server to listen to the world"
+        message_success "Configured the Postgresql server to listen to the world (${conf})"
         needs_restart=true
     else
-        message_success "The Postgresql server is already configured to listen to the world"
+        message_success "The Postgresql server is already configured to listen to the world (${conf})"
     fi
 
     conf="/etc/postgresql/14/main/pg_hba.conf"
-    if grep -q 'host all all 0.0.0.0/0 md5' ${conf}; then
-        message_success "The Postgresql server has the proper connection policy"
+    if grep -q 'host[[:space:]]*all[[:space:]]*all[[:space:]]*0\.0\.0\.0/0[[:space:]]*md5' ${conf}; then
+        message_success "The Postgresql server has the proper connection policy (${conf})"
     else
         echo 'host all all 0.0.0.0/0 md5' >> ${conf}
-        message_success "Added the proper connection policy to the Postgresql server"
+        message_success "Added the proper connection policy to the Postgresql server (${conf})"
         needs_restart=true
     fi
 
@@ -186,7 +186,7 @@ function postgres_enforce() {
 
     local line
     line="$(postgres_psql 'select version();')"
-    if [[ "${line}" == PostgreSQL* ]]; then
+    if [[ "${line}" == ?PostgreSQL* ]]; then
         message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3) server is alive"
     else
         message_failure "The Postgresql server is NOT alive"
