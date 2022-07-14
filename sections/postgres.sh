@@ -59,20 +59,28 @@ function postgres_check() {
     local conf="/etc/postgresql/14/main/postgresql.conf"
     local line
     
-    line="$(grep 'listen_address =' ${conf} )"
-    if [[ ${line} == '#listen_addresses'* ]]; then
-        message_failure "The PostgreSQL server is not configured to listen to the world (${conf})"
-        (( ret++ ))
+    if [ ! -r ${conf} ]; then
+        message_failure "Missing PostgreSQL configuration file (${conf})"
     else
-        message_success "The Postgresql server is configured to listen to the world (${conf})"
+        line="$(grep 'listen_address =' ${conf} )"
+        if [[ ${line} == '#listen_addresses'* ]]; then
+            message_failure "The PostgreSQL server is not configured to listen to the world (${conf})"
+            (( ret++ ))
+        else
+            message_success "The Postgresql server is configured to listen to the world (${conf})"
+        fi
     fi
 
     conf="/etc/postgresql/14/main/pg_hba.conf"
-    if grep -q 'host[[:space:]]*all[[:space:]]*all[[:space:]]*0\.0\.0\.0/0[[:space:]]*md5' ${conf}; then
-        message_success "The Postgresql server has the proper connection policy (${conf})"
+    if [ ! -r ${conf} ]; then
+        message_failure "Missing PostgreSQL configuration file (${conf})"
     else
-        message_failure "The Postgresql server does NOT have the proper connection policy (${conf})"
-        (( ret++ ))
+        if grep -q 'host[[:space:]]*all[[:space:]]*all[[:space:]]*0\.0\.0\.0/0[[:space:]]*md5' ${conf}; then
+            message_success "The Postgresql server has the proper connection policy (${conf})"
+        else
+            message_failure "The Postgresql server does NOT have the proper connection policy (${conf})"
+            (( ret++ ))
+        fi
     fi
 
     if [ "$( dpkg --list | grep -cEw '(pgadmin4|pgadmin4-server|pgadmin4-desktop)' )" -gt 3 ]; then
@@ -82,13 +90,17 @@ function postgres_check() {
         (( ret++ ))
     fi
 
-    local line
-    line="$(postgres_psql 'select version();')"
-    if [[ "${line}" == ?PostgreSQL* ]]; then
-        message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3)) server is alive"
+    if ! grep -wq postgres /etc/passwd; then
+        message_failure "Missing user \"postgres\"."
     else
-        message_failure "The Postgresql server is NOT alive"
-        (( ret++ ))
+        local line
+        line="$(postgres_psql 'select version();')"
+        if [[ "${line}" == ?PostgreSQL* ]]; then
+            message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3)) server is alive"
+        else
+            message_failure "The Postgresql server is NOT alive"
+            (( ret++ ))
+        fi
     fi
 
     return "${ret}"
