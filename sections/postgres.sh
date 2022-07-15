@@ -15,7 +15,7 @@ function postgres_psql() {
     echo -e '#!/bin/bash\necho physics\n' > "${ask_pass}"
     chmod 700 "${ask_pass}"
 
-    SUDO_ASKPASS=${ask_pass} sudo -A -u postgres psql -t --command "${@}"
+    SUDO_ASKPASS=${ask_pass} sudo -A -u postgres psql -t --command "${@}" | sed -e 's;^ ;;' -e '/^$/d'
     /bin/rm "${ask_pass}"
 }
 
@@ -62,7 +62,7 @@ function postgres_check() {
     if [ ! -r ${conf} ]; then
         message_failure "Missing PostgreSQL configuration file (${conf})"
     else
-        line="$(grep 'listen_address =' ${conf} )"
+        line="$(grep 'listen_addresses =' ${conf} )"
         if [[ ${line} == '#listen_addresses'* ]]; then
             message_failure "The PostgreSQL server is not configured to listen to the world (${conf})"
             (( ret++ ))
@@ -95,12 +95,20 @@ function postgres_check() {
     else
         local line
         line="$(postgres_psql 'select version();')"
-        if [[ "${line}" == ?PostgreSQL* ]]; then
-            message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3)) server is alive"
+        if [[ "${line}" == PostgreSQL* ]]; then
+            message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f2)) server is alive"
         else
             message_failure "The Postgresql server is NOT alive"
             (( ret++ ))
         fi
+    fi
+
+    local passwd
+    passwd="$(postgres_psql "select passwd from pg_user where usename='postgres';")"
+    if [ "${passwd}" = '********' ]; then
+        message_success "The 'postgres' user already has a default password"
+    else
+        message_success "The 'postgres' user does NOT have a password"
     fi
 
     return "${ret}"
@@ -149,9 +157,9 @@ function postgres_enforce() {
     local conf="/etc/postgresql/14/main/postgresql.conf"
     local line
     
-    line="$(grep 'listen_address =' ${conf} )"
+    line="$(grep 'listen_addresses =' ${conf} )"
     if [[ ${line} == '#listen_addresses'* ]]; then
-        sed -i -e "s;^#listen_addresses ='localhost';listen_addresses = '*';" ${conf}
+        sed -i -e "s;^#listen_addresses = 'localhost';listen_addresses = '*';" ${conf}
         message_success "Configured the Postgresql server to listen to the world (${conf})"
         needs_restart=true
     else
@@ -176,7 +184,7 @@ function postgres_enforce() {
     if apt-key list 2>/dev/null | grep -qi pgadmin; then
         message_success "The pgadmin apt key is installed"
     else
-        wgwt --quiet -O - https://www.pgadmin.org/static/packages_pgadmin_org.pub | apt-key add >/dev/null
+        wget --quiet -O - https://www.pgadmin.org/static/packages_pgadmin_org.pub | apt-key add >/dev/null
         message_success 'Added the pgadmin apt-key'
     fi
 
@@ -191,17 +199,30 @@ function postgres_enforce() {
         message_success "The pgadmin4 packages are installed"
     else
         apt update
-        apt install -y pgadmin4 pgadmin4-server pgadmin4-desktop
+        apt install -y pgadmin4
         message_success "Installed the pgadmin4 packages"
     fi
     # end pgadmin
 
     local line
     line="$(postgres_psql 'select version();')"
-    if [[ "${line}" == ?PostgreSQL* ]]; then
-        message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f3) server is alive"
+    if [[ "${line}" == PostgreSQL* ]]; then
+        message_success "The Postgresql (version $(echo "${line}" | cut -d' ' -f2)) server is alive"
     else
         message_failure "The Postgresql server is NOT alive"
+    fi
+
+    #
+    # set a default password for user 'postgres'
+    # NOTE: we cannot check if this has already been done, so it is enforced every time :-(
+    #
+    local passwd
+    passwd="$(postgres_psql "select passwd from pg_user where usename='postgres';")"
+    if [ "${passwd}" = '********' ]; then
+        message_success "The 'postgres' user already has a default password"
+    else
+        sudo -u postgres psql --command "alter user postgres password 'postgres';" >/dev/null
+        message_success "Set default password for user 'postgres'"
     fi
 }
 
