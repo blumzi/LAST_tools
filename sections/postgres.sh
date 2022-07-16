@@ -244,7 +244,7 @@ function postgres_enforce() {
         message_success "PostgreSQL user 'ocs' exists and is SUPERUSER."
     else
         if [ "${is_super}" = f ]; then # user 'ocs' exists but is NOT superuser
-            ans="$(postgres_psql "alter user 'ocs' with superuser;")"
+            ans="$(postgres_psql "alter user ocs with superuser;")"
             if [ "${ans}" = "ALTER ROLE" ]; then
                 message_success "Assigned superuser role to PostgreSQL user 'ocs'."
             else
