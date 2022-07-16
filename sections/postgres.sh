@@ -103,12 +103,25 @@ function postgres_check() {
         fi
     fi
 
+    # user 'postgres' should have a password
     local passwd
     passwd="$(postgres_psql "select passwd from pg_user where usename='postgres';")"
     if [ "${passwd}" = '********' ]; then
         message_success "The 'postgres' user already has a default password"
     else
         message_success "The 'postgres' user does NOT have a password"
+    fi
+
+    # there should be a user 'ocs', with 'superuser' role
+    is_super="$(postgres_psql "select usesuper from pg_user where usename='ocs';")"
+    if [ ! "${is_super}" ]; then
+        message_failure "Missing PostgeSQL user named 'ocs'."
+    else
+        if [ "${is_super}" = t ]; then
+            message_success "PostgreSQL user 'ocs' exists and is SUPERUSER."
+        else
+            message_warning "PostgreSQL user 'ocs' exists but is NOT SUPERUSER."
+        fi
     fi
 
     return "${ret}"
@@ -223,6 +236,34 @@ function postgres_enforce() {
     else
         sudo -u postgres psql --command "alter user postgres password 'postgres';" >/dev/null
         message_success "Set default password for user 'postgres'"
+    fi
+
+    # there should be a user 'ocs', with 'superuser' role
+    is_super="$(postgres_psql "select usesuper from pg_user where usename='ocs';")"
+    if [ "${is_super}" = t ]; then
+        message_success "PostgreSQL user 'ocs' exists and is SUPERUSER."
+    else
+        if [ "${is_super}" = f ]; then # user 'ocs' exists but is NOT superuser
+            ans="$(postgres_psql "alter user 'ocs' with superuser;")"
+            if [ "${ans}" = "ALTER ROLE" ]; then
+                message_success "Assigned superuser role to PostgreSQL user 'ocs'."
+            else
+                message_failure "Could not assign superuser role to PostgreSQL user 'ocs'."
+            fi
+        else    # user 'ocs' does not exist
+            ans="$(postgres_psql "create user ocs;")"
+            if [ "${ans}" = "CREATE USER" ]; then
+                message_success "Created PostgreSQL user 'ocs'."
+                ans="$(postgres_psql "alter user ocs with superuser;")"
+                if [ "${ans}" = "ALTER ROLE" ]; then
+                    messages_success "Assigned superuser role to PostgreSQL user 'ocs'."
+                else
+                    message_failure "Failed to assign superuser role to PostgreSQL user 'ocs'."
+                fi
+            else
+                message_failure "Could not create PostgreSQL user 'ocs'."
+            fi
+        fi
     fi
 }
 
