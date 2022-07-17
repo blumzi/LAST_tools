@@ -265,6 +265,21 @@ function postgres_enforce() {
             fi
         fi
     fi
+
+    ans="$(postgres_psql "alter user ocs with password 'physics';")"
+    if [ "${ans}" = "ALTER ROLE" ]; then
+        message_success "Enforced password of PostgreSQL user 'ocs'"
+    else
+        message_failure "Failed to enforce password of PostgreSQL user 'ocs'"
+    fi
+
+    local conf
+    conf=~ocs/.pgpass
+    if [ ! -r "${conf}" ]; then
+        echo "$(macmap_get_local_ipaddr):5432:*:ocs:physics" > "${conf}"
+        chmod 600 "${conf}"
+        chown ocs.ocs "${conf}"
+    fi
 }
 
 function postgres_policy() {
