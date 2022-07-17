@@ -127,7 +127,7 @@ function network_check() {
 
     local target this_host
     this_host="$(hostname -s)"
-    for target in last0 last0{1,2,8}{e,w}; do
+    for target in last0 last0{1,2,6,8}{e,w}; do
         if [ "${target}" = "${this_host}" ]; then
             continue
         fi
@@ -139,7 +139,7 @@ function network_check() {
         fi
     done
 
-    for target in pswitch0{1,2,8}{e,w}; do
+    for target in pswitch0{1,2,6,8}{e,w}; do
         if http_proxy='' timeout 2 wget -O - "http://admin:admin@${target}/st0.xml" >/dev/null 2>&1; then
             message_success "${target} is reachable (wget st0.xml)"
         else
