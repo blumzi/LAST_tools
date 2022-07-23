@@ -109,19 +109,31 @@ function postgres_check() {
     if [ "${passwd}" = '********' ]; then
         message_success "The 'postgres' user already has a default password"
     else
-        message_success "The 'postgres' user does NOT have a password"
+        message_failure "The 'postgres' user does NOT have a password"
+        (( ret++ ))
     fi
 
     # there should be a user 'ocs', with 'superuser' role
     is_super="$(postgres_psql "select usesuper from pg_user where usename='ocs';")"
     if [ ! "${is_super}" ]; then
         message_failure "Missing PostgeSQL user named 'ocs'."
+        (( ret++ ))
     else
         if [ "${is_super}" = t ]; then
             message_success "PostgreSQL user 'ocs' exists and is SUPERUSER."
         else
             message_warning "PostgreSQL user 'ocs' exists but is NOT SUPERUSER."
         fi
+    fi
+
+    local conf line
+    conf=/usr/pgadmin4/web/config.py
+    read -r x x required <<< "$(grep MASTER_PASSWORD_REQUIRED ${conf})"
+    if [ "${required,,}" = false ]; then
+        message_success "Pgadmin master password is disbled (${conf})"
+    else
+        message_failure "Pgadmin master password is NOT disbled (${conf})"
+        (( ret++ ))
     fi
 
     return "${ret}"
@@ -264,6 +276,29 @@ function postgres_enforce() {
                 message_failure "Could not create PostgreSQL user 'ocs'."
             fi
         fi
+    fi
+
+    ans="$(postgres_psql "alter user ocs with password 'physics';")"
+    if [ "${ans}" = "ALTER ROLE" ]; then
+        message_success "Enforced password of PostgreSQL user 'ocs'"
+    else
+        message_failure "Failed to enforce password of PostgreSQL user 'ocs'"
+    fi
+
+    local conf
+    conf=~ocs/.pgpass
+    if [ ! -r "${conf}" ]; then
+        echo "$(macmap_get_local_ipaddr):5432:*:ocs:physics" > "${conf}"
+        chmod 600 "${conf}"
+        chown ocs.ocs "${conf}"
+    fi
+
+    local conf line
+    conf=/usr/pgadmin4/web/config.py
+    read -r x x required <<< "$(grep MASTER_PASSWORD_REQUIRED ${conf})"
+    if [ "${required,,}" != false ]; then
+        sed -i -e 's/MASTER_PASSWORD_REQUIRED =.*/MASTER_PASSWORD_REQUIRED = False/' "${conf}"
+        message_success "Disabled pgadmin master password (${conf})"
     fi
 }
 

@@ -72,16 +72,14 @@ EOF
 function help() {
 	local -a sections
 
+    message_section "Global help"
+    global_help
+
     if [ ${#selected_sections[*]} -ne 0 ]; then
 		sections=( "${selected_sections[@]}" )
 	else
 		sections=( "${registered_sections[@]}" )
 	fi
-
-    if [ ${#sections[*]} -eq 0 ]; then
-        message_section "Global help"
-        global_help
-    fi
 
 	for section in "${sections[@]}"; do
 		eval section_helper="$(util_bashify "${section}")_helper"

@@ -3,6 +3,7 @@
 module_include lib/message
 module_include lib/sections
 module_include lib/macmap
+module_include lib/container
 module_include sections/network
 
 sections_register_section "filesystems" "Manages the exporting/mounting of filesystems" "network ubuntu-packages"
@@ -152,7 +153,7 @@ function filesystems_enforce() {
         config_file="/etc/auto.master.d/last0.autofs"
         {
             grep -v last0 "${config_file}" 2> /dev/null
-            echo "/last0 /etc/auto.last0"
+            echo "$(dirname ${container_mpoint}) /etc/auto.last0"
         } > "${tmp}"
         mv "${tmp}" "${config_file}"
         chmod 644 "${config_file}"
@@ -205,7 +206,7 @@ function filesystems_policy() {
         machine:          last0                                lastXX[ew]
 
         autofs mounts:
-                        /last0/data2/LAST-CONTAINER  NFS->    /mnt/last0/LAST-CONTAINER
+                        /last0/data2/LAST-CONTAINER  NFS->    /last0/LAST-CONTAINER
 
 EOF
 
