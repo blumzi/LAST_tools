@@ -42,10 +42,10 @@ function _catalogs_rsync_command() {
     # shellcheck disable=SC2154
     if [[ "${network_netpart}" == 10.23.3.* ]]; then
         src="blumzi@euler1:/var/www/html/data/catsHTM/${catalog}/"
-        echo "su ocs -c \"rsync ${args[*]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}\""
+        echo "su ocs -c \"rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}\""
     else
         src="${catalogs_container_top}/${catalog}/"
-        echo "rsync ${args[*]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}"
+        echo "rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}"
     fi
     echo "${src}" > /tmp/_catalogs_rsync_command.src
 }
