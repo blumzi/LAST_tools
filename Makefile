@@ -16,11 +16,13 @@ ifeq (${VMWARE},true)
 	mkdir -p ${PACKAGE_DIR}/usr/local/bin ${PACKAGE_DIR}/etc/profile.d
 	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-tool ${PACKAGE_DIR}/usr/local/bin/last-tool
 	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-pswitch ${PACKAGE_DIR}/usr/local/bin/last-pswitch
+	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-plights ${PACKAGE_DIR}/usr/local/bin/last-plights
 	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-fetch-from-github ${PACKAGE_DIR}/usr/local/bin/last-fetch-from-github
 	install -m 644 ${PACKAGE_DIR}//usr/local/share/last-tool/files/last.sh ${PACKAGE_DIR}/etc/profile.d/last.sh
 else
 	ln -sf /usr/local/share/last-tool/bin/last-tool ${PACKAGE_DIR}/usr/local/bin/last-tool
 	ln -sf /usr/local/share/last-tool/bin/last-pswitch ${PACKAGE_DIR}/usr/local/bin/last-pswitch
+	ln -sf /usr/local/share/last-tool/bin/last-lights ${PACKAGE_DIR}/usr/local/bin/last-lights
 	ln -sf /usr/local/share/last-tool/bin/last-watch-fits ${PACKAGE_DIR}/usr/local/bin/last-watch-fits
 	ln -sf /usr/local/share/last-tool/bin/last-fetch-from-github ${PACKAGE_DIR}/usr/local/bin/last-fetch-from-github
 	ln -sf /usr/local/share/last-tool/files/last.sh ${PACKAGE_DIR}/etc/profile.d/last.sh
