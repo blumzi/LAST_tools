@@ -38,7 +38,7 @@ function GET() {
     local -i ret
 
     tmp=$(mktemp "/tmp/${PROG}.XXXXXX")
-    timeout 2 wget --quiet -O - "${url}" > "${tmp}"
+    http_proxy= timeout 2 wget --quiet -O - "${url}" > "${tmp}"
     ret=${?}
     if (( ret == 0 )) && [ -s "${tmp}" ]; then
 	    cat "${tmp}"
@@ -97,8 +97,8 @@ function map_socket_names() {
 #
 # These two lists govern the socket-number <=> socket-name mappings.
 #
-declare -a west_sockets=( [0]=Socket0 [1]=Socket1 [2]=CompW   [3]=CompW [4]=CamSW [5]=CamNE )
-declare -a east_sockets=( [0]=Socket0 [1]=Socket1 [2]=Socket2 [3]=Mount [4]=CamNE [5]=CamSE )
+declare -a west_sockets=( [1]=Socket0 [2]=Socket1 [3]=CompW   [4]=CompW [5]=CamSW [6]=CamNE )
+declare -a east_sockets=( [1]=Socket0 [2]=Socket1 [3]=Socket2 [4]=Mount [5]=CamNE [6]=CamSE )
 
 declare -a sockets
 declare numeric_sockets op
@@ -110,34 +110,39 @@ else
 fi
 
 declare valid_socket_name arg
+nsockets=${#sockets[*]}
 while (( ${#} != 0 )); do
     arg=${1}
-    valid_socket_name=false
-    for ((i = 0; i < ${#sockets[*]}; i++ )); do
-        if [ "${arg,,}" = "${sockets[${i}],,}" ]; then
-            numeric_sockets+=${i}
-            valid_socket_name=true
-            break
-        fi
-    done
+#    valid_socket_name=false
+#    for ((i = 0; i < nsockets; i++ )); do
+#        if [[ "${arg}" == [0-${nsockets}] ]] || [ "${arg,,}" = "${sockets[${i}],,}" ]; then
+#            numeric_sockets+=${i}
+#            valid_socket_name=true
+#            break
+#        fi
+#    done
 
-    if ! ${valid_socket_name}; then
-        case ${arg,,} in
-            on|off|toggle|show)
-                op=${arg}
-                break
-                ;;
-            *)
-                echo "${PROG}: Invalid socket name or operation \"${1}\""
-                exit 1
-                ;;
-        esac
+    if [[ "${arg}" == [1-6] ]]; then
+        selected_sockets+=${arg}
+        shift 1
+        continue
     fi
+
+    case ${arg,,} in
+        on|off|toggle|show)
+            op=${arg}
+            break
+            ;;
+        *)
+            echo "${PROG}: Invalid socket name or operation \"${1}\""
+            exit 1
+            ;;
+    esac
     shift 1
 done
 
-if [ ! "${numeric_sockets}" ]; then
-    numeric_sockets=012345  # all sockets are selected
+if [ ! "${selected_sockets}" ]; then
+    selected_sockets=123456
 fi
 
 if [ ! "${op}" ]; then
@@ -157,9 +162,8 @@ function set_sockets() {
             ;;
     esac
 
-    for (( i = 0; i < ${#numeric_sockets}; i++ )); do
-        sock=${numeric_sockets:i:1}
-        GET "${url_root}/outs.cgi?out${sock}=${numerical_value}" || return ${?}
+    for s in $(echo "${lowered_sockets}" | sed -e 's;\(.\);\1 ;g'); do
+        GET "${url_root}/outs.cgi?out${s}=${numerical_value}" || return ${?}
     done
 }
 
@@ -168,12 +172,20 @@ unset https_proxy
 
 url_root=http://admin:admin@${pswitch}
 
+for s in $(echo "${selected_sockets}" | sed -e 's;\(.\);\1 ;g'); do
+    lowered_sockets+=$(( s - 1 ))
+done
+
 case ${op} in
     show)
-        GET "${url_root}/st0.xml" | \
-            grep "out[${numeric_sockets}]" | \
-            sed -e "s;<out\([${numeric_sockets}]\)>;socket\1=;" -e 's;</out.*;;' -e 's;=0;=off;' -e 's;=1;=on;' | \
-            map_socket_names
+        tmp=$(mktemp)
+        GET "${url_root}/st0.xml" > ${tmp} 
+        for s in $(echo "${lowered_sockets}" | sed -e 's;\(.\);\1 ;g'); do
+            unshifted_socket=$((s + 1))
+            grep "out[${s}]" ${tmp} | \
+                sed -e "s;<out\([${s}]\)>;socket${unshifted_socket}=;" -e 's;</out.*;;' -e 's;=0;=off;' -e 's;=1;=on;'
+        done
+        /bin/rm ${tmp}
         exit "${PIPESTATUS[0]}"
         ;;
 
@@ -182,6 +194,6 @@ case ${op} in
         ;;
 
     toggle)
-        GET "${url_root}/outs.cgi?out=${numeric_sockets}"
+        GET "${url_root}/outs.cgi?out=${lowered_sockets}"
         ;;
 esac
