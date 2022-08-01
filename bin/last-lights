@@ -23,8 +23,8 @@ function usage() {
         ${PROG} <power-switch-name>
             - Gets the current status of the light hooked to the specified power-switch
 
-        ${PROG} on|off [[<power-switch-name>] ... ]
-            - Turn On or OFF either ALL the lights (when no power-swithces are specified)
+        ${PROG} on|off|toggle [[<power-switch-name>] ... ]
+            - Turn ON, OFF or TOGGLE either ALL the lights (when no power-swithces are specified)
                or just on the power-switches specified as arguments.
 
     $(ansi_bold "Notes"):
@@ -62,11 +62,8 @@ action=''
 if [ "${1}" = '-h' ] || [ "${1}" = "--help" ]; then
     usage
     exit 0
-elif [ "${1}" = 'on' ]; then
-    action=on
-    shift 1
-elif [ "${1}" = 'off' ]; then
-    action=off
+elif [ "${1}" = on ] || [ "${1}" = off ] || [ "${1}" = toggle ]; then
+    action="${1}"
     shift 1
 fi
 

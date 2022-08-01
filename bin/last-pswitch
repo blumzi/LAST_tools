@@ -5,6 +5,8 @@
 # shellcheck disable=SC1091
 source /etc/profile.d/last.sh
 
+module_include lib/http
+
 PROG=$(basename "${0}")
 
 function usage() {
@@ -32,21 +34,6 @@ function usage() {
 EOF
 }
 
-function GET() {
-    local url="${1}"
-    local tmp
-    local -i ret
-
-    tmp=$(mktemp "/tmp/${PROG}.XXXXXX")
-    http_proxy= timeout 2 wget --quiet -O - "${url}" > "${tmp}"
-    ret=${?}
-    if (( ret == 0 )) && [ -s "${tmp}" ]; then
-	    cat "${tmp}"
-    fi
-    /bin/rm "${tmp}"
-    return ${ret}
-}
-
 declare pswitch
 declare sockets
 declare value
@@ -72,27 +59,6 @@ else
 fi
 pswitch="${name}"
 shift 1
-
-# East side sockets:
-# #6 Camera NW
-# #5 Camera SW
-# #4 Computer E
-# #3 Computer W
-# West side sockets:
-# #6 Camera NE
-# #5 Camera SE
-# #4 Mount
-
-function map_socket_names() {
-    local line name value index
-
-    while read -r line; do
-        name=${line%=*}
-        index=${name#socket}
-        value=${line#*=}
-        echo "${sockets[${index}]}=${value}"
-    done
-}
 
 #
 # These two lists govern the socket-number <=> socket-name mappings.
@@ -163,7 +129,7 @@ function set_sockets() {
     esac
 
     for s in $(echo "${lowered_sockets}" | sed -e 's;\(.\);\1 ;g'); do
-        GET "${url_root}/outs.cgi?out${s}=${numerical_value}" || return ${?}
+        http_get "${url_root}/outs.cgi?out${s}=${numerical_value}" || return ${?}
     done
 }
 
@@ -179,11 +145,18 @@ done
 case ${op} in
     show)
         tmp=$(mktemp)
-        GET "${url_root}/st0.xml" > ${tmp} 
-        for s in $(echo "${lowered_sockets}" | sed -e 's;\(.\);\1 ;g'); do
+        http_get "${url_root}/st0.xml" > ${tmp} 
+        labels=( $(http_get "${url_root}/st2.xml" | grep -E '(r[6-9]|r1[0-1])' | sed -e 's;<r[0-9]*;;' -e 's;/.*;;' -e 's;[<>];\";g') )
+
+        for s in $(echo "${lowered_sockets}" | sed -e 's;\(.\);\1 ;g' ); do
             unshifted_socket=$((s + 1))
-            grep "out[${s}]" ${tmp} | \
-                sed -e "s;<out\([${s}]\)>;socket${unshifted_socket}=;" -e 's;</out.*;;' -e 's;=0;=off;' -e 's;=1;=on;'
+            line="$(grep "out[${s}]" ${tmp} | \
+                sed -e "s;<out\([${s}]\)>;socket${unshifted_socket}=;" -e 's;</out.*;;' -e 's;=0;=off;' -e 's;=1;=on;' )"
+            if [ "${labels[${s}]}" ]; then
+                printf "%-15s # %s\n" "${line}" "$(echo ${labels[${s}]} | tr -d '"' )"
+            else
+                echo ${line}
+            fi
         done
         /bin/rm ${tmp}
         exit "${PIPESTATUS[0]}"
@@ -194,6 +167,6 @@ case ${op} in
         ;;
 
     toggle)
-        GET "${url_root}/outs.cgi?out=${lowered_sockets}"
+        http_get "${url_root}/outs.cgi?out=${lowered_sockets}"
         ;;
 esac
