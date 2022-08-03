@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#
+# Run matlab with OCS-specific settings
+#
+
+PROG=$(basename ${0})
+
+function usage() {
+    cat <<- EOF
+        
+    Runs matlab (in the current directory) with some OCS-specific environment settings.
+
+EOF
+        while read -r line; do
+            echo "        ${line}"
+        done < <( diff --color=always ${tmp_before} ${tmp_after} )
+
+        cat <<- EOF
+
+    Usage:
+
+        ${PROG} [[arg] ...]
+
+EOF
+}
+
+tmp_before=$(mktemp)
+tmp_after=$(mktemp)
+
+env > ${tmp_before}
+export LANG=en_US
+export http_proxy=
+export https_proxy=
+env > ${tmp_after}
+
+if [ "${1}" = -h ] || [ "${1}" = --help ]; then
+    usage
+    /bin/rm ${tmp_before} ${tmp_after}
+    exit 0
+fi
+/bin/rm ${tmp_before} ${tmp_after}
+
+matlab ${@}
