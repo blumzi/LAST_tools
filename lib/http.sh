@@ -8,7 +8,9 @@ function http_get() {
     tmp=$(mktemp "/tmp/${PROG}.XXXXXX")
     http_proxy= timeout 2 wget --quiet -O - "${url}" > "${tmp}"
     ret=${?}
-    if (( ret == 0 )) && [ -s "${tmp}" ]; then
+    if (( ret == 124 )); then
+        echo "${FUNCNAME}: \"${url}\" timed out after 2 seconds" >&2
+    elif (( ret == 0 )) && [ -s "${tmp}" ]; then
 	    cat "${tmp}"
     fi
     /bin/rm "${tmp}"
@@ -27,7 +29,9 @@ function http_put() {
     tmp=$(mktemp "/tmp/${PROG}.XXXXXX")
     http_proxy= timeout 2 wget --quiet --method=PUT --body-data="${data}" -O - "${url}" > "${tmp}"
     ret=${?}
-    if (( ret == 0 )) && [ -s "${tmp}" ]; then
+    if (( ret == 124 )); then
+        echo "${FUNCNAME}: \"${url}\" timed out after 2 seconds" >&2
+    elif (( ret == 0 )) && [ -s "${tmp}" ]; then
 	    cat "${tmp}"
     fi
     /bin/rm "${tmp}"

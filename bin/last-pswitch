@@ -79,14 +79,6 @@ declare valid_socket_name arg
 nsockets=${#sockets[*]}
 while (( ${#} != 0 )); do
     arg=${1}
-#    valid_socket_name=false
-#    for ((i = 0; i < nsockets; i++ )); do
-#        if [[ "${arg}" == [0-${nsockets}] ]] || [ "${arg,,}" = "${sockets[${i}],,}" ]; then
-#            numeric_sockets+=${i}
-#            valid_socket_name=true
-#            break
-#        fi
-#    done
 
     if [[ "${arg}" == [1-6] ]]; then
         selected_sockets+=${arg}
@@ -145,7 +137,13 @@ done
 case ${op} in
     show)
         tmp=$(mktemp)
-        http_get "${url_root}/st0.xml" > ${tmp} 
+        http_get "${url_root}/st0.xml" > ${tmp}
+        status=$?
+        if (( ${status} != 0 )); then
+            /bin/rm ${tmp}
+            exit ${status}
+        fi
+
         labels=( $(http_get "${url_root}/st2.xml" | grep -E '(r[6-9]|r1[0-1])' | sed -e 's;<r[0-9]*;;' -e 's;/.*;;' -e 's;[<>];\";g') )
 
         for s in $(echo "${lowered_sockets}" | sed -e 's;\(.\);\1 ;g' ); do
