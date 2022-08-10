@@ -144,14 +144,17 @@ case ${op} in
             exit ${status}
         fi
 
-        labels=( $(http_get "${url_root}/st2.xml" | grep -E '(r[6-9]|r1[0-1])' | sed -e 's;<r[0-9]*;;' -e 's;/.*;;' -e 's;[<>];\";g') )
+        for ((i = 0; i < 6; i++)); do
+            read line
+            labels[${i}]="${line//\"/}"
+        done < <(http_get "${url_root}/st2.xml" | grep -E '(r[6-9]|r1[0-1])' | sed -e 's;<r[0-9]*;;' -e 's;/.*;;' -e 's;[<>];\";g')
 
         for s in $(echo "${lowered_sockets}" | sed -e 's;\(.\);\1 ;g' ); do
             unshifted_socket=$((s + 1))
             line="$(grep "out[${s}]" ${tmp} | \
                 sed -e "s;<out\([${s}]\)>;socket${unshifted_socket}=;" -e 's;</out.*;;' -e 's;=0;=off;' -e 's;=1;=on;' )"
             if [ "${labels[${s}]}" ]; then
-                printf "%-15s # %s\n" "${line}" "$(echo ${labels[${s}]} | tr -d '"' )"
+                printf "%-15s # %s\n" "${line}" "$(echo ${labels[${s}]} | tr -d '"')"
             else
                 echo ${line}
             fi
