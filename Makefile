@@ -23,6 +23,7 @@ ifeq (${VMWARE},true)
 else
 	ln -sf /usr/local/share/last-tool/bin/last-tool ${PACKAGE_DIR}/usr/local/bin/last-tool
 	ln -sf /usr/local/share/last-tool/bin/last-matlab ${PACKAGE_DIR}/usr/local/bin/last-matlab
+	ln -sf /usr/local/share/last-tool/bin/last-pswitch ${PACKAGE_DIR}/usr/local/bin/last-pswitch
 	ln -sf /usr/local/share/last-tool/bin/last-lights ${PACKAGE_DIR}/usr/local/bin/last-lights
 	ln -sf /usr/local/share/last-tool/bin/last-watch-fits ${PACKAGE_DIR}/usr/local/bin/last-watch-fits
 	ln -sf /usr/local/share/last-tool/bin/last-fetch-from-github ${PACKAGE_DIR}/usr/local/bin/last-fetch-from-github
