@@ -47,6 +47,12 @@ fi
  
 name=${1,,}
 name=${name#pswitch}
+
+if [ ! "${name}" ]; then
+    echo "${PROG}: Please provide a power-switch name (e.g. 01e or 08w)"
+    exit 1
+fi
+
 if [[ "${name}" == [1-9][ew] ]]; then
     name=pswitch0${name}
 elif [[ "${name}" == 0[1-9][ew] ]]; then
