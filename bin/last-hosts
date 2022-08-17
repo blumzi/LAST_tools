@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#
+# This script outputs the list of currently installed LAST machines.
+# 
+# It helps when writing scripts that need this list
+#
+
+PROG="$(basename "${0}")"
+
+function help() {
+    cat <<- EOF
+
+    Usage: ${PROG} [-h|--help]
+
+    Produces a list of the currently installed (not necessarily running) machines.
+
+EOF
+}
+
+if [ "${1}" = -h ] || [ "${1}" = --help ]; then
+    help
+    exit 0
+fi
+
+echo last0 last0{1,2,8}{e,w} 10.23.3.{12,13}
