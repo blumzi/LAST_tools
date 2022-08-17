@@ -12,7 +12,7 @@
 #
 # Token names:
 #   "Development"
-#   "DiChecco"
+#   "Cecco"
 #
 # Caveat:
 #   The fields MUST NOT contain spaces or tabs
@@ -29,10 +29,10 @@ LAST/LAST_QHYccd                    https://github.com/EastEriq/LAST_QHYccd.git 
 LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    branch:mastrolindo     Development
 LAST/LAST_OCS                       https://github.com/PolishookDavid/LAST_OCS.git                      branch:mastrolindo     Development
 LAST/LAST_Messaging                 https://github.com/EastEriq/LAST_Messaging.git                      branch:main            Development
-LAST/LAST_EnvironmentArduinoSensors https://github.com/EastEriq/LAST_EnvironmentArduinoSensors.git      branch:master          DiChecco
-LAST/LAST_MountArduinoSensors       https://github.com/EastEriq/LAST_MountArduinoSensors.git            branch:master          DiChecco
-LAST/LAST_AtikCamera                https://github.com/EastEriq/LAST_AtikCamera.git                     branch:main            DiChecco
+LAST/LAST_EnvironmentArduinoSensors https://github.com/EastEriq/LAST_EnvironmentArduinoSensors.git      branch:master          Cecco
+LAST/LAST_MountArduinoSensors       https://github.com/EastEriq/LAST_MountArduinoSensors.git            branch:master          Cecco
+LAST/LAST_AtikCamera                https://github.com/EastEriq/LAST_AtikCamera.git                     branch:main            Cecco
 LAST/LAST_config                    https://github.com/EranOfek/LAST_config.git                         branch:mastrolindo     Development
 LAST/LAST_Handle                    https://github.com/EastEriq/LAST_Handle.git                         branch:mastrolindo     Development
-LAST/LAST_EnclosureControl          https://github.com/EastEriq/LAST_EnclosureControl                   branch:main            DiChecco
+LAST/LAST_EnclosureControl          https://github.com/EastEriq/LAST_EnclosureControl                   branch:main            Cecco
 LAST/LAST_tools                     https://github.com/blumzi/LAST_tools                                branch:main            Development
