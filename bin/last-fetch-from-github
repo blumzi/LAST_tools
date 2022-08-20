@@ -193,7 +193,7 @@ if [ ! -r "${tokens_file}" ]; then
 fi
 
 # shellcheck source=/dev/null
-source "${tokens_file}"
+source <(util_uncomment "${tokens_file}")
 if (( "${#github_token[@]}" == 0 )); then
     message_fatal "Could not load github tokens from \"${tokens_file}\""
     exit 1
