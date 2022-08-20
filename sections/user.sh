@@ -107,6 +107,7 @@ function user_enforce() {
     user_enforce_mozilla_proxy
     user_enforce_pulseaudio    
     util_enforce_shortcut --override --favorite google-chrome
+    user_enforce_credential
 
     local bash_aliases
     bash_aliases="$(module_locate files/root/home/ocs/.bash_aliases)"
@@ -184,6 +185,7 @@ function user_check() {
     user_check_mozilla_proxy;                       (( ret += ${?} ))
     user_check_pulseaudio;                          (( ret += ${?} ))
     util_check_shortcut --favorite google-chrome;   (( ret += ${?} ))
+    user_check_credential
 
     return $(( ret ))
 }
@@ -245,6 +247,77 @@ function user_check_pulseaudio() {
 
 function user_enforce_chrome() {
     util_enforce_shortcut --override --favorite google-chrome
+}
+
+#
+# Checks git credentials according to files/github-tokens
+#
+function user_check_credential() {
+    local config_file=$(module_locate files/github-tokens)
+    local label="git-credentials"
+
+    if [ ! -r "${config_file}" ]; then
+        message_fatal "${label}: Cannot locate files/github-tokens"
+    fi
+
+    source <( util_uncomment "${config_file}" )
+
+    local -i errors=0
+    for key in Development Cecco; do
+        if [ ! "${github_token[${key}]}" ] || [ ! "${github_token_user[${key}]}" ]; then
+            message_failure "${label}: Something's wrong with key: \"${key}\" in \"${config_file}\""
+            (( errors++ ))
+        fi
+    done
+
+    if (( errors > 0 )); then
+        return ${errors}
+    fi
+
+    config_file="${user_home}/.git-credentials"
+    local line
+    errors=0
+    for key in Development Cecco; do
+        line="https://${github_token_user[${key}]}:${github_token[${key}]}@github.com"
+        if grep -q "${line}" ${config_file}; then
+            message_success "${label}: Key \"${key}\" is OK in \"${config_file}\"."
+        else
+            message_failure "${label}: Something's wrong with key \"${key}\" in \"${config_file}\"."
+            (( errors++ ))
+        fi
+    done
+    return ${errors}
+}
+
+#
+# Actualizes git credentials according to files/github-tokens
+#
+function user_enforce_credential() {
+    local config_file=$(module_locate files/github-tokens)
+
+    if [ ! -r "${config_file}" ]; then
+        message_fatal "Cannot locate files/github-tokens"
+    fi
+
+    source <( util_uncomment "${config_file}" )
+
+    local -i errors=0
+    for key in Development Cecco; do
+        if [ ! "${github_token[${key}]}" ] || [ ! "${github_token_user[${key}]}" ]; then
+            message_failure "Something's wrong with key: \"${key}\" in \"${config_file}\""
+            (( errors++ ))
+        fi
+    done
+
+    local label="git-credentials"
+    message_info "${label}: Flushing current credentials"
+    git config --global --unset credential.helper # hopefuly flush cached credentials
+    message_info "${label}: Creating new ~/.git-credentials"
+    for key in Development Cecco; do
+        echo "https://${github_token_user[${key}]}:${github_token[${key}]}@github.com"
+    done > ~/.git-credentials
+    message_info "${label}: Setting git credential.helper to \"store\""
+    git config --global credential.helper store
 }
 
 function user_policy() {
