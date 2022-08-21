@@ -209,6 +209,7 @@ for key in $( sorted_repos ); do
  checkout_info="${git_checkout_info["${key}"]}"
     token_name="${git_token_name[${key}]}"
          token="${github_token[${token_name}]}"
+          user="${github_token_user[${token_name}]}"
           repo="${git_repo[${key}]}"
            dir="${key}"
 
@@ -274,6 +275,11 @@ for key in $( sorted_repos ); do
     else
         pushd "${dir}" >/dev/null || continue
         message_info "Pulling from ${repo} into \"${top_dir}/${dir}\" ..."
+        # enforce current github token
+        url="${repo/github.com/${token}@github.com}"
+        git config --local remote.origin.url "${url}"
+
+        # now pull
         git pull --all --tags >/dev/null
         status=$?
         if (( status == 0 )); then
