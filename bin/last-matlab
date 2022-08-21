@@ -41,4 +41,4 @@ if [ "${1}" = -h ] || [ "${1}" = --help ]; then
 fi
 /bin/rm ${tmp_before} ${tmp_after}
 
-matlab ${@}
+matlab "${@}"
