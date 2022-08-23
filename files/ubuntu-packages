@@ -39,6 +39,7 @@ google-chrome-stable
 htop
 
 vim
+code
 inotify-tools
 make
 ssh-askpass
