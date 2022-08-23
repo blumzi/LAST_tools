@@ -59,6 +59,8 @@ function apt_enforce() {
 		message_success "Added Google's apt sources list (${apt_google_source_list})"
 	fi
 
+    apt_enforce_vscode
+
 	message_info "Updating apt ..."
 	apt update
 
@@ -97,6 +99,8 @@ function apt_check() {
         message_failure "Missing Google's apt source list (${apt_google_source_list})"
     fi
 
+    apt_check_vscode
+
     # check auto-update settings
     local config
     config="/etc/apt/apt.conf.d/20auto-upgrades"
@@ -128,6 +132,41 @@ function dummy_apt_helper() {
      -c|--ccc: The -c arg with value
 
 EOF
+}
+
+function apt_enforce_vscode() {
+    local label=vscode
+    local list_file="/etc/apt/sources.list.d/vscode.list"
+
+    if apt-key list 2>/dev/null | grep -q Microsoft; then
+        message_success "${label}: We already have the Microsoft key"
+    else
+        wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | apt-key add - >/dev/null 2>&1
+        message_success "${label}: Fetched key"
+    fi
+
+    if [ -e ${list_file} ]; then
+        message_success "${label}: We already have the source list"
+    else
+        add-apt-repository "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main"
+        message_success "${label}: Added repository"
+    fi
+}
+
+function apt_check_vscode() {
+    local label=vscode
+
+    if apt-key list 2>/dev/null | grep -q Microsoft; then
+        message_success "${label}: We have the Microsoft key"
+    else
+        message_failure "${label}: We DON'T have the Microsoft key"
+    fi
+
+    if [ -e ${list_file} ]; then
+        message_success "${label}: We have the source list"
+    else
+        message_failure "${label}: We DON'T have the source list"
+    fi
 }
 
 function apt_policy() {
