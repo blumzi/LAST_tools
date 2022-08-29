@@ -1,0 +1,45 @@
+#!/bin/bash
+
+#
+# This script manages the LAST meteo logger
+#
+
+trap onSIGTERM SIGTERM
+
+function onSIGTERM() {
+	local pids
+
+	pids=$(get_pids)
+	if [ ! "${pids}" ]; then
+		return
+	fi
+    #shellcheck disable=SC2086
+    kill -SIGTERM ${pids}
+}
+
+function get_pids() {
+    local -a pids
+    
+    mapfile -t pids < <(pgrep -a MATLAB | grep 'Meteologger' | cut -d ' ' -f1)
+    echo "${pids[@]}"
+}
+
+export LANG=en_US
+export LANGUAGE="en_US:en"
+
+declare pids
+
+case "${1}" in
+    start)
+		# The last-meteologger service is set to run as 'ocs'
+        cd ~ocs/matlab
+        last-matlab -nodisplay -batch 'addpath("/home/ocs/matlab/AstroPack/matlab/startup");startup_LAST(false,true); obs.MeteoLogger; pause(inf)'
+        
+		sleep 5             # wait for matlabs to start running
+		pids="$(get_pids)"
+		if [ "${pids}" ]; then
+            #shellcheck disable=SC2086
+			wait ${pids}
+		fi
+        ;;
+esac

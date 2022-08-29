@@ -4,6 +4,7 @@ module_include lib/message
 module_include lib/sections
 module_include lib/macmap
 module_include lib/container
+module_include lib/service
 
 export matlab_local_mac
 export matlab_selected_release _matlab_installed_release
@@ -59,28 +60,7 @@ function matlab_enforce() {
 # The Matlab service is responsible for running the LAST pipeline at system startup
 #
 function matlab_service_enforce() {
-    local system_file="/etc/systemd/system/last-pipeline.service"
-    local our_file="/usr/local/share/last-tool/files/last-pipeline.service"
-
-    if macmap_this_is_last0; then
-        message_success "No Matlab service on last0"
-        return
-    fi
-
-    if [ ! -r "${system_file}" ]; then
-        ln -sf "${our_file}" "${system_file}"
-        message_success "Linked \"${our_file}\" to \"${system_file}\"."
-    fi
-    
-    if ! systemctl is-enabled last-pipeline >& /dev/null; then
-        if systemctl enable last-pipeline >& /dev/null; then
-            message_success "Enabled the \"last-pipeline\" service"
-        else
-            message_failure "Failed to enable the \"last-pipeline\" service"
-        fi
-    else
-        message_success "The \"last-pipeline\" service is enabled"
-    fi
+    service_enforce last-pipeline lastx
 }
 
 function matlab_license_file() {
@@ -119,25 +99,7 @@ function matlab_check() {
 }
 
 function matlab_service_check() {
-    local system_file="/etc/systemd/system/last-pipeline.service"
-    local our_file="/usr/local/share/last-tool/files/last-pipeline.service"
-
-    if macmap_this_is_last0; then
-        message_success "No Matlab service on last0"
-        return 0
-    fi
-
-    if [ ! -r "${system_file}" ]; then
-        message_failure "Our file \"${our_file}\" is not linked to \"${system_file}\"."
-        return 1
-    fi
-    
-    if systemctl is-enabled last-pipeline >& /dev/null; then
-        message_success "The \"last-pipeline\" service is enabled"
-    else
-        message_failure "Failed to enable the \"last-pipeline\" service"
-        return 1
-    fi
+    service_check last-pipeline lastx
 }
 
 #

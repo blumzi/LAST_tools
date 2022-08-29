@@ -41,4 +41,32 @@ if [ "${1}" = -h ] || [ "${1}" = --help ]; then
 fi
 /bin/rm ${tmp_before} ${tmp_after}
 
+source /etc/profile.d/last.sh
+
+module_include lib/message
+
+#
+# Check if the tty lock files in /var/log are relevant, i.e. the processes that 
+#  created them are still alive.
+#
+# If the creating process is not alive, we remove the file, otherwise we warn that they are in use.
+#
+# NOTE: This mechanism tries to prevent Matlab from dying when lock files linger around.
+#        Should we only handle files that were created by Matlab (i.e. /proc/<pid>/cmdline contains 'matlab') ?!?
+#
+for file in $( find /var/lock/ -name 'LCK..tty*' ); do
+    read pid < ${file}
+    if [ ! "${pid}" ]; then
+        continue
+    fi
+
+    if [ ! -d /proc/${pid} ]; then
+        message_info "Removing lock file \"${file}\" (no such process id: ${pid})"
+        /bin/rm -f ${file}
+    else
+        cmd="$(tr '\0' ' ' < /proc/${pid}/cmdline)"
+        message_warning "Lock file \"${file}\" is held by process ${pid} (${cmd}), cannot remove it!"
+    fi
+done
+
 matlab "${@}"
