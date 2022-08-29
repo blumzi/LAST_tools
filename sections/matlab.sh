@@ -12,6 +12,7 @@ export matlab_releases_dir
 matlab_releases_dir="$(module_locate files/matlab-releases)"
 
 matlab_selected_release="R2020b"
+matlab_default_release="R2020b"
 
 eval user_last="ocs"
 # shellcheck disable=SC2154
@@ -102,6 +103,11 @@ function matlab_installed_release() {
 function matlab_check() {
     local -i ret=0
 
+    if [ "${matlab_list_releases_only}" = true ]; then
+        matlab_installation_check;          (( ret += $? ))
+        return $(( ret ))
+    fi
+    
     matlab_installation_check;              (( ret += $? ))
     matlab_startup_check;                   (( ret += $? ))
     astropack_startup_check;                (( ret += $? ))
@@ -171,14 +177,11 @@ function matlab_installation_enforce() {
             message_fatal "Cannot read keys file \"${keys_file}\", exiting"
         fi
 
-        local -a keys_info
-        read -r -a keys_info <<< "$(grep -i "^${local_mac}" "${keys_file}")"
-        if [ ${#keys_info[*]} -ne 2 ]; then
-            message_fatal "Cannot get installation key for mac=${local_mac} from \"${keys_file}\", exiting"
-        fi
-
         local installation_key
-        installation_key="${keys_info[1]}"
+        read -r installation_key <<< "$(util_uncomment "${keys_file}" )"
+        if [ ! "${installation_key}" ]; then
+            message_fatal "Cannot get installation key for release=${matlab_selected_release} from \"${keys_file}\", exiting"
+        fi
 
         # Access the matlab installer
 
@@ -204,10 +207,11 @@ function matlab_installation_enforce() {
         ## SPECIFY INSTALLER MODE
         mode=silent
 EOF
+        local -i status
         pushd "$(dirname "${installer}")" >/dev/null || true
         message_info "Silently installing Matlab ${matlab_selected_release} from \"$(dirname "${installer}")\" (~10 minutes, get some coffee :)"
         ./install -inputFile "${installer_input}"
-        local -i status=${?}
+        status=${?}
         if [ ${status} -eq 0 ]; then
             message_success "Installed Matlab ${matlab_selected_release}"
         else
@@ -219,14 +223,13 @@ EOF
 		/bin/rm -f "${installer_input}"
     fi
 
-    hash >&/dev/null # to hash teh newly installed Matlab
+    hash >&/dev/null # to hash the newly installed Matlab
 
-	local matlabroot license_file
-	matlabroot="$( stat --format '%N' "$(which matlab)" | sed -e 's;^.*->.;;' -e "s;';;g" -e "s;/bin/matlab;;" )"
-	matlab_release=$(basename "${matlabroot}")
-	license_file="$( find "${matlabroot}"/licenses -name "license_$(hostname -s)_*_${matlab_release}.lic" )"
+	local matlabroot existent_license_file
+    matlabroot=/usr/local/MATLAB/${matlab_selected_release}
+	existent_license_file="$( find "${matlabroot}"/licenses -name "license_$(hostname -s)_*_${matlab_selected_release}.lic" )"
 
-	if [ ! "${license_file}" ]; then
+	if [ ! "${existent_license_file}" ]; then
 
 		#
 		# Prepare activation responses for the Matlab installation
@@ -251,11 +254,11 @@ EOF
 			message_fatal "Failed to activate Matlab ${matlab_selected_release} (status=${status})"
 		fi
 	else
-		message_success "Matlab ${matlab_release} has already been activated"
+		message_success "Matlab ${matlab_selected_release} has already been activated"
 	fi
 
     # Finally, link the matlab to /usr/local/bin, 
-    ln -sf ${matlab_top}/bin/matlab /usr/local/bin/matlab
+    ln -sf ${matlab_top}/bin/matlab /usr/local/bin/matlab-${matlab_selected_release}
 
     local tmp
     tmp=$( mktemp )
@@ -588,4 +591,49 @@ function astropack_startup_enforce() {
             message_failure "${script} has failed with status: ${status}"
         fi
     fi
+}
+
+function matlab_arg_parser() {
+    local requested_release
+
+    while true; do
+        case "${ARGV[0]}" in
+
+        -r|--release)
+            requested_release+=( "${2}" )
+            shiftARGV 2
+            ;;
+
+        -l|--list-releases)
+            export matlab_list_releases_only=true
+            shiftARGV 1
+            ;;
+
+        *)
+            if [ "${requested_release}" ]; then
+                matlab_selected_release="${requested_release}"
+            else
+                matlab_selected_release="${matlab_default_release}"
+            fi
+            return
+            ;;
+        esac
+    done
+}
+
+function matlab_helper() {
+    cat <<- EOF
+
+    Usage:
+        ${PROG} check matlab [-l|--list-releases] [-r|--release <release>]
+            - lists the matlab releases available in the LAST-CONTAINER
+
+        ${PROG} enforce matlab [-r|--release <release>]
+            - installs the specified matlab release (default: ${matlab_default_release})
+
+    Flags:
+         -l|--list-release      - list the matlab releases available for installation
+         -r|--release <release> - specifies the matlab release to work with (default: ${matlab_default_release})
+
+EOF
 }
