@@ -26,8 +26,8 @@ function service_enforce() {
     ln -sf "${our_file}" "${system_file}"
     message_success "Linked \"${our_file}\" to \"${system_file}\"."
     
-    if ! systemctl is-enabled ${service} >& /dev/null; then
-        if systemctl enable ${service} >& /dev/null; then
+    if ! systemctl is-enabled ${service} >/dev/null 2>&1; then
+        if systemctl enable ${service} >/dev/null 2>&1 /dev/null; then
             message_success "Enabled the \"${service}\" service"
         else
             message_failure "Failed to enable the \"${service}\" service"
@@ -36,10 +36,10 @@ function service_enforce() {
         message_success "Service \"${service}\" is enabled"
     fi
 
-    if systemctl is-active ${service}; then
+    if systemctl is-active ${service} >/dev/null 2>&1; then
         message_success "Service \"${service}\" is active"
     else
-        if systemctl start ${service} >/dev/null; then
+        if systemctl start ${service} >/dev/null 2>&1; then
             message_success "Started service \"${service}\"."
         else
             message_failure "Failed to start service \"${service}\"."
@@ -61,20 +61,20 @@ function service_check() {
     local our_file="$(module_locate files/root/etc/systemd/system/${service}.service)"
 
     if [ -e ${system_file} ]; then
-        message_success "File \"${file}\" exists"
+        message_success "File \"${system_file}\" exists"
     else
-        message_failure "File \"${file}\" is missing"
+        message_failure "File \"${system_file}\" is missing"
         (( errors++ ))
     fi
 
-    if systemctl is-enabled ${service} >/dev/null; then
+    if systemctl is-enabled ${service} >/dev/null 2>&1; then
         message_success "Service \"${service}\" is enabled"
     else
         message_failure "Service \"${service}\" is disabled"
         (( errors++ ))
     fi
 
-    if systemctl is-active ${service} >/dev/null; then
+    if systemctl is-active ${service} >/dev/null 2>&1; then
         message_success "Service \"${service}\" is active"
     else
         message_failure "Service \"${service}\" is not active"
