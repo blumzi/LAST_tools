@@ -155,6 +155,7 @@ function apt_enforce_vscode() {
 
 function apt_check_vscode() {
     local label=vscode
+    local list_file="/etc/apt/sources.list.d/vscode.list"
 
     if apt-key list 2>/dev/null | grep -q Microsoft; then
         message_success "${label}: We have the Microsoft key"
