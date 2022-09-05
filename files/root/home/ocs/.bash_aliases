@@ -61,3 +61,10 @@ for key in ${!cameras_by_number[*]}; do
 done
 
 unset cameras_by_quadrant cameras_by_number this_mount this_site key
+
+function google_no_proxy() {
+    local tmp=$(mktemp -d)
+
+    google-chrome --user-data-dir=${tmp} --new-window --no-proxy-server "${@}" &
+    /bin/rm -rf ${tmp}
+}
