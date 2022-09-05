@@ -4,8 +4,8 @@ module_include lib/path
 
 export LAST_CONTAINER_LABEL="LAST-CONTAINER"
 export selected_container=""
+export container_mpoint
 
-declare mpoint
 #
 # A container path can be supplied externally by setting the LAST_CONTAINER_PATH environment
 #  variable.  When the application starts it will automatically add to this path
@@ -13,16 +13,16 @@ declare mpoint
 #
 # TBD: what happens when more than one such volume is mounted (can that happen?!?)
 #
-read -r _ _ mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
-if [ "${mpoint}" ]; then
-    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${mpoint}")"
+read -r _ _ container_mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
+if [ "${container_mpoint}" ]; then
+    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
+else
+    container_mpoint=/last0/LAST-CONTAINER
 fi
 
-mpoint=/last0/LAST-CONTAINER
-if [ -d ${mpoint}/catalogs ]; then
-    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${mpoint}")"
+if [ -d ${container_mpoint}/catalogs ]; then
+    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
 fi
-unset mpoint
 
 function container_path() {
     echo "${LAST_CONTAINER_PATH}"
