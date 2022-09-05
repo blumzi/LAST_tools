@@ -148,7 +148,7 @@ function apt_enforce_vscode() {
     if [ -e ${list_file} ]; then
         message_success "${label}: We already have the source list"
     else
-        add-apt-repository "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main"
+        echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > "${list_file}"
         message_success "${label}: Added repository"
     fi
 }
