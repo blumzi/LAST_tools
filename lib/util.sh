@@ -88,7 +88,11 @@ function util_enforce_shortcut() {
 		local user_last="ocs"	# Bogus, should be a global definition, TBD
 
         favorites="$( su - "${user_last}" -c "dconf read /org/gnome/shell/favorite-apps" )"
-        if [[ "${favorites}" != *${shortcut}.desktop* ]]; then
+        if [ ! "${favorites}" ]; then
+            favorites="['${shortcut}.desktop']"
+            su "${user_last}" -c "dconf write /org/gnome/shell/favorite-apps \"${favorites}\""
+            message_success "shortcut: set ${shortcut} as favorites"
+        elif [[ "${favorites}" != *${shortcut}.desktop* ]]; then
             favorites="${favorites%]}, '${shortcut}.desktop']"
             su "${user_last}" -c "dconf write /org/gnome/shell/favorite-apps \"${favorites}\""
             message_success "shortcut: added ${shortcut} to favorites"
