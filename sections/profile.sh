@@ -89,16 +89,17 @@ function etc_environment_check() {
 function etc_environment_enforce() {
     local tmp
     tmp="$(mktemp)"
+    local ips="$( echo 10.23.{1,2,3}.{1..254}, | tr -d ' ')"
+    ips="${ips%,}"
 
     cat <<- EOF > "${tmp}"
 #!/bin/sh
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
 
-if http_proxy=http://bcproxy.weizmann.ac.il:8080 timeout 2 wget --quiet -O - http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep --quiet 'The HDF5/HTM large catalog format'; then
-    export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
-    export https_proxy="http://bcproxy.weizmann.ac.il:8080"
-fi
+export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
+export https_proxy="http://bcproxy.weizmann.ac.il:8080"
+export    no_proxy="127.0.0.1,${ips}"
 EOF
     mv "${tmp}" "${_env_config_file}"
     message_success "Added settings for http_proxy and https_proxy to \"${_env_config_file}\"."
