@@ -49,6 +49,7 @@ function matlab_init() {
 
 function matlab_enforce() {
     matlab_installation_enforce
+    hash -r
 	matlab_startup_enforce
     astropack_startup_enforce
     matlab_support_enforce
