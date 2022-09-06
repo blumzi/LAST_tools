@@ -313,8 +313,8 @@ function matlab_installation_check() {
             fi
 
             # check that we have a file installation key for this machine
-            msg+=", key-for-this-machine: "
-            if grep -qwi "^${matlab_local_mac}" "${keys_file}" >/dev/null 2>&1; then
+            msg+=", file-installation-keys: "
+            if [ -r "${keys_file}" ]; then
                 msg+="$(ansi_bright_green EXISTS)"
             else
                 msg+="$(ansi_bright_red MISSING)"
