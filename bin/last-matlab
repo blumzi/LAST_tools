@@ -5,11 +5,19 @@
 #
 
 PROG=$(basename ${0})
+default_release=R2020b
+
+requested_release="${PROG#last-matlab-}"
+if [ "${requested_release}" ]; then
+    release=${requested_release}
+else
+    release=${default_release}
+fi
 
 function usage() {
     cat <<- EOF
         
-    Runs matlab (in the current directory) with some OCS-specific environment settings.
+    Runs matlab (${release}) in the current directory with some OCS-specific environment settings.
 
 EOF
         while read -r line; do
@@ -54,7 +62,7 @@ module_include lib/message
 # NOTE: This mechanism tries to prevent Matlab from dying when lock files linger around.
 #        Should we only handle files that were created by Matlab (i.e. /proc/<pid>/cmdline contains 'matlab') ?!?
 #
-for file in $( find /var/lock/ -name 'LCK..tty*' ); do
+for file in $( find /var/lock/ -maxdepth 1 -name 'LCK..tty*' ); do
     read pid < ${file}
     if [ ! "${pid}" ]; then
         continue
@@ -64,9 +72,22 @@ for file in $( find /var/lock/ -name 'LCK..tty*' ); do
         message_info "Removing lock file \"${file}\" (no such process id: ${pid})"
         /bin/rm -f ${file}
     else
-        cmd="$(tr '\0' ' ' < /proc/${pid}/cmdline)"
-        message_warning "Lock file \"${file}\" is held by process ${pid} (${cmd}), cannot remove it!"
+        cmd=( "$(tr '\0' ' ' < /proc/${pid}/cmdline)" )
+        if [[ "${cmd[0]}" == /* ]]; then
+            cmd[0]=".../$(basename ${cmd[0]})"
+        fi
+        message_warning "Lock file \"${file}\" is held by process ${pid} (${cmd[*]}), cannot remove it!"
     fi
 done
 
-matlab "${@}"
+matlab=matlab
+if [ "${requested_release}" ]; then
+    matlab+="-${requested_release}"
+fi
+
+if ! command -v ${matlab} >/dev/null; then
+    message_failure "Missing command \"${matlab}\".  Is release \"${requested_release}\" installed ?!?"
+    exit 1
+fi
+
+${matlab} "${@}"
