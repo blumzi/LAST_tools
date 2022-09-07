@@ -68,20 +68,21 @@ function profile_check() {
 function profile_policy() {
     cat <<- EOF
 
-    We maintain the "${_profile_last}" file.  It allows BASH scripts to
-     profit from the infrastructure developed for the LAST project (modules)
+    We maintain the "${_profile_last}" file.  It is used by pam_env(7) to initialize
+     a login process's environment.
 
-    The "${_env_config_file}" file has settings for http_proxy and https_proxy.
+    The "${_env_config_file}" file has settings for http_proxy, https_proxy and no_proxy.
 
 EOF
 }
 
 function etc_environment_check() {
+    local nlines=$(grep -Ec "^export[[:space:]]*(http|https|no)_proxy=" "${_env_config_file}")
 
-    if grep -qs "export[[:space:]]*http.*_proxy=" "${_env_config_file}" ; then
-        message_success "The file \"${_env_config_file}\" has settings for http_proxy and https_proxy"
+    if [ "${nlines}" = 3 ]; then
+        message_success "The file \"${_env_config_file}\" has settings for http_proxy, https_proxy and no_proxy"
     else
-        message_failure "The file \"${_env_config_file}\" does not have settings for http_proxy and https_proxy"
+        message_failure "The file \"${_env_config_file}\" misses settings for either http_proxy, https_proxy or no_proxy"
         return 1
     fi
 }
