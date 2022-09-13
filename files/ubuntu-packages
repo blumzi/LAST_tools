@@ -43,3 +43,4 @@ code
 inotify-tools
 make
 ssh-askpass
+sysstat
