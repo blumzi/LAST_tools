@@ -7,7 +7,12 @@
 PROG=$(basename ${0})
 default_release=R2020b
 
-requested_release="${PROG#last-matlab-}"
+if [ "${PROG}" = last-matlab ]; then
+    requested_release=''
+else
+    requested_release="${PROG#last-matlab-}"
+fi
+
 if [ "${requested_release}" ]; then
     release=${requested_release}
 else
@@ -86,7 +91,14 @@ if [ "${requested_release}" ]; then
 fi
 
 if ! command -v ${matlab} >/dev/null; then
-    message_failure "Missing command \"${matlab}\".  Is release \"${requested_release}\" installed ?!?"
+    msg="Missing command \"${matlab}\"."
+    dir=/usr/local/MATLAB/${release}
+    if [ -x "${dir}" ]; then
+        msg+=" Directory \"${dir}\" exists though."
+    else
+        msg+=" Missing directory \"${dir}\"."
+    fi
+    message_failure "${msg}"
     exit 1
 fi
 
