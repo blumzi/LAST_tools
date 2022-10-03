@@ -64,10 +64,15 @@ function apt_enforce() {
 	message_info "Updating apt ..."
 	apt update
 
-    local config
+    local config delivered_config
+    delivered_config="$(module_locate files/root/etc/apt/apt.conf.d/20auto-upgrades)"
     config="/etc/apt/apt.conf.d/20auto-upgrades"
-    sed -i 's,"1";,"0";,' "${config}"
-    message_success "Disabled apt auto-update (${config})"
+    if ! diff "${delivered_config}" "${config}" >& /dev/null; then
+        cp "${delivered_config}" "${config}"
+        message_success "auto-update: Disabled (${config})"
+    else
+        message_success "auto-update: Already disabled (${config})"
+    fi
 }
 
 function apt_check() {
@@ -102,12 +107,13 @@ function apt_check() {
     apt_check_vscode
 
     # check auto-update settings
-    local config
+    local config delivered_config
+    delivered_config="$(module_locate files/root/etc/apt/apt.conf.d/20auto-upgrades)"
     config="/etc/apt/apt.conf.d/20auto-upgrades"
-    if [ "$(grep -c '"0";' "${config}")" != 2 ]; then
-        message_failure "Apt auto-upgrade is NOT disabled (see ${config})"
+    if diff "${delivered_config}" "${config}" >& /dev/null; then
+        message_success "auto-update: already disabled (${config}) "
     else
-        message_success "Apt auto-upgrade is disabled (${config})"
+        message_failure "auto-update: NOT disabled (${config})"
     fi
 }
 
