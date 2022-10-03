@@ -140,9 +140,9 @@ function catalogs_check() {
         src="$(< /tmp/_catalogs_rsync_command.src)"
         
         if (( nfiles > 0 )); then
-            message_warning "Catalog ${src%/}: ${nfiles} files differ (with ${catalogs_container_top}/${catalog})"
+            message_warning "Catalog ${src%/}: ${nfiles} files differ (with ${catalogs_local_top}/${catalog})"
         else
-            message_success "Catalog ${src%/} is up-to-date (with ${catalogs_container_top}/${catalog})"
+            message_success "Catalog ${src%/} is up-to-date (with ${catalogs_local_top}/${catalog})"
         fi
     done
     /bin/rm "${tmp_nfiles}" /tmp/_catalogs_rsync_command.src
