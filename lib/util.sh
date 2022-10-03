@@ -72,14 +72,14 @@ function util_enforce_shortcut() {
     fi
 
     local global_shortcut="/usr/share/applications/${shortcut}.desktop"
-    local our_shortcut
-    our_shortcut="$(module_locate files/root/"${global_shortcut}")"
+    local delivered_shortcut
+    delivered_shortcut="$(module_locate files/root/"${global_shortcut}")"
 
-    if [ -e "${our_shortcut}" ]; then
+    if [ -e "${delivered_shortcut}" ]; then
         if [ ! -e "${global_shortcut}" ] || ${override}; then
-            cp "${our_shortcut}" "${global_shortcut}"
+            cp "${delivered_shortcut}" "${global_shortcut}"
             chmod +x "${global_shortcut}"
-            message_success "shortcut: Copied \"${our_shortcut}\" to \"${global_shortcut}\"."
+            message_success "shortcut: Copied \"${delivered_shortcut}\" to \"${global_shortcut}\"."
         fi
     fi
 

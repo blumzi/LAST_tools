@@ -158,7 +158,7 @@ function last_software_enforce() {
                 message_failure "Missing ${wine_tgz}"
             fi
 
-            util_enforce_shortcut --favorite CME2
+            util_enforce_shortcut --override --favorite CME2
         fi
 
         if ! macmap_this_is_last0; then
