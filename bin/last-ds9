@@ -1,10 +1,15 @@
 #!/bin/bash
 
+source /etc/profile.d/last.sh
+module_include lib/message
+
+PROG=$(basename "${0}")
+
 function kill_ds9s() {
-    kill %1 %2 %3 %4
+	kill %1 %2
 }
 
-trap kill_ds9s SIGTERM
+trap kill_ds9s SIGINT SIGTERM
 
 declare -A geometry
 
@@ -14,15 +19,18 @@ hsep=10
 wsep=10
 title_height=120
 
-read -r _ dimensions _ <<< "$(xdpyinfo | grep dimensions:)"
+if !  read -r _ dimensions _ <<< "$(xdpyinfo | grep dimensions:)"; then
+	message_fatal "Could not get display info (DISPLAY=${DISPLAY})"
+fi
+
 read -r W H <<< "$(echo "${dimensions}" | tr x ' ')"
 h=$(( H - (top_margin + bot_margin + hsep) - (title_height) ))
-w=$(( h ))
+w=$(( W / 3 ))
 
 orig_x=$((W - (2 * (wsep + w) ) ))
 orig_y=${hsep}
-geometry[w]=${w}x${h}+$((orig_x))+$(( orig_y ))
-geometry[e]=${w}x${h}+$((orig_x + w + wsep))+$(( orig_y ))
+geometry[w]=${w}x${h}+$((orig_x))+$((orig_y))
+geometry[e]=${w}x${h}+$((orig_x + w + wsep))+$((orig_y))
 
 this_host=$(hostname -s)
 this_side=${this_host:${#this_host}-1:1}
@@ -41,18 +49,13 @@ peer_geometry=${geometry[${peer_side}]}
 function help() {
     {
         echo ""
-        echo "This utility watches predefined directories for changed *.fits files and displays them"
-        echo " in ds9 windows."
+        echo "This utility opens ds9 viewer(s) for the images produced by the LAST"
+        echo " cameras of the current mount."
+        echo ""
+        echo "The last-ds9-feeder service wathches for new images being created and"
+        echo " feeds them to the relevant ds9 viewer."
         echo ""
         echo "Usage: ${PROG} [-h|--help] [-v|--verbose]"
-        echo ""
-        echo "Watched directories:"
-        echo ""
-        printf "   %8s  %s\n" "Quadrant" "Directory"
-        printf "   %8s  %s\n" "========" "========="
-        for quad in ${!tops[*]}; do
-            printf "   %2s       %8s\n" "${quad}" "${tops[${quad}]}"
-        done
         echo ""
         echo "Flags:"
         echo " -h|--help:      Show this message and exit"
@@ -70,7 +73,6 @@ function verbose() {
 }
 
 
-PROG=$(basename "${0}")
 OPTS=$( getopt -o 'hv' --long "help,verbose" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
@@ -101,18 +103,28 @@ if [[ "${hostname}" != last*[ew] ]]; then
     exit 1
 fi
 
-this_command="ds9 -title ${this_host} -geometry ${this_geometry}"
-peer_command="ds9 -title ${peer_host} -geometry ${peer_geometry}"
-this_xpa_command="echo 'view vertical; tile yes; frame 2; frame 1; scale XXX' | xpaset -p ${this_host}"
-peer_xpa_command="echo 'view vertical; tile yes; frame 2; frame 1; scale XXX' | xpaset -p ${peer_host}"
+xpa_script="tile yes; tile mode row; frame 2; frame 1"
 
+children=()
 # this host
+verbose "Opening ds9 viewer for the \"${this_side}\" side (${this_host})"
+children+=( ${!} )
 ds9 -title ${this_host} -geometry ${this_geometry} &
-echo ${this_command} &
-echo ${this_xpa_command}
+while [ $(xpaaccess -cn ${this_host}) -lt 1 ]; do
+	sleep 1
+done
+echo "${xpa_script}" | xpaset ${this_host}
 
 # peer_host
-echo ssh -X ${peer_host} -n -o "ConnectTimeout 5" -c "${peer_command}" &
-echo ssh ${peer_host} -n -o "ConnectTimeout 5" -c "${peer_xpa_command}"
+if  >/dev/null 2>&1 ssh -n -o "ConnectTimeout 2" ${peer_host} id; then
+    verbose "Opening ds9 viewer for the \"${peer_side}\" side (${peer_host})"
+    ssh -X ${peer_host} -n -o "ConnectTimeout 5" \
+        "ds9 -title ${peer_host} -geometry ${peer_geometry}" &
+    children+=( ${!} )
+    ssh    ${peer_host} -n -o "ConnectTimeout 5" \
+        "while [ \$(xpaaccess -cn ${peer_host}) -lt 1 ]; do sleep 1; done; echo '${xpa_script}' | xpaset ${peer_host}"
+else
+    message_warning "No connection to peer host (${peer_host})"
+fi
 
 wait

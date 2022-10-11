@@ -1,5 +1,11 @@
 #!/bin/bash
 
+source /etc/profile.d/last.sh
+module_include lib/message
+module_include lib/user
+
+LAST_TOOL_PID=${$}  # for message_fatal
+
 this_host=$(hostname -s)
 this_side=${this_host:${#this_host}-1:1}
 if [ ${this_side} = e ]; then
@@ -14,11 +20,11 @@ mount=${mount%${this_side}}
 north_top=/${this_host}/data1/archive/LAST.01.${mount}
 south_top=/${this_host}/data2/archive/LAST.01.${mount}
 if [ ${this_side} = e ]; then
-    north_top+=.01
-    south_top+=.02
+    north_top+=.01  # ne
+    south_top+=.02  # se
 else
-    north_top+=.03
-    south_top+=.04
+    north_top+=.04  # nw
+    south_top+=.03  # sw
 fi
 
 tops=( ${north_top} ${south_top} )
@@ -59,8 +65,14 @@ function verbose() {
 function watcher() {
     local top="${1}"
     local path
+    local camera_id=${top##*.}
+    local frame_number
 
-    verbose "watching ${top} ..."
+    case ${camera_id} in
+        01|04) frame_number=1 ;;
+        02|03) frame_number=2 ;;
+    esac
+    verbose "watching ${top} (camera: ${camera_id}, frame: ${frame_number}) ..."
 
     while read -r path; do
         if [[ "${path}" != *.fits ]]; then
@@ -69,8 +81,8 @@ function watcher() {
 
         # shellcheck disable=SC2094
         while read ds9_name ds9_address; do
-            verbose "feeding ${path} to ds9 ${ds9_address} ..."
-            xpaset -p ${ds9_address} fits "${path}" < "${path}"
+            verbose "feeding ${path} to frame=${frame_number} of ds9 ${ds9_address} ..."
+            echo "frame ${frame_number}; file ${path}; zoom to fit; zscale" | xpaset ${ds9_address}
         done < <(xpaaccess -cv ${this_host})
 
     done < <(inotifywait --event close_write --monitor --recursive --format "%w%f" "${top}" 2>/dev/null)
@@ -80,7 +92,7 @@ PROG=$(basename "${0}")
 OPTS=$( getopt -o 'hv' --long "help,verbose" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
-verbose=false
+verbose=true
 while true; do
     case "${1}" in
 
@@ -100,8 +112,10 @@ while true; do
         ;;
     esac
 done
-
+    
 for top in ${tops[*]}; do
+    mkdir -m 755 -p ${top}
+    chown ${user_last}.${user_last} ${top}
     watcher ${top} &
 done
 
