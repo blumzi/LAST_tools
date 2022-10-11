@@ -18,10 +18,10 @@ function images_policy() {
 EOF
 }
 
-function sensors_enforce() {
+function images_enforce() {
     service_enforce last-ds9-feeder lastx
 }
 
-function sensors_check() {
+function images_check() {
     service_check last-ds9-feeder lastx
 }
