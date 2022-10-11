@@ -68,37 +68,35 @@ function ssh_enforce_keys() {
         message_success "Created \"${_ssh_user_dir}\""
     fi
 
-    local have_container=false
+    local container_dir
     if [ "${selected_container}" ] && [ -d "${selected_container}/files/ssh" ]; then
         # shellcheck disable=SC2034
-        have_container=true
+        container_dir="${selected_container}/files/ssh"
     fi
+
+	if [ ! -d "${container_dir}" ]; then
+		message_failure "No LAST-CONTAINER ssh directory"
+		return
+	fi
 
     # install the private and public keys in ~ocs/.ssh
     local type file
     for file in id_rsa id_rsa.pub; do
+		if [ ! -r ${container_dir}/${file} ]; then
+			message_failure "Missing ${container_dir}/${file}"
+			continue
+		fi
+
         if [[ "${file}" == *.pub ]]; then
             type=public
         else
             type=private
         fi
 
-        if [ ! -r "${_ssh_user_dir}/${file}" ]; then
-            if ${have_container}; then
-                # shellcheck disable=SC2154
-                if [ -r "${selected_container}/files/ssh/${file}" ]; then
-                    install -m 600 -o "${user_last}" -g "${user_last}" "${selected_container}/files/ssh/${file}" "${_ssh_user_dir}/${file}"
-                    message_success "Installed user's ${type} key"
-                else
-                    message_failure "No ${type} key in ${_selected_container}/files/ssh/${file}"
-                fi
-            else
-                message_failure "Cannot get ${type} key from container (container = ${selected_container})"
-            fi
-        else
-            chown "${user_last}.${user_last}" "${_ssh_user_dir}/${file}"
-            chmod 600 "${_ssh_user_dir}/${file}"
-            message_success "Enforced permissions and ownership on user's ${type} key"
+        if [ ! -r "${_ssh_user_dir}/${file}" ] || 
+				! cmp --silent ${container_dir}/${file} ${_ssh_user_dir}/${file}; then
+			install -m 600 -o "${user_last}" -g "${user_last}" "${container_dir}/${file}" "${_ssh_user_dir}/${file}"
+			message_success "Installed user's ${type} key"
         fi
     done
 
@@ -123,6 +121,17 @@ function ssh_enforce_keys() {
 function ssh_check_keys() {
     local errors=0
 
+    local container_dir
+    if [ "${selected_container}" ] && [ -d "${selected_container}/files/ssh" ]; then
+        # shellcheck disable=SC2034
+        container_dir="${selected_container}/files/ssh"
+    fi
+
+	if [ ! -d "${container_dir}" ]; then
+		message_failure "No LAST-CONTAINER ssh directory"
+		return
+	fi
+
     if [ ! -d "${_ssh_user_dir}" ]; then
         message_failure "Missing ${_ssh_user_dir} directory"
         return 1
@@ -139,6 +148,11 @@ function ssh_check_keys() {
     
     if [ -r "${_ssh_user_dir}/id_rsa" ]; then
         message_success "User's private key exists"
+		if cmp --silent ${_ssh_user_dir}/id_rsa ${container_dir}/id_rsa; then
+			message_success "User's private key matches"
+		else
+			message_failure "User's private key does not match"
+		fi
     else
         message_failure "User's private key does not exist"
         (( errors++ ))
@@ -146,6 +160,11 @@ function ssh_check_keys() {
 
     if [ -r "${_ssh_user_dir}/id_rsa.pub" ]; then
         message_success "User's public key exists"
+		if cmp --silent ${_ssh_user_dir}/id_rsa.pub ${container_dir}/id_rsa.pub; then
+			message_success "User's public key matches"
+		else
+			message_failure "User's public key does not match"
+		fi
     else
         message_failure "User's public key does not exist"
         (( errors++ ))
