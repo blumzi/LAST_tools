@@ -1,0 +1,118 @@
+#!/bin/bash
+
+function kill_ds9s() {
+    kill %1 %2 %3 %4
+}
+
+trap kill_ds9s SIGTERM
+
+declare -A geometry
+
+top_margin=50
+bot_margin=50
+hsep=10
+wsep=10
+title_height=120
+
+read -r _ dimensions _ <<< "$(xdpyinfo | grep dimensions:)"
+read -r W H <<< "$(echo "${dimensions}" | tr x ' ')"
+h=$(( H - (top_margin + bot_margin + hsep) - (title_height) ))
+w=$(( h ))
+
+orig_x=$((W - (2 * (wsep + w) ) ))
+orig_y=${hsep}
+geometry[w]=${w}x${h}+$((orig_x))+$(( orig_y ))
+geometry[e]=${w}x${h}+$((orig_x + w + wsep))+$(( orig_y ))
+
+this_host=$(hostname -s)
+this_side=${this_host:${#this_host}-1:1}
+if [ ${this_side} = e ]; then
+    peer_side=w
+else
+    peer_side=e
+fi
+peer_host=${this_host%${this_side}}${peer_side}
+mount=${this_host#last}
+mount=${mount%${this_side}}
+
+this_geometry=${geometry[${this_side}]}
+peer_geometry=${geometry[${peer_side}]}
+
+function help() {
+    {
+        echo ""
+        echo "This utility watches predefined directories for changed *.fits files and displays them"
+        echo " in ds9 windows."
+        echo ""
+        echo "Usage: ${PROG} [-h|--help] [-v|--verbose]"
+        echo ""
+        echo "Watched directories:"
+        echo ""
+        printf "   %8s  %s\n" "Quadrant" "Directory"
+        printf "   %8s  %s\n" "========" "========="
+        for quad in ${!tops[*]}; do
+            printf "   %2s       %8s\n" "${quad}" "${tops[${quad}]}"
+        done
+        echo ""
+        echo "Flags:"
+        echo " -h|--help:      Show this message and exit"
+        echo " -v|--verbose:   Print file names as they are processed"
+        echo ""
+    } | sed 's;^;    ;'
+}
+
+function verbose() {
+    local text="${*}"
+
+    if ${verbose}; then
+        echo "${PROG}: ${text}" >&2
+    fi
+}
+
+
+PROG=$(basename "${0}")
+OPTS=$( getopt -o 'hv' --long "help,verbose" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+
+verbose=false
+while true; do
+    case "${1}" in
+
+    -h|--help)
+        help
+        exit 0
+        ;;
+
+    -v|--verbose)
+        verbose=true
+        shift 1
+        ;;
+
+    --)
+        shift 1
+        break
+        ;;
+    esac
+done
+
+hostname=$(hostname -s)
+if [[ "${hostname}" != last*[ew] ]]; then
+    verbose "Host \"${hostname}\" is neither an east nor a west host, bailing out!"
+    exit 1
+fi
+
+this_command="ds9 -title ${this_host} -geometry ${this_geometry}"
+peer_command="ds9 -title ${peer_host} -geometry ${peer_geometry}"
+this_xpa_command="echo 'view vertical; tile yes; frame 2; frame 1; scale XXX' | xpaset -p ${this_host}"
+peer_xpa_command="echo 'view vertical; tile yes; frame 2; frame 1; scale XXX' | xpaset -p ${peer_host}"
+
+# this host
+ds9 -title ${this_host} -geometry ${this_geometry} &
+echo ${this_command} &
+echo ${this_xpa_command}
+
+# peer_host
+echo ssh -X ${peer_host} -n -o "ConnectTimeout 5" -c "${peer_command}" &
+echo ssh ${peer_host} -n -o "ConnectTimeout 5" -c "${peer_xpa_command}"
+
+wait

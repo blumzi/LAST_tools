@@ -8,40 +8,43 @@ ifeq ($(shell mapfile -t type < <(df --output=fstype .); echo $${type[1]}),fuse.
 	VMWARE = true
 endif
 
+package: LAST_TOP  = /usr/local/share/last-tool
+package: LOCAL_TOP = /usr/local
 package: clean check-for-github-tokens
-	mkdir -m 755 -p ${PACKAGE_DIR}/usr/local/share/last-tool ${PACKAGE_DIR}/usr/local/bin ${PACKAGE_DIR}/etc/profile.d
-	tar cf - --exclude=LAST-CONTAINER ./bin ./lib ./files ./sections | (cd ${PACKAGE_DIR}/usr/local/share/last-tool ; tar xf -)
-	chmod 755 ${PACKAGE_DIR}/usr/local/share/last-tool/*	
+	mkdir -m 755 -p ${PACKAGE_DIR}/${LAST_TOP} ${PACKAGE_DIR}/${LOCAL_TOP}/bin ${PACKAGE_DIR}/etc/profile.d
+	tar cf - --exclude=LAST-CONTAINER ./bin ./lib ./files ./sections | (cd ${PACKAGE_DIR}/${LAST_TOP} ; tar xf -)
+	chmod 755 ${PACKAGE_DIR}/${LAST_TOP}/*	
 ifeq (${VMWARE},true)
-	mkdir -p ${PACKAGE_DIR}/usr/local/bin ${PACKAGE_DIR}/etc/profile.d
-	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-tool ${PACKAGE_DIR}/usr/local/bin/last-tool
-	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-pswitch ${PACKAGE_DIR}/usr/local/bin/last-pswitch
-	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-plights ${PACKAGE_DIR}/usr/local/bin/last-plights
-	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-matlab ${PACKAGE_DIR}/usr/local/bin/last-matlab
-	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-matlab ${PACKAGE_DIR}/usr/local/bin/last-matlab-R2022a
-	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-hosts ${PACKAGE_DIR}/usr/local/bin/last-hosts
-	install -m 755 ${PACKAGE_DIR}/usr/local/share/last-tool/bin/last-fetch-from-github ${PACKAGE_DIR}/usr/local/bin/last-fetch-from-github
-	install -m 644 ${PACKAGE_DIR}//usr/local/share/last-tool/files/last.sh ${PACKAGE_DIR}/etc/profile.d/last.sh
+	mkdir -p ${PACKAGE_DIR}/${LOCAL_TOP}/bin ${PACKAGE_DIR}/etc/profile.d
+	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-tool 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-tool
+	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-pswitch 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pswitch
+	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-lights 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-lights
+	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-matlab 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab
+	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-matlab 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab-R2022a
+	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-hosts 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-hosts
+	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-fetch-from-github	${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
+	install -m 644 ${PACKAGE_DIR}//${LAST_TOP}/files/last.sh 				${PACKAGE_DIR}/etc/profile.d/last.sh
 else
-	ln -sf /usr/local/share/last-tool/bin/last-tool ${PACKAGE_DIR}/usr/local/bin/last-tool
-	ln -sf /usr/local/share/last-tool/bin/last-matlab ${PACKAGE_DIR}/usr/local/bin/last-matlab
-	ln -sf /usr/local/share/last-tool/bin/last-matlab ${PACKAGE_DIR}/usr/local/bin/last-matlab-R2022a
-	ln -sf /usr/local/share/last-tool/bin/last-hosts ${PACKAGE_DIR}/usr/local/bin/last-hosts
-	ln -sf /usr/local/share/last-tool/bin/last-pswitch ${PACKAGE_DIR}/usr/local/bin/last-pswitch
-	ln -sf /usr/local/share/last-tool/bin/last-lights ${PACKAGE_DIR}/usr/local/bin/last-lights
-	ln -sf /usr/local/share/last-tool/bin/last-watch-fits ${PACKAGE_DIR}/usr/local/bin/last-watch-fits
-	ln -sf /usr/local/share/last-tool/bin/last-fetch-from-github ${PACKAGE_DIR}/usr/local/bin/last-fetch-from-github
-	ln -sf /usr/local/share/last-tool/files/last.sh ${PACKAGE_DIR}/etc/profile.d/last.sh
+	ln -sf ${LAST_TOP}/bin/last-tool 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-tool
+	ln -sf ${LAST_TOP}/bin/last-matlab 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab
+	ln -sf ${LAST_TOP}/bin/last-matlab 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab-R2022a
+	ln -sf ${LAST_TOP}/bin/last-hosts 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-hosts
+	ln -sf ${LAST_TOP}/bin/last-pswitch 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pswitch
+	ln -sf ${LAST_TOP}/bin/last-lights 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-lights
+	ln -sf ${LAST_TOP}/bin/last-ds9-feeder 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9-feeder
+	ln -sf ${LAST_TOP}/bin/last-ds9		 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9
+	ln -sf ${LAST_TOP}/bin/last-fetch-from-github 			${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
+	ln -sf ${LAST_TOP}/files/root/etc/profile.d/last.sh 	${PACKAGE_DIR}/etc/profile.d/last.sh
 endif
 	@( \
         repo=$$(git remote get-url --all origin | sed -s 's;//.*@;//;'); \
         commit=$$(git rev-parse --short HEAD); \
-		echo "Git-repo:     $$(git remote show -n origin | grep Fetch | cut -d: -f2- | sed -e 's;//.*@;//;')"; \
+		echo "Git-repo:      $$(git remote show -n origin | grep Fetch | cut -d: -f2- | sed -e 's;//.*@;//;')"; \
 		echo "Git-branch:    $$(git branch --show-current)"; \
 		echo "Git-commit:    $${repo}/commits/$${commit}"; \
 		echo "Build-time:    $$(date)"; \
-		echo "Build-machine: $$(hostname)"\
-	) > ${PACKAGE_DIR}/usr/local/share/last-tool/files/info 
+		echo "Build-machine: $$(hostname)" \
+	) > ${PACKAGE_DIR}/${LAST_TOP}/files/info 
 	mkdir -m 755 ${PACKAGE_DIR}/DEBIAN
 	install -m 644 debian/control ${PACKAGE_DIR}/DEBIAN/control
 	install -m 644 debian/changelog ${PACKAGE_DIR}/DEBIAN/changelog

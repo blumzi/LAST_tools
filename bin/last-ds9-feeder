@@ -1,0 +1,108 @@
+#!/bin/bash
+
+this_host=$(hostname -s)
+this_side=${this_host:${#this_host}-1:1}
+if [ ${this_side} = e ]; then
+    peer_side=w
+else
+    peer_side=e
+fi
+peer_host=${this_host%${this_side}}${peer_side}
+mount=${this_host#last}
+mount=${mount%${this_side}}
+
+north_top=/${this_host}/data1/archive/LAST.01.${mount}
+south_top=/${this_host}/data2/archive/LAST.01.${mount}
+if [ ${this_side} = e ]; then
+    north_top+=.01
+    south_top+=.02
+else
+    north_top+=.03
+    south_top+=.04
+fi
+
+tops=( ${north_top} ${south_top} )
+
+function help() {
+    {
+        echo ""
+        echo "This utility watches predefined directories for changed *.fits files and feeds them"
+        echo " to ds9 viewers (if any are active)."
+        echo ""
+        echo "Usage: ${PROG} [-h|--help] [-v|--verbose]"
+        echo ""
+        echo "Watched directories:"
+        echo ""
+        printf "   %6s  %s\n" "Camera" "Directory"
+        printf "   %6s  %s\n" "======" "========="
+        for camera in north south; do
+            camera_top=${camera}_top
+            eval "top=${!camera_top}"
+            printf "   %-6s  %s\n" "${camera}" "${top}"
+        done
+        echo ""
+        echo "Flags:"
+        echo " -h|--help:      Show this message and exit"
+        echo " -v|--verbose:   Print file names as they are processed"
+        echo ""
+    } | sed 's;^;    ;'
+}
+
+function verbose() {
+    local text="${*}"
+
+    if ${verbose}; then
+        echo "${PROG}: ${text}" >&2
+    fi
+}
+
+function watcher() {
+    local top="${1}"
+    local path
+
+    verbose "watching ${top} ..."
+
+    while read -r path; do
+        if [[ "${path}" != *.fits ]]; then
+            continue
+        fi
+
+        # shellcheck disable=SC2094
+        while read ds9_name ds9_address; do
+            verbose "feeding ${path} to ds9 ${ds9_address} ..."
+            xpaset -p ${ds9_address} fits "${path}" < "${path}"
+        done < <(xpaaccess -cv ${this_host})
+
+    done < <(inotifywait --event close_write --monitor --recursive --format "%w%f" "${top}" 2>/dev/null)
+}
+
+PROG=$(basename "${0}")
+OPTS=$( getopt -o 'hv' --long "help,verbose" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+
+verbose=false
+while true; do
+    case "${1}" in
+
+    -h|--help)
+        help
+        exit 0
+        ;;
+
+    -v|--verbose)
+        verbose=true
+        shift 1
+        ;;
+
+    --)
+        shift 1
+        break
+        ;;
+    esac
+done
+
+for top in ${tops[*]}; do
+    watcher ${top} &
+done
+
+wait

@@ -1,0 +1,12 @@
+[Unit]
+Description=Feeds LAST images to ds9 viwer
+
+[Service]
+User=ocs
+WorkingDirectory=/home/ocs
+ExecStart=/usr/local/share/last-tool/bin/last-ds9-feeder start
+ExecStop=pkill -f last-ds9-feeder
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
