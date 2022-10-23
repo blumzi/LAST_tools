@@ -77,7 +77,7 @@ EOF
 }
 
 function etc_environment_check() {
-    local nlines=$(grep -Ec "^export[[:space:]]*(http|https|no)_proxy=" "${_env_config_file}")
+    local nlines=$(grep -Ec "^(http|https|no)_proxy=" "${_env_config_file}")
 
     if [ "${nlines}" = 3 ]; then
         message_success "The file \"${_env_config_file}\" has settings for http_proxy, https_proxy and no_proxy"
@@ -90,19 +90,20 @@ function etc_environment_check() {
 function etc_environment_enforce() {
     local tmp
     tmp="$(mktemp)"
-    local ips="$( echo 10.23.{1,2,3}.{1..254}, | tr -d ' ')"
+    local ips
+    printf -v ips "%s," 10.23.{1..3}.{1..25}
     ips="${ips%,}"
+
 
     cat <<- EOF > "${tmp}"
 #!/bin/sh
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
 
-export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
-export https_proxy="http://bcproxy.weizmann.ac.il:8080"
-export    no_proxy="127.0.0.1,${ips}"
+http_proxy="http://bcproxy.weizmann.ac.il:8080"
+https_proxy="http://bcproxy.weizmann.ac.il:8080"
+no_proxy="127.0.0.1,${ips}"
 EOF
     mv "${tmp}" "${_env_config_file}"
     message_success "Added settings for http_proxy and https_proxy to \"${_env_config_file}\"."
 }
-
