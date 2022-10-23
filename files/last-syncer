@@ -19,18 +19,26 @@
 #
 # Macros:
 #  The following macros will be expanded:
-#  - {machine}      - The current machine's (short) hostname
-#  - {top}          - LAST.01.02.03
-#  - {euler1-last}  - euler1:/var/www/html/data/archive/LAST
-#  - {date}         - Expands to the current yyyy/mm/dd
+#  - ${machine}      - The current machine's (short) hostname
+#  - ${top}          - LAST.01.02.03
+#  - ${euler1_last}  - euler1:/var/www/html/data/archive/LAST
+#  - ${date}         - Expands to the current yyyy/mm/dd
 #
 
-# ----------------                          ---------------                     -------
-# Source-directory                          Destination-URL                     Enabled
-# ----------------                          ---------------                     -------
+machine=$(hostname -s)
+node=01
+mount=${machine#last}
+mount=${mount%[ew]}
+telescope=
+euler1_last="euler1:/var/www/html/data/archive/LAST"
 
-/{machine}/data1/archive/{top}/calib        {euler1-last}/{top}/calib           true
-/{machine}/data1/archive/{top}/new          {euler1-last}/{top}/new             false
+tops=LAST.${node}.${mount}.{01..04}
+# ----------------                              ---------------                         -------     -----
+# Source-directory                              Destination-URL                         Enabled     Proto
+# ----------------                              ---------------                         -------     -----
 
-/{machine}/data1/archive/{top}/{date}/proc  {euler1-last}/{top}/{date}/proc     true
-/{machine}/data1/archive/{top}/{date}/raw   {euler1-last}/{top}/{date}/raw      false
+/${machine}/data1/archive/${top}/calib          ${euler1_last}/${top}/calib             true        rsync
+/${machine}/data1/archive/${top}/new            ${euler1_last}/${top}/new               false       rsync
+
+/${machine}/data1/archive/${top}/${date}/proc   ${euler1_last}/${top}/${date}/proc      true        rsync
+/${machine}/data1/archive/${top}/${date}/raw    ${euler1_last}/${top}/${date}/raw       false       rsync
