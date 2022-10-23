@@ -103,7 +103,7 @@ while true; do
     esac
 done
 
-xpa_script="tile yes; tile mode col; frame 2; frame 1"
+xpa_script="tile mode column; frame new; tile yes; frame 1"
 
 children=()
 # this host
