@@ -4,6 +4,7 @@ source /etc/profile.d/last.sh
 module_include lib/message
 
 PROG=$(basename "${0}")
+LAST_TOOL_PID=${$}  # for message_fatal
 
 function kill_ds9s() {
 	kill %1 %2
@@ -33,6 +34,11 @@ geometry[w]=${w}x${h}+$((orig_x))+$((orig_y))
 geometry[e]=${w}x${h}+$((orig_x + w + wsep))+$((orig_y))
 
 this_host=$(hostname -s)
+
+if [[ "${this_host}" != last*[ew] ]]; then
+    message_fatal "Host \"${this_host}\" is neither an east nor a west host, bailing out!"
+fi
+
 this_side=${this_host:${#this_host}-1:1}
 if [ ${this_side} = e ]; then
     peer_side=w
@@ -40,8 +46,8 @@ else
     peer_side=e
 fi
 peer_host=${this_host%${this_side}}${peer_side}
-mount=${this_host#last}
-mount=${mount%${this_side}}
+mount_id=${this_host#last}
+mount_id=${mount_id%${this_side}}
 
 this_geometry=${geometry[${this_side}]}
 peer_geometry=${geometry[${peer_side}]}
@@ -97,13 +103,7 @@ while true; do
     esac
 done
 
-hostname=$(hostname -s)
-if [[ "${hostname}" != last*[ew] ]]; then
-    verbose "Host \"${hostname}\" is neither an east nor a west host, bailing out!"
-    exit 1
-fi
-
-xpa_script="tile yes; tile mode row; frame 2; frame 1"
+xpa_script="tile yes; tile mode col; frame 2; frame 1"
 
 children=()
 # this host
