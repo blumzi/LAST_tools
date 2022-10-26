@@ -17,12 +17,14 @@ peer_host=${this_host%${this_side}}${peer_side}
 mount=${this_host#last}
 mount=${mount%${this_side}}
 
-north_top=/${this_host}/data1/archive/LAST.01.${mount}
-south_top=/${this_host}/data2/archive/LAST.01.${mount}
 if [ ${this_side} = e ]; then
+    north_top=/${this_host}/data1/archive/LAST.01.${mount}
+    south_top=/${this_host}/data2/archive/LAST.01.${mount}
     north_top+=.01  # ne
     south_top+=.02  # se
 else
+    north_top=/${this_host}/data2/archive/LAST.01.${mount}
+    south_top=/${this_host}/data1/archive/LAST.01.${mount}
     north_top+=.04  # nw
     south_top+=.03  # sw
 fi
