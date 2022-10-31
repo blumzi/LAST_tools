@@ -4,6 +4,7 @@ module_include lib/message
 module_include lib/sections
 module_include lib/macmap
 module_include lib/container
+module_include lib/user
 module_include sections/network
 
 sections_register_section "filesystems" "Manages the exporting/mounting of filesystems" "network ubuntu-packages"
@@ -84,6 +85,8 @@ function filesystems_enforce() {
     mv "${tmp}" "${config_file}"
     chmod 644 "${config_file}"
     message_success "Updated \"${config_file}\"."
+
+    filesystems_enforce_disk_sizes
 
     tmp=$(mktemp)
     config_file="/etc/exports"
@@ -167,6 +170,8 @@ function filesystems_enforce() {
         mkdir -p /last0
         systemctl start autofs
     fi
+
+    filesystems_enforce_varlog
 }
 
 function filesystems_check() {
@@ -177,8 +182,10 @@ function filesystems_check() {
         return 0
     fi
 
-    filesystems_check_config; (( ret += $? ))
-    filesystems_check_mounts; (( ret += $? ))
+    filesystems_check_disk_sizes;   (( ret += $? ))
+    filesystems_check_config;       (( ret += $? ))
+    filesystems_check_mounts;       (( ret += $? ))
+    filesystems_check_varlog;       (( ret += $? ))
 
     return $(( ret ))
 }
@@ -304,4 +311,130 @@ function filesystems_check_mounts() {
     fi
 
     return $(( ret ))
+}
+
+function filesystems_check_varlog() {
+    local dir="/var/log/ocs"
+    local -i ret=0
+
+    if [ ! -d "${dir}" ]; then
+        message_failure "${dir}: Missing."
+        return 1
+    else
+        message_success "${dir}: exists."
+    fi
+
+    local existing_owner="$(stat --format "%U.%G" "${dir}")"
+    local wanted_owner="${user_name}.${user_group}"
+
+    if [ "${owner}" != "${wanted_owner}" ]; then
+        message_failure "${dir}: owner is ${existing_owner} instead of ${wanted_owner}"
+        (( ret++ ))
+    else
+        message_success "${dir}: owner is ${existing_owner}"
+    fi
+
+    local existing_access="$(stat --format "%a" ${dir})"
+    local wanted_access=775
+
+    if [ "${access}" != "${wanted_access}" ]; then
+        message_failure "${dir}: access is ${existing_access} instead of ${wanted_access}"
+        (( ret++ ))
+    else
+        message_success "${dir}: access is ${existing_access}"
+    fi
+
+    return ${ret}
+}
+
+
+function filesystems_enforce_varlog() {
+    local dir="/var/log/ocs"
+
+    if [ ! -d "${dir}" ]; then
+        mkdir -m 775 -p ${dir}
+        message_success "${dir}: created"
+    else
+        message_success "${dir}: exists."
+    fi
+
+    local existing_owner="$(stat --format "%U.%G" "${dir}")"
+    local wanted_owner="${user_name}.${user_group}"
+
+    if [ "${owner}" != "${wanted_owner}" ]; then
+        chown ${wanted_owner} ${dir}
+        message_success "${dir}: changed ownership to ${wanted_owner}"
+    else
+        message_success "${dir}: ownership is ${existing_owner}"
+    fi
+
+    local existing_access="$(stat --format "%a" ${dir})"
+    local wanted_access=775
+
+    if [ "${access}" != "${wanted_access}" ]; then
+        chmod ${wanted_access} ${dir}
+        message_success "${dir}: changed access to ${wanted_access}"
+    else
+        message_success "${dir}: access is ${existing_access}"
+    fi
+}
+
+export -A _filesystems_expected_sizes=(
+     [data]="5.5T"
+    [data1]="13T"
+    [data2]="13T"
+)
+
+function filesystems_check_disk_sizes() {
+    local device size used avail percent mpoint dir expected
+    local -i ret=0
+
+    while read device size used avail percent mpoint; do
+        dir=$(basename ${mpoint})
+        expected="${_filesystems_expected_sizes[${dir}]}"
+        if [ "${size}" = "${expected}" ]; then
+            message_success "$(printf "%-6s size is %4s" ${dir}: ${size})"
+        else
+            message_warning "$(printf "%-6s size is %4s instead of %4s" ${dir}: ${size} ${expected})"
+            (( ret++ ))
+        fi
+    done < <(df -h -t ext4 | grep /data)
+
+    return ${ret}
+}
+
+#
+# Sample output of: df -h -t ext4 | grep /data
+#
+# /dev/sdc1       5.5T  2.7T  2.6T  51% /last03e/data
+# /dev/sdb1        13T  1.5T   11T  12% /last03e/data2
+# /dev/sda1        13T  362G   12T   3% /last03e/data1
+#
+
+function filesystems_enforce_disk_sizes() {
+    local small_device small_mpoint small_size
+    local used avail percent dir
+
+    read -r data_device data_size used avail percent data_mpoint < <(df -h -t ext4 | grep '/data$')
+    read -r small_device small_size used avail percent small_mpoint < <(df -h -t ext4 | grep '5\.5T' | head -1)
+
+    data_dir=$(basename ${data_mpoint})
+
+    local expected
+    expected=${_filesystems_expected_sizes[${data_dir}]}
+
+    local tmp=$(mktemp)
+    if [ "${data_size}" != "${expected}" ]; then
+        message_info "The smallest device \"${small_device}\" (size: ${small_size}) MUST be mounted on \"${data_mpoint}\"."
+        sed \
+            --expression "\;${data_mpoint} ;s;${data_device};${small_device};" \
+            --expression "\;${small_mpoint} ;s;${small_device};${data_device};" \
+            < /etc/fstab > ${tmp}
+        mv ${tmp} /etc/fstab
+        message_success "${data_device}: will be mounted on ${small_mpoint}"
+        message_success "${small_device}: will be mounted on ${data_mpoint}"
+        message_warning "System must be rebooted to enforce the changes"
+    else
+        message_success "${small_mpoint}: has expected size (${expected})"
+    fi
 }
