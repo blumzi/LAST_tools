@@ -1,5 +1,7 @@
 #!/bin/bash
 
+module_include lib/user
+
 #
 # Utility functions
 #
@@ -85,16 +87,16 @@ function util_enforce_shortcut() {
 
     if ${make_favorite}; then
         local favorites
-		local user_last="ocs"	# Bogus, should be a global definition, TBD
+		local user_name="ocs"	# Bogus, should be a global definition, TBD
 
-        favorites="$( su - "${user_last}" -c "dconf read /org/gnome/shell/favorite-apps" )"
+        favorites="$( su - "${user_name}" -c "dconf read /org/gnome/shell/favorite-apps" )"
         if [ ! "${favorites}" ]; then
             favorites="['${shortcut}.desktop']"
-            su "${user_last}" -c "dconf write /org/gnome/shell/favorite-apps \"${favorites}\""
+            su "${user_name}" -c "dconf write /org/gnome/shell/favorite-apps \"${favorites}\""
             message_success "shortcut: set ${shortcut} as favorites"
         elif [[ "${favorites}" != *${shortcut}.desktop* ]]; then
             favorites="${favorites%]}, '${shortcut}.desktop']"
-            su "${user_last}" -c "dconf write /org/gnome/shell/favorite-apps \"${favorites}\""
+            su "${user_name}" -c "dconf write /org/gnome/shell/favorite-apps \"${favorites}\""
             message_success "shortcut: added ${shortcut} to favorites"
         else
             message_success "shortcut: ${shortcut} is already a favorite"
@@ -130,9 +132,8 @@ function util_check_shortcut() {
 
     if ${should_be_favorite}; then
         local favorites
-		local user_last="ocs"	# Bogus, should be a global definition, TBD
 		
-        favorites="$( su - "${user_last}" -c "dconf read /org/gnome/shell/favorite-apps" )"
+        favorites="$( su - "${user_name}" -c "dconf read /org/gnome/shell/favorite-apps" )"
         if [[ "${favorites}" == *${shortcut}.desktop* ]]; then
             message_success "${FUNCNAME[0]}: ${shortcut} is a favorite"
         else

@@ -2,6 +2,7 @@
 
 module_include lib/message
 module_include lib/sections
+module_include lib/user
 
 export ssh_config_file=/etc/ssh/ssh_config
 
@@ -47,8 +48,8 @@ function ssh_policy() {
       This tells the ssh client to try every 15 seconds for at most 4 times (total of 1 minute)
        to get proof of life from the server, before closing the connection.
 
-    - Ssh keys (private and public) for the user "${user_last}" are installed from the LAST-CONTAINER
-    - The ${user_last} user must be able to ssh without a password
+    - Ssh keys (private and public) for the user "${user_name}" are installed from the LAST-CONTAINER
+    - The ${user_name} user must be able to ssh without a password
 
 EOF
 }
@@ -63,7 +64,7 @@ function ssh_enforce_keys() {
     if [ ! -d "${_ssh_user_dir}" ]; then
         mkdir -p "${_ssh_user_dir}"
         # shellcheck disable=SC2154
-        chown "${user_last}.${user_last}" "${_ssh_user_dir}"
+        chown "${user_name}.${user_group}" "${_ssh_user_dir}"
         chmod 700 "${_ssh_user_dir}"
         message_success "Created \"${_ssh_user_dir}\""
     fi
@@ -95,7 +96,7 @@ function ssh_enforce_keys() {
 
         if [ ! -r "${_ssh_user_dir}/${file}" ] || 
 				! cmp --silent ${container_dir}/${file} ${_ssh_user_dir}/${file}; then
-			install -m 600 -o "${user_last}" -g "${user_last}" "${container_dir}/${file}" "${_ssh_user_dir}/${file}"
+			install -m 600 -o "${user_name}" -g "${user_group}" "${container_dir}/${file}" "${_ssh_user_dir}/${file}"
 			message_success "Installed user's ${type} key"
         fi
     done
@@ -104,7 +105,7 @@ function ssh_enforce_keys() {
     read -r _ key _ < "${_ssh_user_dir}/id_rsa.pub"
     if ! grep -qsw "${key}" "${_ssh_user_dir}/authorized_keys"; then
         cat "${_ssh_user_dir}/id_rsa.pub" >> "${_ssh_user_dir}/authorized_keys"
-        chown "${user_last}.${user_last}" "${_ssh_user_dir}/authorized_keys"
+        chown "${user_name}.${user_group}" "${_ssh_user_dir}/authorized_keys"
         chmod 644 "${_ssh_user_dir}/authorized_keys"
         message_success "Added public key to authorized_keys"
     else
@@ -113,7 +114,7 @@ function ssh_enforce_keys() {
 
     # scan for ssh host keys from all last machines
     2>/dev/null ssh-keyscan -H -T 2 -f <(grep -wE '(last[0-1][0-9][ew]|last0)' /etc/hosts | while read -r _ host _; do echo "${host}"; done; echo localhost) > "${_ssh_user_dir}/known_hosts"
-    chown "${user_last}.${user_last}" "${_ssh_user_dir}/known_hosts"
+    chown "${user_name}.${user_group}" "${_ssh_user_dir}/known_hosts"
     chmod 644 "${_ssh_user_dir}/known_hosts"
     message_success "Scanned for known_hosts keys"
 }
@@ -171,12 +172,12 @@ function ssh_check_keys() {
     fi
 
     local answer status
-    answer=$(timeout 2s su "${user_last}" -c 'ssh localhost id -u')
+    answer=$(timeout 2s su "${user_name}" -c 'ssh localhost id -u')
     status=${?}
-    if [ "${status}" != 0 ] || [ "${answer}" != "$(su "${user_last}" -c 'id -u')" ]; then
-        message_failure "Passwordless ${user_last} ssh to localhost failed"
+    if [ "${status}" != 0 ] || [ "${answer}" != "$(su "${user_name}" -c 'id -u')" ]; then
+        message_failure "Passwordless ${user_name} ssh to localhost failed"
     else
-        message_success "Passwordless ${user_last} ssh to localhost works"
+        message_success "Passwordless ${user_name} ssh to localhost works"
     fi
       
 }

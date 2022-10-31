@@ -121,7 +121,7 @@ done
     
 for top in ${tops[*]}; do
     mkdir -m 755 -p ${top}
-    chown ${user_last}.${user_last} ${top}
+    chown ${user_name}.${user_group} ${top}
     watcher ${top} &
 done
 

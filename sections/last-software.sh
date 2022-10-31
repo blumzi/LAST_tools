@@ -3,6 +3,7 @@
 module_include lib/container
 module_include lib/util
 module_include lib/ansi
+module_include lib/user
 
 sections_register_section "last-software" "Manages our own LAST software" "user ubuntu-packages"
 
@@ -125,7 +126,7 @@ function last_software_enforce() {
         args+="--repo=${repo} "
     done
     # shellcheck disable=SC2154
-    su "${user_last}" -c "${fetcher} ${args} --dir ~${user_last}/matlab"
+    su "${user_name}" -c "${fetcher} ${args} --dir ~${user_name}/matlab"
 
     if ${last_software_extras}; then
         #
@@ -149,7 +150,7 @@ function last_software_enforce() {
             if [ -d "${wine_dir}" ]; then
                 message_success "The directory ${wine_dir} exists"
             elif [ -r "${wine_tgz}" ]; then
-                if su "${user_last}" -c "cd ~${user_last}; mkdir -p .wine; tar xzf ${wine_tgz}"; then
+                if su "${user_name}" -c "cd ~${user_name}; mkdir -p .wine; tar xzf ${wine_tgz}"; then
                     message_success "Extracted ${wine_tgz} into ${wine_dir}"
                 else
                     message_failure "Could not extract ${wine_tgz} into ${wine_dir}"
@@ -226,7 +227,7 @@ function last_software_check() {
         args+="--repo=${repo} "
     done
 
-    su "${user_last}" -c "${fetcher} ${args} --dir ~${user_last}/matlab --check"
+    su "${user_name}" -c "${fetcher} ${args} --dir ~${user_name}/matlab --check"
     (( ret += $? ))
 
     if ${last_software_extras}; then
@@ -278,7 +279,7 @@ function last_software_policy() {
     Software repsitories:
 
 EOF
-    su "${user_last}" -c "${fetcher} --dir ~ --list"
+    su "${user_name}" -c "${fetcher} --dir ~ --list"
     echo ""
 
     cat <<- EOF

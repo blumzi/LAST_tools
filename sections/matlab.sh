@@ -5,6 +5,7 @@ module_include lib/sections
 module_include lib/macmap
 module_include lib/container
 module_include lib/service
+module_include lib/user
 
 export matlab_local_mac
 export matlab_selected_release _matlab_installed_release
@@ -15,9 +16,6 @@ matlab_releases_dir="$(module_locate files/matlab-releases)"
 matlab_selected_release="R2020b"
 matlab_default_release="R2020b"
 
-eval user_last="ocs"
-# shellcheck disable=SC2154
-eval user_home=~"${user_last}"
 # shellcheck disable=SC2154
 eval user_matlab_dir="${user_home}"/matlab
 
@@ -233,7 +231,7 @@ EOF
         echo "export PATH=\${PATH}:MATLABROOT/bin"
     } > "${tmp}"
     mv "${tmp}" "${bashrc}"
-    chown "${user_last}"."${user_last}" "${bashrc}"
+    chown "${user_name}"."${user_group}" "${bashrc}"
     message_success "Added MATLABROOT=${matlab_top}/bin to ${bashrc}"
 
     /bin/rm "${activate_ini}" >& /dev/null
@@ -546,7 +544,7 @@ function astropack_startup_enforce() {
         message_success "The script ${script} was invoked"
     else
         message_info "Invoking \"${script}\" in \"AstroPack/matlab/startup\" ..."
-        su "${user_last}" -c "cd ~/matlab; LANG=en_US matlab -batch \"addpath('/home/ocs/matlab/AstroPack/matlab/startup'); ${script}\" "
+        su "${user_name}" -c "cd ~/matlab; LANG=en_US matlab -batch \"addpath('/home/ocs/matlab/AstroPack/matlab/startup'); ${script}\" "
         status=${?}
         if (( status == 0 )); then
             message_success "${script} has succeeded"
