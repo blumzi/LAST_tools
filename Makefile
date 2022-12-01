@@ -23,7 +23,8 @@ ifeq (${VMWARE},true)
 	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-matlab 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab-R2022a
 	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-hosts 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-hosts
 	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-fetch-from-github	${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
-	install -m 644 ${PACKAGE_DIR}//${LAST_TOP}/files/last.sh 				${PACKAGE_DIR}/etc/profile.d/last.sh
+	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/last.sh 				${PACKAGE_DIR}/etc/profile.d/last.sh
+	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/etc/systemd/system/last-pipeline.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline.service
 else
 	ln -sf ${LAST_TOP}/bin/last-tool 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-tool
 	ln -sf ${LAST_TOP}/bin/last-matlab 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab
@@ -35,6 +36,8 @@ else
 	ln -sf ${LAST_TOP}/bin/last-ds9		 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9
 	ln -sf ${LAST_TOP}/bin/last-fetch-from-github 			${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
 	ln -sf ${LAST_TOP}/files/root/etc/profile.d/last.sh 	${PACKAGE_DIR}/etc/profile.d/last.sh
+	mkdir -p  ${PACKAGE_DIR}/etc/systemd/system
+	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline.service
 endif
 	@( \
         repo=$$(git remote get-url --all origin | sed -s 's;//.*@;//;'); \
