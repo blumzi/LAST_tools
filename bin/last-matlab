@@ -77,7 +77,7 @@ for file in $( find /var/lock/ -maxdepth 1 -name 'LCK..tty*' ); do
         message_info "Removing lock file \"${file}\" (no such process id: ${pid})"
         /bin/rm -f ${file}
     else
-        cmd=( "$(tr '\0' ' ' < /proc/${pid}/cmdline)" )
+        cmd=( $(tr '\0' ' ' < /proc/${pid}/cmdline) )
         if [[ "${cmd[0]}" == /* ]]; then
             cmd[0]=".../$(basename ${cmd[0]})"
         fi
