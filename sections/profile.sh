@@ -91,7 +91,7 @@ function etc_environment_enforce() {
     local tmp
     tmp="$(mktemp)"
     local ips
-    printf -v ips "%s," 10.23.{1..3}.{1..25}
+    printf -v ips "%s," 10.23.{1..3}.{1..25} 10.23.0.{3..5} 10.23.0.{100..103}
     ips="${ips%,}"
 
 
