@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source /etc/profile.d/last.shmodule_include lib/user
+
 #
 # This script manages the LAST meteo logger
 #
@@ -32,7 +34,7 @@ declare pids
 case "${1}" in
     start)
 		# The last-meteologger service is set to run as 'ocs'
-        cd ~ocs/matlab
+        cd ${user_matlabdir}
         last-matlab -nodisplay -batch 'addpath("/home/ocs/matlab/AstroPack/matlab/startup");startup_LAST(false,true); obs.MeteoLogger; pause(inf)'
         
 		sleep 5             # wait for matlabs to start running

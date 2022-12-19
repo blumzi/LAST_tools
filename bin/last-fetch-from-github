@@ -22,7 +22,7 @@ declare -a selected_repos
 declare reclone=false
 
 # shellcheck disable=SC2154
-eval top_dir=~"${user_name}"/matlab
+eval top_dir="${user_matlabdir}"
 
 declare line repo url checkout_info token_name
 while read -r line; do

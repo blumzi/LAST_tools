@@ -286,7 +286,7 @@ function postgres_enforce() {
     fi
 
     local conf
-    conf=~ocs/.pgpass
+    conf=${user_home}/.pgpass
     if [ ! -r "${conf}" ]; then
         echo "$(macmap_get_local_ipaddr):5432:*:ocs:physics" > "${conf}"
         chmod 600 "${conf}"

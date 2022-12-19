@@ -126,7 +126,7 @@ function last_software_enforce() {
         args+="--repo=${repo} "
     done
     # shellcheck disable=SC2154
-    su "${user_name}" -c "${fetcher} ${args} --dir ~${user_name}/matlab"
+    su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir}"
 
     if ${last_software_extras}; then
         #
@@ -227,7 +227,7 @@ function last_software_check() {
         args+="--repo=${repo} "
     done
 
-    su "${user_name}" -c "${fetcher} ${args} --dir ~${user_name}/matlab --check"
+    su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir} --check"
     (( ret += $? ))
 
     if ${last_software_extras}; then
