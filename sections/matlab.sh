@@ -17,11 +17,8 @@ matlab_selected_release="R2020b"
 matlab_default_release="R2020b"
 
 # shellcheck disable=SC2154
-eval user_matlab_dir="${user_home}"/matlab
-
-# shellcheck disable=SC2154
-export user_startup="${user_matlab_dir}/startup.m"
-export last_startup="${user_matlab_dir}/AstroPack/matlab/startup/startup_LAST.m"
+export user_startup="${user_matlabdir}/startup.m"
+export last_startup="${user_matlabdir}/AstroPack/matlab/startup/startup_LAST.m"
 
 
 function mac_to_file_name() {
@@ -52,6 +49,7 @@ function matlab_enforce() {
     astropack_startup_enforce
     matlab_support_enforce
     matlab_service_enforce
+    matlab_config_enforce
     util_enforce_shortcut --favorite matlab
 }
 
@@ -92,6 +90,7 @@ function matlab_check() {
     astropack_startup_check;                (( ret += $? ))
     matlab_support_check;                   (( ret += $? ))
     matlab_service_check;                   (( ret += $? ))
+    matlab_config_check;                    (( ret += $? ))
     util_check_shortcut --favorite matlab;  (( ret += $? ))
 
     return $(( ret ))
@@ -520,8 +519,8 @@ function astropack_startup_check() {
         return 0
     fi
 
-    msg="The script startup_Installer in \"${user_matlab_dir}/AstroPack/matlab/startup\" was"
-    if [ -d "${user_matlab_dir}/data" ]; then
+    msg="The script startup_Installer in \"${user_matlabdir}/AstroPack/matlab/startup\" was"
+    if [ -d "${user_matlabdir}/data" ]; then
         message_success "${msg} invoked"
     else
         message_failure "${msg} NOT invoked"
@@ -540,11 +539,11 @@ function astropack_startup_enforce() {
     fi
 
     # shellcheck disable=SC2154
-    if [ -d "${user_matlab_dir}/data" ]; then
+    if [ -d "${user_matlabdir}/data" ]; then
         message_success "The script ${script} was invoked"
     else
         message_info "Invoking \"${script}\" in \"AstroPack/matlab/startup\" ..."
-        su "${user_name}" -c "cd ~/matlab; LANG=en_US matlab -batch \"addpath('/home/ocs/matlab/AstroPack/matlab/startup'); ${script}\" "
+        su "${user_name}" -c "cd ${user_matlabdir}; LANG=en_US matlab -batch \"addpath('/home/ocs/matlab/AstroPack/matlab/startup'); ${script}\" "
         status=${?}
         if (( status == 0 )); then
             message_success "${script} has succeeded"
@@ -552,6 +551,34 @@ function astropack_startup_enforce() {
             message_failure "${script} has failed with status: ${status}"
         fi
     fi
+}
+
+function matlab_config_check() {
+    local config_file="${user_matlabdir}/LAST/LAST_config/config/obs.api.Node.yml"
+    local -i ret=0
+
+    if [ ! -r "${config_file}" ]; then
+        message_failure "Missing \"${config_file}\"."
+        (( ret++ ))
+    fi
+
+    if [ $(grep -cEw '(Name|Id|ProjectName):' ${config_file}) != 3 ]; then
+        message_failure "Missing information in \"${config_file}\""
+        (( ret++ ))
+    fi
+
+    return $(( ret ))
+}
+
+function matlab_config_enforce() {
+    local config_file="${user_matlabdir}/LAST/LAST_config/config/obs.api.Node.yml"
+
+    cat > ${config_file} << EOF
+    ProjectName: LAST
+    Name: Neot Smadar
+    Mounts: 12
+    Id: 1
+EOF
 }
 
 function matlab_arg_parser() {
