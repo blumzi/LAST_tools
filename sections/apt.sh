@@ -73,6 +73,8 @@ function apt_enforce() {
     else
         message_success "auto-update: Already disabled (${config})"
     fi
+
+    apt_enforce_unattended_upgrades
 }
 
 function apt_check() {
@@ -115,6 +117,8 @@ function apt_check() {
     else
         message_failure "auto-update: NOT disabled (${config})"
     fi
+
+    apt_check_unattended_upgrades
 }
 
 function dummy_apt_arg_parser() {
@@ -176,6 +180,29 @@ function apt_check_vscode() {
     fi
 }
 
+
+function apt_check_unattended_upgrades() {
+    local service="unattended-upgrades"
+
+    if [ "$(systemctl is-enabled ${service})" != "disabled" ]; then
+        message_failure "The \"${service}\" is NOT disabled"
+    else
+        message_success "The \"${service}\" is disabled."
+    fi
+}
+
+function apt_enforce_unattended_upgrades() {
+    local service="unattended-upgrades"
+
+    if systemctl stop ${service} && systemctl disable ${service}; then
+        message_success "Stopped and disabled the \"${service}\" service."
+        return 0
+    else
+        message_failure "Failed to stop and disable the \"${service}\" service."
+        return 1
+    fi
+}
+
 function apt_policy() {
     cat <<- EOF
 
@@ -183,6 +210,7 @@ function apt_policy() {
        configuration file ${apt_config_file} should reflect this.
     - We need Google's "Linux Package Signing Keys" in order to 'apt install' google packages.
     - We need Google's apt sources list (${apt_google_source_list})
+    - We disable the unattended-upgrades service
 
     Automatic updates are $(ansi_underline disabled)
 EOF
