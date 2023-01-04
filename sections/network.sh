@@ -3,6 +3,7 @@
 module_include lib/macmap
 module_include lib/sections
 module_include lib/ipv4
+module_include lib/service
 
 export network_local_hostname network_local_ipaddr network_peer_hostname network_peer_ipaddr
 export network_netpart network_netmask network_interface network_gateway network_gateway
@@ -72,6 +73,8 @@ EOF
 
     netplan apply
     message_success "Applied netplan \"${plan}\""
+
+    service_enforce last-ether-speed-watcher lastx
 }
 
 function network_check() {
@@ -147,6 +150,9 @@ function network_check() {
             (( errors++ ))
         fi
     done
+
+    service_ckeck last-ether-speed-watcher lastx
+
     return $(( errors ))
 }
 
