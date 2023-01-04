@@ -151,7 +151,7 @@ function network_check() {
         fi
     done
 
-    service_ckeck last-ether-speed-watcher lastx
+    service_check last-ether-speed-watcher lastx
 
     return $(( errors ))
 }
