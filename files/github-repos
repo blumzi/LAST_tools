@@ -37,4 +37,5 @@ LAST/LAST_Handle                    https://github.com/EastEriq/LAST_Handle.git 
 LAST/LAST_EnclosureControl          https://github.com/EastEriq/LAST_EnclosureControl                   branch:main            Cecco
 LAST/LAST_tools                     https://github.com/blumzi/LAST_tools                                branch:main            Development
 LAST/LAST_WebApi                    https://github.com/blumzi/LAST_WebApi                               branch:main            Development
+LAST/LAST_Api                       https://github.com/blumzi/LAST_Api                                  branch:master          Development
 LAST/LAST_SerialDevice              https://github.com/blumzi/LAST_SerialDevice                         branch:main            Development
