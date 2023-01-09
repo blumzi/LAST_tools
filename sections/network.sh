@@ -3,6 +3,7 @@
 module_include lib/macmap
 module_include lib/sections
 module_include lib/ipv4
+module_include lib/wget
 module_include lib/service
 
 export network_local_hostname network_local_ipaddr network_peer_hostname network_peer_ipaddr
@@ -74,7 +75,7 @@ EOF
     netplan apply
     message_success "Applied netplan \"${plan}\""
 
-    service_enforce last-ether-speed-watcher lastx
+    network_enforce_ethernet_advertising
 }
 
 function network_check() {
@@ -113,7 +114,7 @@ function network_check() {
     fi
 
     # Machines on weizmann.ac.il should be reachable via the HTTP proxy
-    if wget --output-document=- --timeout=2 --tries=2 http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep -qs 'large catalog format'; then
+    if wget ${WGET_OPTIONS} --output-document=- --tries=2 http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep -qs 'large catalog format'; then
         message_success "WIS-network:  Succeeded reaching the weizmann.ac.il network (got the http://euler1.weizmann.ac.il/catsHTM page)"
     else
         message_warning "WIS-network:  Failed reaching the weizmann.ac.il network (could not wget the http://euler1.weizmann.ac.il/catsHTM page)"
@@ -121,7 +122,7 @@ function network_check() {
     fi
 
     # Machines OUTSIDE weizmann.ac.il should be reachable via the HTTP proxy
-    if wget --output-document=- --timeout=2 --tries=2 http://google.com 2>/dev/null | grep -qs '<!doctype html>'; then
+    if wget ${WGET_OPTIONS} --output-document=- --tries=2 http://google.com 2>/dev/null | grep -qs '<!doctype html>'; then
         message_success "Internet:     Succeeded reaching the Internet (got the http://google.com page)"
     else
         message_warning "Internet:     Failed reaching the Internet (could not wget the http://google.com page)"
@@ -143,7 +144,7 @@ function network_check() {
     done
 
     for target in pswitch0{1,2,6,8}{e,w}; do
-        if http_proxy='' timeout 2 wget -O - "http://admin:admin@${target}/st0.xml" >/dev/null 2>&1; then
+        if http_proxy='' wget ${WGET_OPTIONS} -O - "http://admin:admin@${target}/st0.xml" >/dev/null 2>&1; then
             message_success "${target} is reachable (wget st0.xml)"
         else
             message_failure "${target} is NOT reachable (wget st0.xml)"
@@ -151,9 +152,36 @@ function network_check() {
         fi
     done
 
-    service_check last-ether-speed-watcher lastx
+    network_check_ethernet_advertising
 
     return $(( errors ))
+}
+
+function network_enforce_ethernet_advertising() {
+    local config="/lib/systemd/network/99-default.link"
+    local expected="1000baset-full"
+
+    local tmp=$(mktemp)
+    {
+        grep -v 'Advertise=' ${config}
+        echo Advertise=${expected}
+    } > ${tmp}
+    mv ${tmp} ${config}
+    systemctl reload systemd-udevd
+    message_success "Enforced udev ethernet advertisement ${expected} (${config})"
+}
+
+function network_check_ethernet_advertising() {
+    local config="/lib/systemd/network/99-default.link"
+    local expected="1000baset-full"
+
+    IFS='=' read _ value <<< $(grep Advertise= ${config})
+    if [ "${value}" = ${expected} ]; then
+        message_success "Udev is set to advertise ${expected} (${config})"
+    else
+        message_failure "Udev is NOT set to advertise ${expected} (${config})"
+        return 1
+    fi
 }
 
 function network_policy() {
