@@ -3,6 +3,7 @@
 module_include lib/message
 module_include lib/sections
 module_include lib/macmap
+module_include lib/wget
 
 sections_register_section "postgres" "Maintains PostgreSQL on last0" "network"
 
@@ -149,7 +150,7 @@ function postgres_enforce() {
     if apt-key list 2>/dev/null | grep -q 'PostgreSQL Debian Repository' 2> /dev/null; then
         message_success 'The "PostgreSQL Debian Repository" apt-key already installed'
     else
-        if wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - >/dev/null; then
+        if wget ${WGET_OPTIONS} -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - >/dev/null; then
             message_success 'Added the "PostgreSQL Debian Repository" apt-key'
         else
             message_failure 'Failed to add the "PostgreSQL Debian Repository" apt-key'
@@ -209,7 +210,7 @@ function postgres_enforce() {
     if apt-key list 2>/dev/null | grep -qi pgadmin; then
         message_success "The pgadmin apt key is installed"
     else
-        wget --quiet -O - https://www.pgadmin.org/static/packages_pgadmin_org.pub | apt-key add >/dev/null
+        wget ${WGET_OPTIONS} -O - https://www.pgadmin.org/static/packages_pgadmin_org.pub | apt-key add >/dev/null
         message_success 'Added the pgadmin apt-key'
     fi
 

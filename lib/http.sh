@@ -1,15 +1,17 @@
 #!/bin/bash
 
+module_include lib/wget
+
 function http_get() {
     local url="${1}"
     local tmp
     local -i ret
 
     tmp=$(mktemp "/tmp/${PROG}.XXXXXX")
-    http_proxy= timeout 2 wget --quiet -O - "${url}" > "${tmp}"
+    http_proxy= wget ${WGET_OPTIONS} -O - "${url}" > "${tmp}"
     ret=${?}
-    if (( ret == 124 )); then
-        echo "${FUNCNAME}: \"${url}\" timed out after 2 seconds" >&2
+    if (( ret != 0 )); then
+        echo "${FUNCNAME}: \"${url}\" wget failed with rc=${ret}" >&2
     elif (( ret == 0 )) && [ -s "${tmp}" ]; then
 	    cat "${tmp}"
     fi
@@ -27,10 +29,10 @@ function http_put() {
     local -i ret
 
     tmp=$(mktemp "/tmp/${PROG}.XXXXXX")
-    http_proxy= timeout 2 wget --quiet --method=PUT --body-data="${data}" -O - "${url}" > "${tmp}"
+    http_proxy= wget ${WGET_OPTIONS} --method=PUT --body-data="${data}" -O - "${url}" > "${tmp}"
     ret=${?}
-    if (( ret == 124 )); then
-        echo "${FUNCNAME}: \"${url}\" timed out after 2 seconds" >&2
+    if (( ret != 0 )); then
+        echo "${FUNCNAME}: \"${url}\" wget failed with rc=${ret}" >&2
     elif (( ret == 0 )) && [ -s "${tmp}" ]; then
 	    cat "${tmp}"
     fi
