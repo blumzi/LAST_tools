@@ -2,6 +2,7 @@
 
 module_include lib/message
 module_include lib/sections
+module_include lib/wget
 
 export apt_config_file=/etc/apt/apt.conf
 export apt_google_source_list="/etc/apt/sources.list.d/google.list"
@@ -45,7 +46,7 @@ function apt_enforce() {
 	if [ "${google_keys}" ]; then
 		message_success "We have Google's \"Linux Package Signing Keys\" installed"
 	else
-		if [ "$(wget -q -O - "https://dl.google.com/linux/linux_signing_key.pub" | apt-key add -)" = OK ]; then
+		if [ "$(wget -o /dev/null -q -O - "https://dl.google.com/linux/linux_signing_key.pub" | apt-key add -)" = OK ]; then
 			message_success "Installed Google's \"Linux Package Signing Keys\"."
 		else
 			message_failure "Failed to install Google's \"Linux Package Signing Keys\"."
@@ -151,7 +152,7 @@ function apt_enforce_vscode() {
     if apt-key list 2>/dev/null | grep -q Microsoft; then
         message_success "${label}: We already have the Microsoft key"
     else
-        wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | apt-key add - >/dev/null 2>&1
+        wget ${WGET_OPTIONS} https://packages.microsoft.com/keys/microsoft.asc -O- | apt-key add - >/dev/null 2>&1
         message_success "${label}: Fetched key"
     fi
 
