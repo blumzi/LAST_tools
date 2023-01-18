@@ -29,6 +29,9 @@ else
     south_top+=.03  # sw
 fi
 
+north_top+='/new'
+south_top+='/new'
+
 tops=( ${north_top} ${south_top} )
 
 function help() {
