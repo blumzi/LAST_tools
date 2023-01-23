@@ -327,7 +327,7 @@ function filesystems_check_varlog() {
     local existing_owner="$(stat --format "%U.%G" "${dir}")"
     local wanted_owner="${user_name}.${user_group}"
 
-    if [ "${owner}" != "${wanted_owner}" ]; then
+    if [ "${existing_owner}" != "${wanted_owner}" ]; then
         message_failure "${dir}: owner is ${existing_owner} instead of ${wanted_owner}"
         (( ret++ ))
     else
@@ -337,7 +337,7 @@ function filesystems_check_varlog() {
     local existing_access="$(stat --format "%a" ${dir})"
     local wanted_access=775
 
-    if [ "${access}" != "${wanted_access}" ]; then
+    if [ "${existing_access}" != "${wanted_access}" ]; then
         message_failure "${dir}: access is ${existing_access} instead of ${wanted_access}"
         (( ret++ ))
     else
