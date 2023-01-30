@@ -33,6 +33,7 @@ function util_bashify() {
 # Sets the environment variables http_proxy and https_proxy, iff
 #  the proxy server bcproxy.weizmann.ac.il replies to ping.
 function util_test_and_set_http_proxy() {
+    return
 	if http_proxy=http://bcproxy.weizmann.ac.il:8080 wget ${WGET_OPTIONS} -O - http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep --quiet 'The HDF5/HTM large catalog format'; then
 		export  http_proxy="http://bcproxy.weizmann.ac.il:8080"
 		export https_proxy="http://bcproxy.weizmann.ac.il:8080"
