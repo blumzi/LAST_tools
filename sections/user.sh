@@ -47,15 +47,14 @@ function user_enforce() {
     fi
 
     # enforce the user's home to /home/ocs
-	if [ "${user_home}" = "/home/${user_name}" ]; then
-		message_success "The user's home is \"/home/${user_name}\"."
+    local current_home="$(awk -F: '{print $6}' <<< $(grep "^${user_name}:" /etc/passwd))"
+	if [ "${current_home}" = "${user_home}" ]; then
+		message_success "The user's home is \"${user_home}\"."
 	else
-		local old_home
-		eval old_home=~${user_name}
-		sed -i "s;${old_home}:;${user_home}:;" /etc/passwd
-		mv "${old_home}" "${user_home}}"
-        rmdir "$(dirname "${old_home}")"
-		message_success "Changed the user's home from \"${user_home}\" to \"/home/${user_name}\"."
+		sed -i "s;${current_home}:;${user_home}:;" /etc/passwd
+		mv "${current_home}" "${user_home}}"
+        rmdir "$(dirname "${current_home}")"
+		message_success "Changed the user's home from \"${current_home}\" to \"/home/${user_home}\"."
 	fi
 
     # make sure the user owns it's home
@@ -148,9 +147,8 @@ function user_check() {
         message_failure "User \"${user_name}\" is not a member of the group(s): $(IFS=,; echo "${missing[*]}")"
         (( ret++ ))
     fi
-
-    local current_home
-    eval current_home=~"${user_name}"
+    
+    local current_home="$(awk -F: '{print $6}' <<< $(grep "^${user_name}:" /etc/passwd))"
     # is the user's home where we expect it to be?
 	if [ "${current_home}" = "${user_home}" ]; then
 		message_success "The user's home is \"${user_home}\"."
