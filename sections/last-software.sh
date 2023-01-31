@@ -52,7 +52,7 @@ EOF
 export last_software_extras_default=true
 
 function last_software_arg_parser() {
-    local requested_extras=false requested_no_extras=false
+    local requested_extras=${last_software_extras_default} requested_no_extras=false
 
     while true; do
         case "${ARGV[0]}" in
@@ -91,10 +91,9 @@ function last_software_arg_parser() {
                 if ${requested_extras}; then
                     last_software_extras=true
                 fi
-            else
-                last_software_extras=false
-            fi
+	    fi
 
+            last_software_extras=${requested_extras}
             return
             ;;
         esac
