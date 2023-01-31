@@ -39,13 +39,14 @@ function _catalogs_rsync_command() {
     local -a args=( "${@}" )
     local src
 
-    # shellcheck disable=SC2154
-    if [[ "${network_netpart}" == 10.23.3.* ]]; then
+    src="${catalogs_container_top}/${catalog}/"
+    if [ -d "${src}" ]; then
+        echo "rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}"
+    elif [[ "${network_netpart}" == 10.23.3.* ]] && ping -w 1 -c 1 euler1 >/dev/null 2>&1 ; then
         src="blumzi@euler1:/var/www/html/data/catsHTM/${catalog}/"
         echo "su ocs -c \"rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}\""
     else
-        src="${catalogs_container_top}/${catalog}/"
-        echo "rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}"
+        message_fatal "No source for catalog ${catalog}"
     fi
     echo "${src}" > /tmp/_catalogs_rsync_command.src
 }
