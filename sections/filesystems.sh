@@ -156,7 +156,7 @@ function filesystems_enforce() {
         config_file="/etc/auto.master.d/last0.autofs"
         {
             grep -v last0 "${config_file}" 2> /dev/null
-            echo "$(dirname ${container_mpoint}) /etc/auto.last0"
+            echo "/last0 /etc/auto.last0"
         } > "${tmp}"
         mv "${tmp}" "${config_file}"
         chmod 644 "${config_file}"
