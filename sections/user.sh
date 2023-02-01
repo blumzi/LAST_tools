@@ -52,9 +52,9 @@ function user_enforce() {
 		message_success "The user's home is \"${user_home}\"."
 	else
 		sed -i "s;${current_home}:;${user_home}:;" /etc/passwd
-		mv "${current_home}" "${user_home}}"
+		mv "${current_home}" "${user_home}"
         rmdir "$(dirname "${current_home}")"
-		message_success "Changed the user's home from \"${current_home}\" to \"/home/${user_home}\"."
+		message_success "Changed the user's home from \"${current_home}\" to \"${user_home}\"."
 	fi
 
     # make sure the user owns it's home
@@ -251,7 +251,7 @@ function user_policy() {
     All the LAST processes and resources are owned by the user "${user_name}"
 
     - The user must exist and be a member of the sudo and dialout groups
-    - The user's home directory should be /home/${user_name}
+    - The user's home directory should be ${user_home}
     - The directory ${user_home}}/matlab must exist
     - The file ${user_home}/.bash_profile should contain code for:
      - using the Weizmann Institute's HTTP(s) proxies
