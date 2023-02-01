@@ -560,6 +560,7 @@ function matlab_config_check() {
     if [ ! -r "${config_file}" ]; then
         message_failure "Missing \"${config_file}\"."
         (( ret++ ))
+        return $(( ret ))
     fi
 
     if [ $(grep -cEw '(Name|Id|ProjectName):' ${config_file}) != 3 ]; then
