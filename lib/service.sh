@@ -20,14 +20,14 @@ function service_enforce() {
         return
     fi
 
-    local system_file="/etc/systemd/system/${service}.service"
+    local system_file="/usr/lib/systemd/system/${service}.service"
     local our_file="$(module_locate files/root/etc/systemd/system/${service}.service)"
 
     ln -sf "${our_file}" "${system_file}"
     message_success "Linked \"${our_file}\" to \"${system_file}\"."
     
-    if ! systemctl is-enabled ${service} >/dev/null 2>&1; then
-        if systemctl enable ${service} >/dev/null 2>&1 /dev/null; then
+    if [ $(systemctl is-enabled ${service}) != enabled ]; then
+        if systemctl enable ${service} >/dev/null 2>&1 ; then
             message_success "Enabled the \"${service}\" service"
         else
             message_failure "Failed to enable the \"${service}\" service"
