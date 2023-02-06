@@ -110,7 +110,7 @@ function network_check() {
         message_warning "last-network: Cannot ping \"last0\"."
         (( errors++ ))
     else
-        message_success "last-network: Can ping \"last0\"."
+        message_success "last-network: Can ping \"last1\"."
     fi
 
     # Machines on weizmann.ac.il should be reachable via the HTTP proxy
@@ -122,7 +122,7 @@ function network_check() {
     fi
 
     # Machines OUTSIDE weizmann.ac.il should be reachable via the HTTP proxy
-    if wget ${WGET_OPTIONS} --output-document=- --tries=2 http://google.com 2>/dev/null | grep -qs '<!doctype html>'; then
+    if wget ${WGET_OPTIONS} --timeout=2 --output-document=- --tries=2 http://google.com 2>/dev/null | grep -qs '<!doctype html>'; then
         message_success "Internet:     Succeeded reaching the Internet (got the http://google.com page)"
     else
         message_warning "Internet:     Failed reaching the Internet (could not wget the http://google.com page)"
@@ -131,7 +131,7 @@ function network_check() {
 
     local target this_host
     this_host="$(hostname -s)"
-    for target in last0 last0{1,2,6,8}{e,w}; do
+    for target in $(last-hosts); do
         if [ "${target}" = "${this_host}" ]; then
             continue
         fi
@@ -143,7 +143,8 @@ function network_check() {
         fi
     done
 
-    for target in pswitch0{1,2,6,8}{e,w}; do
+    local pswitches=( $(last-hosts | sed -e 's;last0\>;;' -e 's;\<last;pswitch;g' ) )
+    for target in ${pswitches[*]}; do
         if http_proxy='' wget ${WGET_OPTIONS} -O - "http://admin:admin@${target}/st0.xml" >/dev/null 2>&1; then
             message_success "${target} is reachable (wget st0.xml)"
         else
