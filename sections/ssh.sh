@@ -171,6 +171,8 @@ function ssh_check_keys() {
         (( errors++ ))
     fi
 
+    su - ocs -c 'ssh-keyscan -H localhost >> ~/.ssh/known_hosts'
+
     local answer status
     answer=$(timeout 2s su "${user_name}" -c 'ssh localhost id -u')
     status=${?}
