@@ -17,7 +17,12 @@ read -r _ _ container_mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL
 if [ "${container_mpoint}" ]; then
     LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
 else
-    container_mpoint=/last0/LAST-CONTAINER
+    # force automount
+    local reply
+    reply="$(timeout 10 bash -c 'cd /last0/LAST-CONTAINER; echo catalo*')"
+    if [ "${reply}" = catalogs ]; then
+        container_mpoint=/last0/LAST-CONTAINER
+    fi
 fi
 
 if [ -d ${container_mpoint}/catalogs ]; then
