@@ -25,7 +25,7 @@ ip_addr=$(macmap_get_local_ipaddr)
 if [[ "${ip_addr}" == 10.23.1.* ]]; then
     # try to force automount of the container
     container_mpoint=/last0/LAST-CONTAINER
-    if [ "$(cd ${container_mpoint}; echo cata*)" = catalogs ]; then
+    if [ "$(cd ${container_mpoint} >/dev/null 2>&1; echo cata*)" = catalogs ]; then
         LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
     fi
 elif [[ "${ip_addr}" == 10.23.3.* ]]; then
@@ -34,7 +34,7 @@ elif [[ "${ip_addr}" == 10.23.3.* ]]; then
     else
         # try to force automount of the container
         container_mpoint=/last03e/LAST-CONTAINER
-        if [ "$(cd ${container_mpoint}; echo cata*)" = catalogs ]; then
+        if [ "$(cd ${container_mpoint} >/dev/null 2>&1; echo cata*)" = catalogs ]; then
             LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
         fi
     fi
