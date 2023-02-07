@@ -1,6 +1,7 @@
 #!/bin/bash
 
 module_include lib/path
+module_include lib/macmap
 
 export LAST_CONTAINER_LABEL="LAST-CONTAINER"
 export selected_container=""
@@ -13,21 +14,32 @@ export container_mpoint
 #
 # TBD: what happens when more than one such volume is mounted (can that happen?!?)
 #
+
+# 1. If we have a local USB disk, it will be first-in-line
 read -r _ _ container_mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
 if [ "${container_mpoint}" ]; then
     LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
-else
-    # force automount
-    local reply
-    reply="$(timeout 10 bash -c 'cd /last0/LAST-CONTAINER; echo catalo*')"
-    if [ "${reply}" = catalogs ]; then
-        container_mpoint=/last0/LAST-CONTAINER
-    fi
 fi
 
-if [ -d ${container_mpoint}/catalogs ]; then
-    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
+ip_addr=$(macmap_get_local_ipaddr)
+if [[ "${ip_addr}" == 10.23.1.* ]]; then
+    # try to force automount of the container
+    container_mpoint=/last0/LAST-CONTAINER
+    if [ "$(cd ${container_mpoint}; echo cata*)" = catalogs ]; then
+        LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
+    fi
+elif [[ "${ip_addr}" == 10.23.3.* ]]; then
+    if [ "${ip_addr}" = 10.23.3.5 ]; then
+        LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "/last03e/data2/LAST-CONTAINER")"
+    else
+        # try to force automount of the container
+        container_mpoint=/last03e/LAST-CONTAINER
+        if [ "$(cd ${container_mpoint}; echo cata*)" = catalogs ]; then
+            LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
+        fi
+    fi
 fi
+unset container_mpoint ip_addr
 
 function container_path() {
     echo "${LAST_CONTAINER_PATH}"
