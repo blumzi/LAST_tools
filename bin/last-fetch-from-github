@@ -51,7 +51,7 @@ function repo_was_selected() {
         return 0
     fi
 
-    for r in "${selected_repos[@]}"; do
+    for r in ${selected_repos[@]}; do
         if [ "${r}" = "${repo}" ]; then
             return 0
         fi
@@ -238,37 +238,6 @@ for key in $( sorted_repos ); do
         status=$?
         if [ "${status}" -eq 0 ]; then
             message_success "Cloned \"${repo}\" into \"${top_dir}/${dir}\"."
-            if [ "${checkout_info}" ] && [ "${checkout_info}" != "none" ]; then
-                declare -a info
-                read -r -a info <<< "${checkout_info//,/ }"
-                checkout_args="" tag="" branch="" msg=""
-
-                for i in "${info[@]}"; do
-                    case "${i}" in
-                        tag:*)
-                            tag="${info#tag:}"
-                            checkout_args+="tags/${tag} "
-                            msg+="tag=${tag} "
-                            ;;
-                        branch:*)
-                            branch="${info#branch:}"
-                            checkout_args+="${branch} "
-                            msg+="branch=${branch} "
-                            ;;
-                    esac                    
-                done
-                
-                pushd "$(basename "${dir}")" >/dev/null || true
-                # shellcheck disable=SC2086
-                git checkout ${checkout_args} >/dev/null 2>&1
-                status=$?
-                if (( status == 0 )); then
-                    message_success "Checked out with ${msg} in \"${top_dir}/${dir}\"."
-                else
-                    message_failure "Could not checkout with ${msg} in \"${top_dir}/${dir}\" (status: ${status})"
-                fi
-                popd >/dev/null || true
-            fi
         else
             message_failure "Could not clone \"${repo}\" into \"${top_dir}/${dir}\" (status: ${status})"
         fi
@@ -289,5 +258,37 @@ for key in $( sorted_repos ); do
             message_failure "Could not pull from \"${repo}\" into \"${top_dir}/${dir}\" (status: ${status})"
         fi
         popd >/dev/null || continue
+    fi
+
+    if [ "${checkout_info}" ] && [ "${checkout_info}" != "none" ]; then
+        declare -a info
+        read -r -a info <<< "${checkout_info//,/ }"
+        checkout_args="" tag="" branch="" msg=""
+
+        for i in "${info[@]}"; do
+            case "${i}" in
+                tag:*)
+                    tag="${info#tag:}"
+                    checkout_args+="tags/${tag} "
+                    msg+="tag=${tag} "
+                    ;;
+                branch:*)
+                    branch="${info#branch:}"
+                    checkout_args+="${branch} "
+                    msg+="branch=${branch} "
+                    ;;
+            esac                    
+        done
+        
+        pushd "${dir}" >/dev/null || true
+        # shellcheck disable=SC2086
+        git checkout ${checkout_args} >/dev/null 2>&1
+        status=$?
+        if (( status == 0 )); then
+            message_success "Checked out with ${msg} in \"${top_dir}/${dir}\"."
+        else
+            message_failure "Could not checkout with ${msg} in \"${top_dir}/${dir}\" (status: ${status})"
+        fi
+        popd >/dev/null || true
     fi
 done
