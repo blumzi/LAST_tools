@@ -7,7 +7,7 @@ module_include lib/wget
 export apt_config_file=/etc/apt/apt.conf
 export apt_google_source_list="/etc/apt/sources.list.d/google.list"
 
-sections_register_section "apt" "Configures Apt" "network"
+sections_register_section "apt" "Configures Apt" "profile network"
 
 function apt_enforce() {
     
