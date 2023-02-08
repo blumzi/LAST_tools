@@ -12,6 +12,19 @@ export LAST_TOOL_PID="${$}"
 
 module_include lib/message
 module_include lib/macmap
+
+#
+# Quick and dirty, use the user-supplied container argument
+#
+args=( ${@} )
+for ((i = 0; i < ${#args[*]}; i++ )); do
+	if [ ${args[${i}]} = -c ] || [ ${args[${i}]} = --container ]; then
+        export selected_container=${args[$((i+1))]}
+        break
+    fi
+done
+unset args i
+
 module_include lib/container
 module_include lib/util
 

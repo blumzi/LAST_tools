@@ -4,7 +4,6 @@ module_include lib/path
 module_include lib/macmap
 
 export LAST_CONTAINER_LABEL="LAST-CONTAINER"
-export selected_container=""
 export container_mpoint
 
 #
@@ -14,6 +13,11 @@ export container_mpoint
 #
 # TBD: what happens when more than one such volume is mounted (can that happen?!?)
 #
+
+# 0. If there is a selected_container in the environment, use it (set in last-tool)
+if [ "${selected_container}" ]; then
+    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${selected_container}")"
+fi
 
 # 1. If we have a local USB disk, it will be first-in-line
 read -r _ _ container_mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
