@@ -39,10 +39,10 @@ else
 	mkdir -p  ${PACKAGE_DIR}/etc/systemd/system
 	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline.service
 endif
-	@( \
-        repo=$$(git remote get-url --all origin | sed -s 's;//.*@;//;'); \
+	@(  \
+        repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
         commit=$$(git rev-parse --short HEAD); \
-		echo "Git-repo:      $$(git remote show -n origin | grep Fetch | cut -d: -f2- | sed- e 's;^[[:space:]]*;;' -e 's;//.*@;//;')"; \
+		echo "Git-repo:      $$(git remote show -n origin | grep Fetch | cut -d: -f2- | sed -e 's;^[[:space:]]*;;' -e 's;//.*@;//;')"; \
 		echo "Git-branch:    $$(git branch --show-current)"; \
 		echo "Git-commit:    $${repo}/commits/$${commit}"; \
 		echo "Build-time:    $$(date)"; \
