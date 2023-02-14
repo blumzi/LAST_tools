@@ -23,4 +23,4 @@ if [ "${1}" = -h ] || [ "${1}" = --help ]; then
     exit 0
 fi
 
-echo last0 last0{1,2,3,4,5,6,8,10}{e,w}
+echo last0 last0{1,2,3,4,5,6,8}{e,w} last10{e,w}
