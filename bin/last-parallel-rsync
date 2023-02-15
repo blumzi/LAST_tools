@@ -1,0 +1,167 @@
+#!/bin/bash
+
+function cleanup() {
+    local failures=( $(if [ -s ${tmp}/.failures ]; then cat ${tmp}/.failures 2>/dev/null; fi) )
+
+    if (( ${#failures[*]} > 0 )); then
+        message_fatal "Chunks ${failures[*]} have failed to synchronize!"
+    else
+        message_success "All ${nchunks} chunks have been synchronized"
+    fi
+    /bin/rm -rf ${tmp}
+}
+
+#trap cleanup SIGHUP SIGINT
+
+PROG=$(basename ${0})
+source /etc/profile.d/last.sh
+
+module_include lib/message
+
+# defaults
+default_target="last@marvin:/BIGDATA/last/data/temp"
+identity=
+default_nproc=10
+rsync_extra_args=
+rsync_info_args="--info=STATS0 --info=FLIST0"
+quiet=false
+
+function usage() {
+    cat <<- EOF
+
+    Usage: ${PROG} <source-directory> [<user@host>:]<target-directory>
+
+    The <source-directory> will be recursivelly synchronized with the <target-directory>.
+    Both source and target may reside on the current machine.
+
+    This utility:
+    - Uses an rsync 'dry-run' to get the list of out-of-date files
+       between the source and the target directories (a workload list).
+    - Splits the workload into chunks (maximum as many as the number of parallel processes)
+    - Starts the relevant number of rsync processes, one-per-chunk
+    - Waits for all the rsync processes to end.
+
+    Arguments:
+     -h|--help        - Show usage and exit
+     -q|--quiet       - Be quiet
+     -s|--source      - Specifies the source-directory
+     -f|--from        - Specifies the source-directory
+     -t|--to|--target - Specifies the target-directory (default: ${default_target})
+     -p|--processes   - Specifies the number of processes to use (default: ${default_nproc})
+     -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
+
+EOF
+}
+
+OPTS=$( getopt -o 'qs:f:t:hi:p:x' --long "quiet:help,extra:,processes:,identity:,source:,from:,to:,target:" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+
+check=false
+while true; do
+	case "${1}" in
+
+    -q|--quiet)
+        quiet=true
+        shift 1
+        ;;
+
+    -s|--source|-f|--from)
+        source="$(realpath ${2})"
+        shift 2
+        ;;
+
+    -t|--target|--to)
+        target="${2}"
+        shift 2
+        ;;
+
+    -h|--help)
+        usage
+        exit 0
+        ;;
+
+    -i|--identity)
+        identity="${2}"
+        shift 2
+        ;;
+    
+    -p|--processes)
+        nprocs="${2}"
+        shift 2
+        ;;
+    
+    -x|--extra)
+        rsync_extra_args="${2}"
+        shift 2
+        ;;
+
+	--)
+		shift 1
+		break
+		;;
+	esac
+done
+
+
+if [ ! "${source}" ]; then
+    echo -e "\n"
+    message_failure "Missing source-directory (use -s|--source|-f|--from argument)"
+    usage
+    exit 1
+fi
+
+if [ ! "${target}" ]; then
+    target="${default_target}"
+fi
+
+target=$( echo ${target} | sed -e 's;[/]*$;;' )
+target=${target}
+
+if [ ! "${nprocs}" ]; then
+    nprocs=${default_nproc}
+fi
+
+tmp=$(mktemp -d)
+cd ${tmp}
+files_list=files
+
+message_info "Source: \"${source}\""
+message_info "Target: \"${target}\""
+message_info "Gathering list of files ..."
+
+#set -x
+rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${target}/${source} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
+# cat ${files_list}
+# cleanup
+# exit 0
+
+if (( $(wc -l < ${files_list}) == 0 )); then
+    message_success "The source and target directories are synchronized"
+    cleanup
+    exit 0
+fi
+
+message_info "Splitting workload among ${nproc} processes ..."
+nlines=$( awk -v lines=$(wc -l < ${files_list}) -v nprocs=${nprocs} 'BEGIN {print int(lines/nprocs) + 1}' )
+split --lines=${nlines} < ${files_list}
+chunks=( x?? )
+
+remote_dir=${target}/${source}
+ssh last@marvin mkdir -p ${remote_dir#*:}
+
+for ((i = 0; i < ${#chunks[*]}; i++)); do
+    (
+        message_info "Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
+        rsync -aR --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${target}/${source} 2>/dev/null
+        status=${?}
+        if [ ${status} -eq 0 ]; then
+            message_success "Chunk #$((i+1)) (of ${#chunks[*]}) succeeded"
+        else
+            message_failure "Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
+            echo ${i} >> ${tmp}/.failures
+        fi
+    ) &
+done
+
+wait
+cleanup

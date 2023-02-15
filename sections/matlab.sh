@@ -58,6 +58,7 @@ function matlab_enforce() {
 #
 function matlab_service_enforce() {
     service_enforce last-pipeline lastx
+    service_enforce last-rsync-watcher lastx
 }
 
 function matlab_license_file() {
@@ -98,6 +99,7 @@ function matlab_check() {
 
 function matlab_service_check() {
     service_check last-pipeline lastx
+    service_check last-rsync-watcher lastx
 }
 
 #
