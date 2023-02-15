@@ -53,7 +53,7 @@ function usage() {
 EOF
 }
 
-OPTS=$( getopt -o 'qs:f:t:hi:p:x' --long "quiet:help,extra:,processes:,identity:,source:,from:,to:,target:" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'qs:f:t:hi:p:x' --long "quiet:,help,extra:,processes:,identity:,source:,from:,to:,target:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 check=false
