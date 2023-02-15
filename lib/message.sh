@@ -65,7 +65,9 @@ function message_warning {
 
 # plain message
 function message_info {
-    echo "[INFO] ${*}"
+    if ! ${LAST_TOOL_QUIET}; then
+        echo -e "[INFO] ${*}"
+    fi
 
     if ! ${LAST_TOOL_DONTLOG}; then
         message_log "[INFO] ${*}"
