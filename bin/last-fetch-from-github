@@ -1,5 +1,7 @@
 #!/bin/bash
 
+trap "/bin/rm -rf ${tmp}" EXIT
+
 # shellcheck disable=SC1091
 source /etc/profile.d/last.sh
 
@@ -273,6 +275,10 @@ for key in $( sorted_repos ); do
         popd >/dev/null || continue
     fi
 
+    if (( ${status} != 0 )); then
+        continue
+    fi
+
     if [ "${checkout_info}" ] && [ "${checkout_info}" != "none" ]; then
         declare -a info
         read -r -a info <<< "${checkout_info//,/ }"
@@ -309,6 +315,10 @@ for key in $( sorted_repos ); do
             done < ${tmp}/err
         fi
         /bin/rm ${tmp}/{out,err}
+
+        if (( ${status} != 0 )); then
+            continue
+        fi
 
         #
         # Pull (merge)
