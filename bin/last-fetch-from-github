@@ -225,7 +225,7 @@ for key in $( sorted_repos ); do
 
     declare checkout_args tag branch msg repo_msg
 
-    repo_msg="{repo=$(ansi_bold ${key})} "
+    repo_msg="{$(ansi_bold ${key})} "
 
     if ${reclone} && [ -d "${dir}/.git" ]; then
         message_info "${repo_msg} Removing ${top_dir}/${dir} (to be recloned) ..."
