@@ -50,6 +50,7 @@ EOF
 }
 
 export last_software_extras_default=true
+export last_software_repos_were_selected=false
 
 function last_software_arg_parser() {
     local requested_extras=${last_software_extras_default} requested_no_extras=false
@@ -59,6 +60,7 @@ function last_software_arg_parser() {
 
         -r|--repo)
             export last_software_selected_repos+=( "${2}" )
+            export last_software_repos_were_selected=true
             shiftARGV 2
             ;;
 
@@ -127,7 +129,7 @@ function last_software_enforce() {
     # shellcheck disable=SC2154
     su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir}"
 
-    if ${last_software_extras}; then
+    if ${last_software_extras} && ! ${last_software_repos_were_selected}; then
         #
         # Frome here on we need a LAST container
         #
