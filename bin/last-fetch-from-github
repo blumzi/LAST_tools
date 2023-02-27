@@ -1,8 +1,11 @@
 #!/bin/bash
 
+trap "/bin/rm -rf ${tmp}" EXIT
+
 # shellcheck disable=SC1091
 source /etc/profile.d/last.sh
 
+module_include lib/ansi
 module_include lib/message
 module_include lib/util
 module_include lib/user
@@ -222,42 +225,58 @@ for key in $( sorted_repos ); do
         message_fatal "Github token \"${token_name}\" for repo \"${repo}\" not found in \"${tokens_file}\""
     fi
 
-    declare checkout_args tag branch msg
+    declare checkout_args tag branch msg repo_msg
+
+    repo_msg="{$(ansi_bold ${key})} "
 
     if ${reclone} && [ -d "${dir}/.git" ]; then
-        message_info "Removing ${top_dir}/${dir} (to be recloned) ..."
+        message_info "${repo_msg} Removing ${top_dir}/${dir} (to be recloned) ..."
         /bin/rm -rf "${dir}"
     fi
+
+    tmp=$(mktemp -d)
 
     if [ ! -d "${dir}/.git" ]; then
         mkdir -p "${dir}"
         pushd "$(dirname "${dir}")" >/dev/null || continue
         url="${repo/github/${token}@github}"
-        message_info "Cloning from ${repo} into \"${top_dir}/${dir}\" ..."
-        git clone "${url}" >/dev/null 2>&1
+        message_info "${repo_msg} Cloning from ${repo} into \"${top_dir}/${dir}\" ..."
+        git clone "${url}" > ${tmp}/out 2> ${tmp}/err
         status=$?
         if [ "${status}" -eq 0 ]; then
-            message_success "Cloned \"${repo}\" into \"${top_dir}/${dir}\"."
+            message_success "${repo_msg} Cloned \"${repo}\" into \"${top_dir}/${dir}\"."
         else
-            message_failure "Could not clone \"${repo}\" into \"${top_dir}/${dir}\" (status: ${status})"
+            message_failure "${repo_msg} Could not clone \"${repo}\" into \"${top_dir}/${dir}\" (status: ${status})"
+            while read -r line; do
+                message_failure "${repo_msg} ${line}"
+            done < ${tmp}/err
         fi
+        /bin/rm ${tmp}/{out,err}
         popd >/dev/null || continue
     else
         pushd "${dir}" >/dev/null || continue
-        message_info "Pulling from ${repo} into \"${top_dir}/${dir}\" ..."
+        message_info "${repo_msg} Fetching from ${repo} into \"${top_dir}/${dir}\" ..."
         # enforce current github token
         url="${repo/github.com/${token}@github.com}"
         git config --local remote.origin.url "${url}"
 
         # now pull
-        git pull --all --tags >/dev/null
+        git fetch --all --tags --jobs=4 > ${tmp}/out 2> ${tmp}/err
         status=$?
         if (( status == 0 )); then
-            message_success "Pulled from \"${repo}\" into \"${top_dir}/${dir}\"."
+            message_success "${repo_msg} Fetched from \"${repo}\" into \"${top_dir}/${dir}\"."
         else
-            message_failure "Could not pull from \"${repo}\" into \"${top_dir}/${dir}\" (status: ${status})"
+            message_failure "${repo_msg} Could not fetch from \"${repo}\" into \"${top_dir}/${dir}\" (status: ${status})"
+            while read -r line; do
+                message_failure "${repo_msg} ${line}"
+            done < ${tmp}/err
         fi
+        /bin/rm ${tmp}/{out,err}
         popd >/dev/null || continue
+    fi
+
+    if (( ${status} != 0 )); then
+        continue
     fi
 
     if [ "${checkout_info}" ] && [ "${checkout_info}" != "none" ]; then
@@ -270,25 +289,51 @@ for key in $( sorted_repos ); do
                 tag:*)
                     tag="${info#tag:}"
                     checkout_args+="tags/${tag} "
-                    msg+="tag=${tag} "
+                    msg+="tag=$(ansi_bold ${tag}) "
                     ;;
                 branch:*)
                     branch="${info#branch:}"
                     checkout_args+="${branch} "
-                    msg+="branch=${branch} "
+                    msg+="branch=$(ansi_bold ${branch}) "
                     ;;
             esac                    
         done
         
         pushd "${dir}" >/dev/null || true
+        #
+        # Checkout the configured branch (may fail)
+        #
         # shellcheck disable=SC2086
-        git checkout ${checkout_args} >/dev/null 2>&1
+        git checkout ${checkout_args} > ${tmp}/out 2> ${tmp}/err
         status=$?
         if (( status == 0 )); then
-            message_success "Checked out with ${msg} in \"${top_dir}/${dir}\"."
+            message_success "${repo_msg} Checked out ${msg} in \"${top_dir}/${dir}\"."
         else
-            message_failure "Could not checkout with ${msg} in \"${top_dir}/${dir}\" (status: ${status})"
+            message_failure "${repo_msg} Could not checkout ${msg} in \"${top_dir}/${dir}\" (status: ${status})"
+            while read -r line; do
+                message_failure "${repo_msg} ${line}"
+            done < ${tmp}/err
         fi
+        /bin/rm ${tmp}/{out,err}
+
+        if (( ${status} != 0 )); then
+            continue
+        fi
+
+        #
+        # Pull (merge)
+        #
+        git pull > ${tmp}/out 2> ${tmp}/err
+        status=$?
+        if (( status == 0 )); then
+            message_success "${repo_msg} Pulled ${msg} in \"${top_dir}/${dir}\"."
+        else
+            message_failure "${repo_msg} Could not pull ${msg} in \"${top_dir}/${dir}\" (status: ${status})"
+            while read -r line; do
+                message_failure "${repo_msg} ${line}"
+            done < ${tmp}/err
+        fi
+        /bin/rm ${tmp}/{out,err}
         popd >/dev/null || true
     fi
 done

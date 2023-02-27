@@ -11,7 +11,7 @@ export ubuntu_packages_file
 ubuntu_packages_file="$(module_locate files/ubuntu-packages)"
 
 # get the list of additional packages required from a file, ignoring comments and empty lines
-mapfile -t ubuntu_packages_missing < <( util_uncomment "${ubuntu_packages_file}" | sort --unique )
+mapfile -t ubuntu_packages_requested < <( util_uncomment "${ubuntu_packages_file}" | sort --unique )
 
 function ubuntu_packages_enforce() {
 
@@ -27,7 +27,7 @@ function ubuntu_packages_enforce() {
 function ubuntu_packages_check() {
     local package
 
-    for package in "${ubuntu_packages_missing[@]}"; do
+    for package in "${ubuntu_packages_requested[@]}"; do
         if dpkg -L "${package}" >& /dev/null; then
             message_success "Package \"${package}\" is installed"
         else

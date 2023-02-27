@@ -81,6 +81,9 @@ function watcher() {
         01|02) invert="Y" ;;
         03|04) invert="X" ;;
     esac
+
+    mkdir -p ${top}; chown ${user_name}.${user_name} ${top}
+
     verbose "watching ${top} (camera: ${camera_id}, frame: ${frame_number}) ..."
 
     while read -r path; do

@@ -110,7 +110,7 @@ function network_check() {
         message_warning "last-network: Cannot ping \"last0\"."
         (( errors++ ))
     else
-        message_success "last-network: Can ping \"last1\"."
+        message_success "last-network: Can ping \"last0\"."
     fi
 
     # Machines on weizmann.ac.il should be reachable via the HTTP proxy
@@ -143,7 +143,7 @@ function network_check() {
         fi
     done
 
-    local pswitches=( $(last-hosts | sed -e 's;last0\>;;' -e 's;\<last;pswitch;g' ) )
+    local pswitches=( $(last-hosts | sed -e 's;\<last0\>.;;' -e 's;last;pswitch;g' ) )
     for target in ${pswitches[*]}; do
         if http_proxy='' wget ${WGET_OPTIONS} -O - "http://admin:admin@${target}/st0.xml" >/dev/null 2>&1; then
             message_success "${target} is reachable (wget st0.xml)"

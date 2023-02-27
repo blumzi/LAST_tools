@@ -8,15 +8,15 @@
 #
 
 # Power switches:
-04:91:62:b7:0a:f0	10.23.2.1	pswitch01e SWITCH1 pswitch1
-04:91:62:c0:48:88	10.23.2.2	pswitch01w SWITCH2 pswitch2
-04:91:62:c0:6b:59	10.23.2.3	pswitch02e SWITCH3 pswitch3
-04:91:62:B6:A7:A3	10.23.2.4	pswitch02w SWITCH4 pswitch4
-04:91:62:c0:86:2A	10.23.2.5	pswitch03e SWITCH5 pswitch5
-04:91:62:c0:2C:ED	10.23.2.6	pswitch03w SWITCH6 pswitch6
-04:91:62:c0:1D:6C	10.23.2.7	pswitch04e SWITCH7 pswitch7
-04:91:62:c0:30:09	10.23.2.8	pswitch04w SWITCH8 pswitch8
-04:91:62:c0:89:EF	10.23.2.9	pswitch05e SWITCH9 pswitch9
+04:91:62:b7:0a:f0	10.23.2.1	pswitch01e SWITCH1  pswitch1
+04:91:62:c0:48:88	10.23.2.2	pswitch01w SWITCH2  pswitch2
+04:91:62:c0:6b:59	10.23.2.3	pswitch02e SWITCH3  pswitch3
+04:91:62:B6:A7:A3	10.23.2.4	pswitch02w SWITCH4  pswitch4
+04:91:62:c0:86:2A	10.23.2.5	pswitch03e SWITCH5  pswitch5
+04:91:62:c0:2C:ED	10.23.2.6	pswitch03w SWITCH6  pswitch6
+04:91:62:c0:1D:6C	10.23.2.7	pswitch04e SWITCH7  pswitch7
+04:91:62:c0:30:09	10.23.2.8	pswitch04w SWITCH8  pswitch8
+04:91:62:c0:89:EF	10.23.2.9	pswitch05e SWITCH9  pswitch9
 04:91:62:c0:2F:0C	10.23.2.10	pswitch05w SWITCH10 pswitch10
 04:91:62:c0:35:F2	10.23.3.11	pswitch06e SWITCH11 pswitch11
 04:91:62:c0:2E:33	10.23.3.12	pswitch06w SWITCH12 pswitch12
@@ -24,6 +24,14 @@
 04:91:62:c0:89:F7	10.23.2.14	pswitch07w SWITCH14 pswitch14
 04:91:62:c0:7F:F3	10.23.2.15	pswitch08e SWITCH15 pswitch15
 04:91:62:c0:8C:7F	10.23.2.16	pswitch08w SWITCH16 pswitch16
+04:91:62:c0:7F:F3	10.23.2.17	pswitch09e SWITCH17 pswitch17
+04:91:62:c0:8C:7F	10.23.2.18	pswitch09w SWITCH18 pswitch18
+04:91:62:c0:7F:F3	10.23.2.19	pswitch10e SWITCH18 pswitch18
+04:91:62:c0:8C:7F	10.23.2.20	pswitch10w SWITCH19 pswitch19
+04:91:62:c0:7F:F3	10.23.2.21	pswitch11e SWITCH18 pswitch20
+04:91:62:c0:8C:7F	10.23.2.22	pswitch11w SWITCH19 pswitch21
+04:91:62:c0:7F:F3	10.23.3.23	pswitch12e SWITCH18 pswitch22
+04:91:62:c0:8C:7F	10.23.3.24	pswitch12w SWITCH19 pswitch23
 
 # Computers:
 D8:5E:D3:04:ED:EC   10.23.1.1   last01e	last1
@@ -36,24 +44,25 @@ D8:5E:D3:04:DC:31	10.23.1.7	last04e last7
 D8:5E:D3:03:D9:B5	10.23.1.8	last04w last8
 D8:5E:D3:03:DC:1A	10.23.1.9	last05e	last9
 D8:5E:D3:04:DC:39	10.23.1.10	last05w	last10
-18:C0:4D:80:19:63	10.23.3.111	last06e	last11
-18:C0:4D:82:1E:0B	10.23.3.112	last06w	last12
+D8:5E:D3:05:0B:41	10.23.1.11	last06e	last11
+D8:5E:D3:05:04:CD	10.23.1.12	last06w	last12
 #D8:5E:D3:03:DC:1A	10.23.1.13	last07e	last13
 #D8:5E:D3:04:DC:39	10.23.1.14	last07w	last14
 D8:5E:D3:04:DF:72	10.23.1.15	last08e	last15
 D8:5E:D3:04:DC:21	10.23.1.16	last08w	last16
+#D8:5E:D3:04:ED:EE	10.23.1.17	last09e	last17
 #D8:5E:D3:04:ED:EE	10.23.1.18	last09w	last18
-D8:5E:D3:05:04:74	10.23.1.19	last10e	last19
-D8:5E:D3:05:04:C9	10.23.1.20	last10w	last20
-D8:5E:D3:05:0A:FC	10.23.1.21	last11e	last21
-D8:5E:D3:05:0B:41	10.23.1.22	last11w	last22
-D8:5E:D3:05:04:CD	10.23.1.23	last12e	last23
+D8:5E:D3:03:D9:C9	10.23.1.19	last10e	last19
+D8:5E:D3:04:DC:0A	10.23.1.20	last10w	last20
+18:C0:4D:80:19:63	10.23.3.21	last11e	last21
+18:C0:4D:82:1E:0B	10.23.3.22	last11w	last22
+#D8:5E:D3:05:04:CD	10.23.1.23	last12e	last23
 #D8:5E:D3:04:14:D3	10.23.3.24	last12w	last24
 18:C0:4D:82:1D:FF	10.23.3.24	last12w	last24
 B4:2E:99:A8:6B:C6   10.23.1.25  last0
 
-#	TBD:	last0
-ff:ff:ff:ff:ff:ff	10.23.1.25	last0
+# last0
+B4:2E:99:A8:6B:C6	10.23.1.25	last0
 
 #	Controllers
 7c:16:0d:01:a8:88	10.23.2.101	roofcontrol roof

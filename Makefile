@@ -34,15 +34,16 @@ else
 	ln -sf ${LAST_TOP}/bin/last-lights 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-lights
 	ln -sf ${LAST_TOP}/bin/last-ds9-feeder 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9-feeder
 	ln -sf ${LAST_TOP}/bin/last-ds9		 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9
+	ln -sf ${LAST_TOP}/bin/last-parallel-rsync              ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-parallel-rsync
 	ln -sf ${LAST_TOP}/bin/last-fetch-from-github 			${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
 	ln -sf ${LAST_TOP}/files/root/etc/profile.d/last.sh 	${PACKAGE_DIR}/etc/profile.d/last.sh
 	mkdir -p  ${PACKAGE_DIR}/etc/systemd/system
 	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline.service
 endif
-	@( \
-        repo=$$(git remote get-url --all origin | sed -s 's;//.*@;//;'); \
+	@(  \
+        repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
         commit=$$(git rev-parse --short HEAD); \
-		echo "Git-repo:      $$(git remote show -n origin | grep Fetch | cut -d: -f2- | sed -e 's;//.*@;//;')"; \
+		echo "Git-repo:      $$(git remote show -n origin | grep Fetch | cut -d: -f2- | sed -e 's;^[[:space:]]*;;' -e 's;//.*@;//;')"; \
 		echo "Git-branch:    $$(git branch --show-current)"; \
 		echo "Git-commit:    $${repo}/commits/$${commit}"; \
 		echo "Build-time:    $$(date)"; \
