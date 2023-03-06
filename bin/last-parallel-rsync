@@ -29,7 +29,7 @@ quiet=false
 function usage() {
     cat <<- EOF
 
-    Usage: ${PROG} <source-directory> [<user@host>:]<target-directory>
+    Usage: ${PROG} -s|--source <source-directory> -t|--to|--target [<user@host>:]<target-directory>
 
     The <source-directory> will be recursivelly synchronized with the <target-directory>.
     Both source and target may reside on the current machine.
@@ -110,6 +110,8 @@ if [ ! "${source}" ]; then
     exit 1
 fi
 
+source=$(realpath ${source})
+
 if [ ! "${target}" ]; then
     target="${default_target}"
 fi
@@ -160,9 +162,10 @@ for ((i = 0; i < ${#chunks[*]}; i++)); do
         rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${target}/${source} 2>/dev/null > ${tmp}
         status=${?}
         if [ ${status} -eq 0 ]; then
+            Speedup=$(grep speedup ${tmp} ) | cut -d' ' -f8)
             Bps=$(grep '^sent ' ${tmp} | cut -d' ' -f9 | tr -d ,)
             Mbps=$(awk -v Bps=${Bps} 'BEGIN { printf "%.3f\n", Bps / 125000 }')
-            message_success "Chunk #$((i+1)) (of ${#chunks[*]}) succeeded (${Mbps} Mbps)"
+            message_success "Chunk #$((i+1)) (of ${#chunks[*]}) succeeded (${Mbps} Mbps, speedup ${Speedup})"
         else
             message_failure "Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
             echo ${i} >> ${tmp}/.failures
