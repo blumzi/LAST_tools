@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #
-# This script outputs the list of currently installed LAST machines.
+# This script produces a list of LAST machines.
 # 
-# It helps when writing scripts that need this list
+# It helps when writing scripts that need to iterate over the LAST machines
 #
 
 PROG="$(basename "${0}")"
@@ -11,16 +11,36 @@ PROG="$(basename "${0}")"
 function help() {
     cat <<- EOF
 
-    Usage: ${PROG} [-h|--help]
+    Usage: ${PROG} [-h|--help] [-d|--deployed] [-a|--all]
 
     Produces a list of the currently installed (not necessarily running) machines.
+    -h|--help:     Shows this help and exits
+    -d|--deployed: Lists only the LAST machines that are known as deployed
+    -a|--all:      List all LAST machines (default)
 
 EOF
 }
 
-if [ "${1}" = -h ] || [ "${1}" = --help ]; then
-    help
-    exit 0
-fi
+deployed_machines=( last0 last0{1,2,8}{e,w} )
+     all_machines=( last0 last0{1,2,3,4,5,6,8}{e,w} last10{e,w} )
 
-echo last0 last0{1,2,3,4,5,6,8}{e,w} last10{e,w}
+while [ ${#} -gt 0 ]; do
+    case "${1}" in
+        -h|--help)
+            help
+            exit 0
+            ;;
+
+        -d|--deployed)
+            echo ${deployed_machines[*]}
+            exit 0
+            ;;
+
+        -a|--all)
+            echo ${deployed_machines[*]}
+            exit 0
+            ;;
+    esac
+done
+
+echo ${all_machines[*]}
