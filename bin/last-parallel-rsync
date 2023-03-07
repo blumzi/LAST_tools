@@ -2,16 +2,23 @@
 
 function cleanup() {
     local failures=( $(if [ -s ${tmp}/.failures ]; then cat ${tmp}/.failures 2>/dev/null; fi) )
+    local running_processes=( $(jobs -pr) )
 
-    if (( ${#failures[*]} > 0 )); then
-        message_fatal "Chunks ${failures[*]} have failed to synchronize!"
+    if [ ${#running_processes[*]} -eq 0 ]; then
+        if (( ${#failures[*]} != 0 )); then
+            message_success "All ${nchunks} chunks have been synchronized"
+        else
+            message_fatal "Chunks ${failures[*]} have failed to synchronize!"
+        fi
     else
-        message_success "All ${nchunks} chunks have been synchronized"
+        message_info "Killing running processes: ${running_processes[*]}"
+        exec 2>/dev/null
+        kill -9 ${running_processes[*]} 2>/dev/null
     fi
     /bin/rm -rf ${tmp}
 }
 
-#trap cleanup SIGHUP SIGINT
+trap cleanup SIGHUP SIGINT
 
 PROG=$(basename ${0})
 source /etc/profile.d/last.sh
@@ -29,7 +36,7 @@ quiet=false
 function usage() {
     cat <<- EOF
 
-    Usage: ${PROG} -s|--source <source-directory> -t|--to|--target [<user@host>:]<target-directory>
+    Usage: ${PROG} -s|--source|-f|--from <source-directory> [ -t|--to|--target [<user@host>:]<target-directory> ]
 
     The <source-directory> will be recursivelly synchronized with the <target-directory>.
     Both source and target may reside on the current machine.
@@ -155,22 +162,25 @@ chunks=( x?? )
 remote_dir=${target}/${source}
 ssh last@marvin.weizmann.ac.il mkdir -p ${remote_dir#*:}
 
+tmp=$(mktemp -d)
 for ((i = 0; i < ${#chunks[*]}; i++)); do
     (
-        tmp=$(mktemp)
         message_info "Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
-        rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${target}/${source} 2>/dev/null > ${tmp}
+        stat_file=${tmp}/stat.${i}
+        rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${target}/${source} 2>/dev/null > ${stat_file}
         status=${?}
-        if [ ${status} -eq 0 ]; then
-            Speedup=$(grep speedup ${tmp} | cut -d' ' -f8)
-            Bps=$(grep '^sent ' ${tmp} | cut -d' ' -f9 | tr -d ,)
-            Mbps=$(awk -v Bps=${Bps} 'BEGIN { printf "%.3f\n", Bps / 125000 }')
+        if [ "${status}" ] && [ ${status} -eq 0 ]; then
+            Speedup=$(grep speedup ${stat_file}  | cut -d' ' -f8)
+                Bps=$(grep '^sent ' ${stat_file} | cut -d' ' -f9 | tr -d ,)
+               Mbps=$(awk -v Bps=${Bps} 'BEGIN { printf "%.3f\n", Bps / 125000 }')
             message_success "Chunk #$((i+1)) (of ${#chunks[*]}) succeeded (${Mbps} Mbps, speedup ${Speedup})"
         else
-            message_failure "Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
+            # rsync returns 20 when killed
+            if [ "${status}" != 20 ]; then
+                message_failure "Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
+            fi
             echo ${i} >> ${tmp}/.failures
         fi
-        /bin/rm ${tmp}
     ) &
 done
 
