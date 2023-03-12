@@ -97,7 +97,7 @@ function watcher() {
         while read ds9_name ds9_address; do
             verbose "feeding ${path} to frame=${frame_number} of ds9 ${ds9_address} ..."
             echo "frame ${frame_number}; file ${path}; zoom to .25; zscale" | xpaset ${ds9_address}
-        done < <(su - ${user_name} -c "xpaaccess -cv ${this_host}")
+        done < <(sudo -u ${user_name} xpaaccess -cv ${this_host})
 
     done < <(inotifywait --event close_write --monitor --recursive --format "%w%f" "${top}" 2>/dev/null)
 }
