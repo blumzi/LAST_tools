@@ -70,9 +70,11 @@ function verbose() {
 function watcher() {
     local top="${1}"
     local path
-    local camera_id=${top##*.}
-    local frame_number invert
+    local camera_id frame_number invert
 
+    path=${top#*LAST}
+    path=${path//\/*/}
+    camera_id=${path##*.}
     case ${camera_id} in
         01|04) frame_number=1 ;;
         02|03) frame_number=2 ;;
@@ -94,8 +96,8 @@ function watcher() {
         # shellcheck disable=SC2094
         while read ds9_name ds9_address; do
             verbose "feeding ${path} to frame=${frame_number} of ds9 ${ds9_address} ..."
-            echo "frame ${frame_number}; file ${path}; zoom to fit; zscale; invert ${invert}" | xpaset ${ds9_address}
-        done < <(xpaaccess -cv ${this_host})
+            echo "frame ${frame_number}; file ${path}; zoom to .25; zscale" | xpaset ${ds9_address}
+        done < <(su - ${user_name} -c "xpaaccess -cv ${this_host}")
 
     done < <(inotifywait --event close_write --monitor --recursive --format "%w%f" "${top}" 2>/dev/null)
 }
