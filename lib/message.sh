@@ -17,9 +17,15 @@ function message_init() {
 
 function message_log() {
     local message="${1}"
+    local tag="${PROG}"
+    local pid=${$}
+
+    if [ "${LAST_TOOL_PID}" ]; then
+        pid=${LAST_TOOL_PID}
+    fi
 
     if ! ${LAST_TOOL_DONTLOG}; then
-        logger -t "${PROG}" "${message}"
+        logger -t "${PROG}[${pid}]" "${message}"
     fi
 }
 
