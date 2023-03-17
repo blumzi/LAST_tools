@@ -9,7 +9,7 @@ sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems ne
 export catalogs_local_top
 catalogs_local_top="/$(hostname)/data/catsHTM"
 export catalogs_container_top
-export -a catalogs=( GAIA/DRE3 MergedCat/V1 )
+export -a catalogs=( GAIA/DR3 MergedCat/V2 )
 export _catalogs_source=""
 
 function catalogs_init() {
