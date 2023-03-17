@@ -272,6 +272,38 @@ function filesystems_check_config() {
         fi
     done
 
+    # check auto mounting of /last0/LAST-CONTAINER
+    config_file=/etc/auto.master.d/last0.autofs
+    if [ ! -r "${config_file}" ]; then
+        message_failure "last0: Missing \"${config_file}\"."
+        (( ret++ ))
+    elif ! grep --quiet "/last0 /etc/auto.last0" "${config_file}"; then
+        message_failure "last0: Missing \"/last0 /etc/auto.last0\" in ${config_file}"
+        (( ret++ ))
+    else
+        message_success "last0: Config file \"${config_file}\" is OK."
+    fi
+
+    config_file=/etc/auto.last0
+    local line="LAST-CONTAINER -rw,hard,bg last0:/last0/data2/LAST-CONTAINER"
+    if [ ! -r ${config_file} ]; then
+        message_failure "last0: Missing config file \"${config_file}\""
+        (( ret++ ))
+    elif ! grep --quiet "${line}" ${config_file}; then
+        message_failure "last0: Missing line \"${line}\" in \"${config_file}\""
+        (( ret++ ))
+    else
+        message_success "last0: Config file \"${config_file}\" contains required line"
+    fi
+
+    local dir=/last0/LAST-CONTAINER/catalogs
+    if [ ! -d ${dir} ]; then
+        message_failure "last0: No ${dir}"
+        (( ret++ ))
+    else
+        message_success "last0: ${dir} is accessible"
+    fi
+
     return $(( ret ))
 }
 
@@ -424,8 +456,18 @@ function filesystems_enforce_disk_sizes() {
     expected=${_filesystems_expected_sizes[${data_dir}]}
 
     local tmp=$(mktemp)
+    local successes=0
     if [ "${data_size}" != "${expected}" ]; then
         message_info "The smallest device \"${small_device}\" (size: ${small_size}) MUST be mounted on \"${data_mpoint}\"."
+
+        for i in /${_filesystems_local_hostname}/{data,data1/data2}; do
+            if umount -f ${i} >/dev/null 2>&1; then
+                message_success "Unmounted \"${i}\""
+                (( successes++ ))
+            else
+                message_warning "Could not umount \"${i}\""
+            fi
+        done
         sed \
             --expression "\;${data_mpoint} ;s;${data_device};${small_device};" \
             --expression "\;${small_mpoint} ;s;${small_device};${data_device};" \
@@ -433,7 +475,10 @@ function filesystems_enforce_disk_sizes() {
         mv ${tmp} /etc/fstab
         message_success "${data_device}: will be mounted on ${small_mpoint}"
         message_success "${small_device}: will be mounted on ${data_mpoint}"
-        message_warning "System must be rebooted to enforce the changes"
+        mount -a -t ext4
+        if (( successes != 3 )); then
+            message_warning "System must be rebooted to enforce the changes"
+        fi
     else
         message_success "${small_mpoint}: has expected size (${expected})"
     fi
