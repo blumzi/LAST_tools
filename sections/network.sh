@@ -131,7 +131,7 @@ function network_check() {
 
     local target this_host
     this_host="$(hostname -s)"
-    for target in $(last-hosts); do
+    for target in $(last-hosts --deployed); do
         if [ "${target}" = "${this_host}" ]; then
             continue
         fi
@@ -143,7 +143,7 @@ function network_check() {
         fi
     done
 
-    local pswitches=( $(last-hosts | sed -e 's;\<last0\>.;;' -e 's;last;pswitch;g' ) )
+    local pswitches=( $(last-hosts --deployed | sed -e 's;\<last0\>.;;' -e 's;last;pswitch;g' ) )
     for target in ${pswitches[*]}; do
         if http_proxy='' wget ${WGET_OPTIONS} -O - "http://admin:admin@${target}/st0.xml" >/dev/null 2>&1; then
             message_success "${target} is reachable (wget st0.xml)"
