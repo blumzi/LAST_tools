@@ -21,7 +21,7 @@ function help() {
 EOF
 }
 
-deployed_machines=( last0 last0{1,2,8}{e,w} )
+deployed_machines=( last0 last0{1,2,3,4,5,8}{e,w} )
      all_machines=( last0 last0{1,2,3,4,5,6,8}{e,w} last10{e,w} )
 
 while [ ${#} -gt 0 ]; do
