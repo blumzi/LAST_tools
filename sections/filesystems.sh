@@ -18,9 +18,9 @@ export _filesystems_mount_options="rw,sync,no_root_squash,no_subtree_check"
 #  a partition (spanning the whole disk) was created
 #
 export -A _filesystems_devmap=(
-    [/dev/sda]="data1"      # whole device
-    [/dev/sdb]="data2"
-    [/dev/sdc]="data"
+    [/dev/sda]="data"      # whole device
+    [/dev/sdb]="data1"
+    [/dev/sdc]="data2"
 )
 
 function filesystems_init() {

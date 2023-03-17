@@ -4,6 +4,8 @@ module_include message
 module_include deploy
 module_include container
 
+trap cleanup SIGINT
+
 sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems network"
 
 export catalogs_local_top
@@ -11,6 +13,10 @@ catalogs_local_top="/$(hostname)/data/catsHTM"
 export catalogs_container_top
 export -a catalogs=( GAIA/DR3 MergedCat/V2 )
 export _catalogs_source=""
+
+function cleanup() {
+	/bin/rm -rf /tmp/rsync-*${$}*
+}
 
 function catalogs_init() {
     # shellcheck disable=SC1090
@@ -58,7 +64,10 @@ function catalogs_sync_catalog() {
 
     no_slashes_catalog=$( echo "${catalog}" | tr / _)
     files_list=/tmp/rsync-"${no_slashes_catalog}".${$}
-    eval "$(_catalogs_rsync_command "${catalog}"/ -av --dry-run) | grep -v '\.\/' | cut -d ' ' -f2 > ${files_list}"
+    eval "$(_catalogs_rsync_command "${catalog}"/ -av --dry-run) | \
+	    grep -v '\.\/' | \
+	    grep -v '^directory$' | \
+	    cut -d ' ' -f2 > ${files_list}"
     nfiles=$(wc -l < "${files_list}")
 
     if (( nfiles == 0 )); then
@@ -134,7 +143,7 @@ function catalogs_check() {
         local -i nfiles
         local cmd
 
-        cmd="$(_catalogs_rsync_command "${catalog}"  -a --dry-run) | grep -v '\.\/' | wc -l"
+        cmd="$(_catalogs_rsync_command "${catalog}"  -a --dry-run) | grep -v '\.\/' | grep -v '^directory$' | wc -l"
         eval "${cmd} > ${tmp_nfiles}"
 
         nfiles="$(< "${tmp_nfiles}")"
