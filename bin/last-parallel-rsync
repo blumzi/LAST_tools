@@ -110,6 +110,12 @@ if [ ! "${source}" ]; then
     exit 1
 fi
 
+if [ ! -d "${source}" ]; then
+    echo -e "\n"
+    message_failure "Bad source directory \"${source}\""
+    exit 1
+fi
+
 if [ ! "${target}" ]; then
     target="${default_target}"
 fi
