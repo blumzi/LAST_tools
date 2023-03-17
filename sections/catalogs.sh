@@ -4,7 +4,7 @@ module_include message
 module_include deploy
 module_include container
 
-trap cleanup SIGINT
+trap cleanup SIGINT SIGTERM
 
 sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems network"
 
@@ -67,6 +67,7 @@ function catalogs_sync_catalog() {
     eval "$(_catalogs_rsync_command "${catalog}"/ -av --dry-run) | \
 	    grep -v '\.\/' | \
 	    grep -v '^directory$' | \
+	    sed -e 's;^\.GAIA;GAIA;' | \
 	    cut -d ' ' -f2 > ${files_list}"
     nfiles=$(wc -l < "${files_list}")
 
@@ -85,7 +86,7 @@ function catalogs_sync_catalog() {
     local chunk_no=0
     for chunk in x??; do
 	    message_info "Synchronizing chunk #$((chunk_no++)) of \"${catalog}\" ($(wc -l < "${chunk}") files) ..."
-        eval "$(_catalogs_rsync_command ${catalog} -avq --files-from="${chunk}" )" &
+        eval "$(_catalogs_rsync_command ${catalog} -avq --files-from="${chunk}" ) 2>/dev/null" &
     done
     wait -fn
     status=${?}
