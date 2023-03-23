@@ -61,7 +61,7 @@ function message_failure {
 # [WARN] message
 function message_warning {
     if ! ${LAST_TOOL_QUIET}; then
-        echo -e "[$( ansi_bright_yellow WARN )] ${*}" >&2
+        echo -e "[$( ansi_bright_yellow WARN )] ${*}"
     fi
 
     if ! ${LAST_TOOL_DONTLOG}; then
