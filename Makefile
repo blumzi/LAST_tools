@@ -50,7 +50,11 @@ endif
 		echo "Build-machine: $$(hostname)" \
 	) > ${PACKAGE_DIR}/${LAST_TOP}/files/info 
 	mkdir -m 755 ${PACKAGE_DIR}/DEBIAN
-	install -m 644 debian/control ${PACKAGE_DIR}/DEBIAN/control
+	@seconds_since_2000=$$(date -ud@$$(($$(date -u +%s)-$$(date -ud'2000-01-01 00:00:00' +%s))) +%s); \
+	  days_since_2000=$$((seconds_since_2000 / ( 24 * 3600 ) )); \
+	    remaining_seconds=$$(( ( seconds_since_2000 - ( days_since_2000 * ( 24 * 3600 ) ) ) / 2 )); \
+	    running_version=$${days_since_2000}.$${remaining_seconds}; \
+	    sed "/^Version:/s;$$;.$${running_version};" < debian/control | tr -d '\r' > ${PACKAGE_DIR}/DEBIAN/control
 	install -m 644 debian/changelog ${PACKAGE_DIR}/DEBIAN/changelog
 	install -m 755 debian/rules ${PACKAGE_DIR}/DEBIAN/rules	
 ifeq (${VMWARE},true)
