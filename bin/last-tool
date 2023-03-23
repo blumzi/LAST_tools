@@ -53,7 +53,8 @@ function global_help() {
 
      Flags:
      -h|--help:        show this help and exit
-     -v|--version:     show version info and exit
+     -v|--version:     show version and exit
+     -i|--info:        show info and exit
      -q|--quiet:       be silent (default: verbose)
      -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
      -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH, currently "$(container_path)"))
@@ -182,7 +183,7 @@ function root_or_die() {
     fi
 }
 
-function show_version() {
+function show_info() {
     local info_file
     info_file=$(module_locate files/info)
 
@@ -191,6 +192,11 @@ function show_version() {
     fi
 
     cat "${info_file}"
+}
+
+function show_version() {
+    read _ _ version _ <<< $(dpkg -l last-tool | grep '^ii')
+    echo ${version}
 }
 
 declare mode
@@ -268,6 +274,11 @@ while [ "${#ARGV[@]}" -gt 0 ]; do
 			shiftARGV 2
 			continue
 			;;
+
+        -i|--info)
+            show_info
+            exit 0
+            ;;
 
         -v|--version)
             show_version
