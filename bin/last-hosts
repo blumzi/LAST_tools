@@ -23,7 +23,7 @@ function help() {
 EOF
 }
 
-deployed_machines=( last0 last0{1,2,3,4,5,6,8,10}{e,w} )
+deployed_machines=( last0 last0{1,2,3,4,5,6,8}{e,w} last10{e,w} )
      lab_machines=( last11{e,w} last12w )
   stored_machines=( last{07,09}{e,w} last12e )
      all_machines=( ${deployed_machines[*]} ${lab_machines[*]} ${stored_machines[*]} )
