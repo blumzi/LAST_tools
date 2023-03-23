@@ -11,23 +11,37 @@ PROG="$(basename "${0}")"
 function help() {
     cat <<- EOF
 
-    Usage: ${PROG} [-h|--help] [-d|--deployed] [-a|--all]
+    Usage: ${PROG} [-h|--help] [-d|--deployed] [-l|--lab] [-s|--stored] [-a|--all]
 
     Produces a list of the currently installed (not necessarily running) machines.
     -h|--help:     Shows this help and exits
-    -d|--deployed: Lists only the LAST machines that are known as deployed
-    -a|--all:      List all LAST machines (default)
+    -d|--deployed: Lists only the LAST machines that are known as deployed (default)
+    -l|--lab:      Lists only the LAST machines in the lab
+    -s|--stored:   Lists only the LAST machines in storage
+    -a|--all:      List all LAST machines
 
 EOF
 }
 
-deployed_machines=( last0 last0{1,2,3,4,5,8}{e,w} )
-     all_machines=( last0 last0{1,2,3,4,5,6,8}{e,w} last10{e,w} )
+deployed_machines=( last0 last0{1,2,3,4,5,6,8,10}{e,w} )
+     lab_machines=( last11{e,w} last12w )
+  stored_machines=( last{07,09}{e,w} last12e )
+     all_machines=( ${deployed_machines[*]} ${lab_machines[*]} ${stored_machines[*]} )
 
 while [ ${#} -gt 0 ]; do
     case "${1}" in
         -h|--help)
             help
+            exit 0
+            ;;
+
+        -s|--stored)
+            echo ${stored_machines[*]}
+            exit 0
+            ;;
+
+        -l|--lab)
+            echo ${lab_machines[*]}
             exit 0
             ;;
 
@@ -37,10 +51,10 @@ while [ ${#} -gt 0 ]; do
             ;;
 
         -a|--all)
-            echo ${deployed_machines[*]}
+            echo ${all_machines[*]}
             exit 0
             ;;
     esac
 done
 
-echo ${all_machines[*]}
+echo ${deployed_machines[*]}
