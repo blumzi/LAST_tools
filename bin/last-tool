@@ -47,7 +47,7 @@ function global_help() {
     The LAST installation policy is $(ansi_bold "anything and everything") that differentiates a LAST installation
      from a vanilla Ubuntu installation (network, packages, matlab, LAST software, etc.)
 
-    This tool either checks or enforces the LAST installation policy.
+    This tool either checks or makes (enforces) the LAST installation policy.
 
     Usage: ${PROG} [[flag] ...] <mode> [[section] ...] 
 
@@ -61,7 +61,7 @@ function global_help() {
      Running <mode>:
       One running <mode> must be selected from the following (no default):
         check:                Checks if the current machine complies with the LAST installation policy
-        enforce:              Enforces the LAST installation policy upon the current machine
+        enforce|make:         Enforces the LAST installation policy upon the current machine
         show-env|env:         Shows some information about the available installation resources
         show-policy|policy:   Prints out the LAST policy for the seected section(s)
         list-sections:        Just list all the available sections
@@ -286,8 +286,13 @@ fi
 
 # done with global flags, expect the mode
 case "${ARGV[0]}" in
-	check|enforce)
+	check)
 		mode="${ARGV[0]}"
+		shiftARGV 1
+		;;
+
+	make|enforce)
+		mode=enforce
 		shiftARGV 1
 		;;
 
