@@ -25,6 +25,7 @@ function service_enforce() {
 
     ln -sf "${our_file}" "${system_file}"
     message_success "Linked \"${our_file}\" to \"${system_file}\"."
+    systemctl daemon-reload
     
     if [ $(systemctl is-enabled ${service}) != enabled ]; then
         if systemctl enable ${service} >/dev/null 2>&1 ; then
