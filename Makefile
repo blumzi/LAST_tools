@@ -1,11 +1,11 @@
 SHELL=bash
 PACKAGE_BASE_VERSION=1.0
 PACKAGE_SHORT_NAME=last-tool
-PACKAGE_VERSION=$(shell \
+PACKAGE_VERSION:=$(shell \
     seconds_since_2000=$$(date -ud@$$(($$(date -u +%s)-$$(date -ud'2000-01-01 00:00:00' +%s))) +%s); \
-	days_since_2000=$$((seconds_since_2000 / ( 24 * 3600 ) )); \
-	remaining_seconds=$$(( ( seconds_since_2000 - ( days_since_2000 * ( 24 * 3600 ) ) ) / 2 )); \
-	running_version=$${days_since_2000}.$${remaining_seconds}; \
+	   days_since_2000=$$((seconds_since_2000 / ( 24 * 3600 ) )); \
+	 remaining_seconds=$$(( ( seconds_since_2000 - ( days_since_2000 * ( 24 * 3600 ) ) ) / 2 )); \
+	   running_version=$${days_since_2000}.$${remaining_seconds}; \
     echo ${PACKAGE_BASE_VERSION}.$${running_version} )
 
 PACKAGE_NAME=${PACKAGE_SHORT_NAME}-${PACKAGE_VERSION}
@@ -59,7 +59,7 @@ endif
 		echo "Build-machine: $$(hostname)" \
 	) > ${PACKAGE_DIR}/${LAST_TOP}/files/info 
 	mkdir -p -m 755 ${PACKAGE_DIR}/DEBIAN
-	sed -e "/^Package:/s;:.*;: ${PACKAGE_NAME};" -e "/^Version:/s;:.*;: ${PACKAGE_VERSION};" < debian/control | tr -d '\r' > ${PACKAGE_DIR}/DEBIAN/control
+	sed -e "/^Version:/s;:.*;: ${PACKAGE_VERSION};" < debian/control | tr -d '\r' > ${PACKAGE_DIR}/DEBIAN/control
 	install -m 644 debian/changelog ${PACKAGE_DIR}/DEBIAN/changelog
 	install -m 755 debian/rules ${PACKAGE_DIR}/DEBIAN/rules	
 ifeq (${VMWARE},true)

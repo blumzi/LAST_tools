@@ -195,7 +195,7 @@ function show_info() {
 }
 
 function show_version() {
-    read _ _ version _ <<< $(dpkg -l last-tool | grep '^ii')
+    read _ _ version _ <<< $(dpkg -l | grep last-tool )
     echo ${version}
 }
 
