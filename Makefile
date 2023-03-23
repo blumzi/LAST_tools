@@ -1,7 +1,15 @@
-PACKAGE_VERSION=1.0.0
-PACKAGE_NAME=last-tool-${PACKAGE_VERSION}
-PACKAGE_DIR=packaging/${PACKAGE_NAME}
 SHELL=bash
+PACKAGE_BASE_VERSION=1.0
+PACKAGE_SHORT_NAME=last-tool
+PACKAGE_VERSION=$(shell \
+    seconds_since_2000=$$(date -ud@$$(($$(date -u +%s)-$$(date -ud'2000-01-01 00:00:00' +%s))) +%s); \
+	days_since_2000=$$((seconds_since_2000 / ( 24 * 3600 ) )); \
+	remaining_seconds=$$(( ( seconds_since_2000 - ( days_since_2000 * ( 24 * 3600 ) ) ) / 2 )); \
+	running_version=$${days_since_2000}.$${remaining_seconds}; \
+    echo ${PACKAGE_BASE_VERSION}.$${running_version} )
+
+PACKAGE_NAME=${PACKAGE_SHORT_NAME}-${PACKAGE_VERSION}
+PACKAGE_DIR=packaging/${PACKAGE_NAME}
 
 VMWARE = 
 ifeq ($(shell mapfile -t type < <(df --output=fstype .); echo $${type[1]}),fuse.vmhgfs-fuse)
@@ -10,7 +18,7 @@ endif
 
 package: LAST_TOP  = /usr/local/share/last-tool
 package: LOCAL_TOP = /usr/local
-package: clean check-for-github-tokens
+package: mrclean check-for-github-tokens
 	mkdir -m 755 -p ${PACKAGE_DIR}/${LAST_TOP} ${PACKAGE_DIR}/${LOCAL_TOP}/bin ${PACKAGE_DIR}/etc/profile.d
 	tar cf - --exclude=LAST-CONTAINER ./bin ./lib ./files ./sections | (cd ${PACKAGE_DIR}/${LAST_TOP} ; tar xf -)
 	chmod 755 ${PACKAGE_DIR}/${LAST_TOP}/*	
@@ -43,18 +51,15 @@ endif
 	@(  \
         repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
         commit=$$(git rev-parse --short HEAD); \
+		echo "Version :      ${PACKAGE_VERSION}"; \
 		echo "Git-repo:      $$(git remote show -n origin | grep Fetch | cut -d: -f2- | sed -e 's;^[[:space:]]*;;' -e 's;//.*@;//;')"; \
 		echo "Git-branch:    $$(git branch --show-current)"; \
 		echo "Git-commit:    $${repo}/commits/$${commit}"; \
 		echo "Build-time:    $$(date)"; \
 		echo "Build-machine: $$(hostname)" \
 	) > ${PACKAGE_DIR}/${LAST_TOP}/files/info 
-	mkdir -m 755 ${PACKAGE_DIR}/DEBIAN
-	@seconds_since_2000=$$(date -ud@$$(($$(date -u +%s)-$$(date -ud'2000-01-01 00:00:00' +%s))) +%s); \
-	  days_since_2000=$$((seconds_since_2000 / ( 24 * 3600 ) )); \
-	    remaining_seconds=$$(( ( seconds_since_2000 - ( days_since_2000 * ( 24 * 3600 ) ) ) / 2 )); \
-	    running_version=$${days_since_2000}.$${remaining_seconds}; \
-	    sed "/^Version:/s;$$;.$${running_version};" < debian/control | tr -d '\r' > ${PACKAGE_DIR}/DEBIAN/control
+	mkdir -p -m 755 ${PACKAGE_DIR}/DEBIAN
+	sed -e "/^Package:/s;:.*;: ${PACKAGE_NAME};" -e "/^Version:/s;:.*;: ${PACKAGE_VERSION};" < debian/control | tr -d '\r' > ${PACKAGE_DIR}/DEBIAN/control
 	install -m 644 debian/changelog ${PACKAGE_DIR}/DEBIAN/changelog
 	install -m 755 debian/rules ${PACKAGE_DIR}/DEBIAN/rules	
 ifeq (${VMWARE},true)
@@ -68,5 +73,16 @@ endif
 clean:
 	/bin/rm -rf packaging
 
+mrclean: clean
+	/bin/rm -f ${PACKAGE_SHORT_NAME}*.deb
+
 check-for-github-tokens:
 	test -r files/github-tokens
+
+distrib: package
+	@if [ ! -x ~ocs/bin/asroot ]; then echo '*** Missing ~ocs/bin/asroot ***'; exit 1; fi
+	@for host in $$(last-hosts --deployed); do \
+	    echo $${host}:; \
+        scp -o "ConnectTimeout 2" ${PACKAGE_NAME}.deb $${host}:/tmp; \
+        ~ocs/bin/asroot --host $${host} --cmd "dpkg --remove ${PACKAGE_SHORT_NAME}; dpkg --install /tmp/${PACKAGE_NAME}.deb"; \
+     done
