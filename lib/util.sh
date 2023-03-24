@@ -89,7 +89,6 @@ function util_enforce_shortcut() {
 
     if ${make_favorite}; then
         local favorites
-		local user_name="ocs"	# Bogus, should be a global definition, TBD
 
         favorites="$( su - "${user_name}" -c "dconf read /org/gnome/shell/favorite-apps" )"
         if [ ! "${favorites}" ]; then
