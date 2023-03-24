@@ -6,3 +6,4 @@ last-tool-*.deb
 files/ssh/id_rsa
 files/ssh/id_rsa.pub
 .vscode/*
+*.swp
