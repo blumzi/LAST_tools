@@ -15,6 +15,8 @@ matlab_releases_dir="$(module_locate files/matlab-releases)"
 
 matlab_selected_release="R2020b"
 matlab_default_release="R2020b"
+wis_account_number="40558509"
+matlab_hostname=$(hostname -s)
 
 # shellcheck disable=SC2154
 export user_startup="${user_matlabdir}/startup.m"
@@ -61,8 +63,8 @@ function matlab_service_enforce() {
     service_enforce last-rsync-watcher lastx
 }
 
-function matlab_license_file() {
-    echo "${matlab_releases_dir}/${matlab_selected_release}/licenses/$(mac_to_file_name "${matlab_local_mac}")"
+function matlab_delivered_license_file() {
+    echo "${matlab_releases_dir}/${matlab_selected_release}/licenses/license_${matlab_hostname}_${wis_account_number}_${matlab_selected_release}.lic"
 }
 
 function matlab_installed_release() {
@@ -187,11 +189,9 @@ EOF
 
     hash >&/dev/null # to hash the newly installed Matlab
 
-	local matlabroot existent_license_file
-    matlabroot=/usr/local/MATLAB/${matlab_selected_release}
-	existent_license_file="$( find "${matlabroot}"/licenses -name "license_$(hostname -s)_*_${matlab_selected_release}.lic" )"
+	local existent_license_file="/usr/local/MATLAB/${matlab_selected_release}/licenses/license_${matlab_hostname}_${wis_account_number}_${matlab_selected_release}.lic"
 
-	if [ ! "${existent_license_file}" ]; then
+	if [ ! -r "${existent_license_file}" ]; then
 
 		#
 		# Prepare activation responses for the Matlab installation
@@ -203,10 +203,10 @@ EOF
 		# SPECIFY ACTIVATION TYPE (Required)
 		activateCommand=activateOffline
 		# SPECIFY LICENSE FILE LOCATION (Required if activateCommand=activateOffline)
-		licenseFile=$(matlab_license_file)
+		licenseFile=$(matlab_delivered_license_file)
 	EOF
 		message_info "Silently activating Matlab ${matlab_selected_release} (~1 minute) ..."
-		# Activate the Matlab by running, it will says 'success'
+		# Activate the Matlab by running, it will say 'Silent activation succeeded'
 		declare result
 		result="$( ${matlab_top}/bin/activate_matlab.sh -propertiesFile "${activate_ini}" )"
 		status=${?}
@@ -221,6 +221,7 @@ EOF
 
     # Finally, link the matlab to /usr/local/bin, 
     ln -sf ${matlab_top}/bin/matlab /usr/local/bin/matlab-${matlab_selected_release}
+    hash >&/dev/null # to hash the newly linked Matlab
 
     local tmp
     tmp=$( mktemp )
@@ -274,11 +275,6 @@ function matlab_installation_check() {
     #
     # It doesn't seem to be installed, can we install it?
     #
-    if [ ! "${matlab_local_mac}" ]; then
-        message_failure "Cannot get this machine's MAC address"
-        return $(( ++errors ))    # no point in continuing
-    fi
-
     if [ "${selected_container}" ]; then
         message_info "Checking available Matlab installations (for mac=${matlab_local_mac})"
         local msg keys_file license_file
@@ -321,7 +317,7 @@ function matlab_installation_check() {
             fi
 
             # check that we have a license key for this machine
-            license_file="${release_info_dir}/licenses/$(mac_to_file_name "${matlab_local_mac}")"
+            license_file="$(matlab_delivered_license_file)"
 
             msg+=", license-for-this-machine: "
             if [ -r "${license_file}" ]; then
