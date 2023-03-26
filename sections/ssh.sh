@@ -82,7 +82,7 @@ function ssh_enforce_keys() {
 
     # install the private and public keys in ~ocs/.ssh
     local type file
-    for file in id_rsa id_rsa.pub; do
+    for file in id_rsa id_rsa.pem id_rsa.pub; do
 		if [ ! -r ${container_dir}/${file} ]; then
 			message_failure "Missing ${container_dir}/${file}"
 			continue
@@ -97,7 +97,7 @@ function ssh_enforce_keys() {
         if [ ! -r "${_ssh_user_dir}/${file}" ] || 
 				! cmp --silent ${container_dir}/${file} ${_ssh_user_dir}/${file}; then
 			install -m 600 -o "${user_name}" -g "${user_group}" "${container_dir}/${file}" "${_ssh_user_dir}/${file}"
-			message_success "Installed user's ${type} key"
+			message_success "Installed user's ${type} key (${file})"
         fi
     done
 
@@ -113,7 +113,8 @@ function ssh_enforce_keys() {
     fi
 
     # scan for ssh host keys from all last machines
-    2>/dev/null ssh-keyscan -H -T 2 -f <(grep -wE '(last[0-1][0-9][ew]|last0)' /etc/hosts | while read -r _ host _; do echo "${host}"; done; echo localhost) > "${_ssh_user_dir}/known_hosts"
+    local hosts=$(last-hosts --deployed)
+    2>/dev/null ssh-keyscan -H -T 2 -f <(grep -wE "(${hosts// /|})" /etc/hosts | while read -r _ host _; do echo "${host}"; done; echo localhost) > "${_ssh_user_dir}/known_hosts"
     chown "${user_name}.${user_group}" "${_ssh_user_dir}/known_hosts"
     chmod 644 "${_ssh_user_dir}/known_hosts"
     message_success "Scanned for known_hosts keys"
@@ -147,29 +148,26 @@ function ssh_check_keys() {
         (( errors++ ))
     fi
     
-    if [ -r "${_ssh_user_dir}/id_rsa" ]; then
-        message_success "User's private key exists"
-		if cmp --silent ${_ssh_user_dir}/id_rsa ${container_dir}/id_rsa; then
-			message_success "User's private key matches"
-		else
-			message_failure "User's private key does not match"
-		fi
-    else
-        message_failure "User's private key does not exist"
-        (( errors++ ))
-    fi
+    local file
+    for file in id_rsa id_rsa.pem id_rsa.pub; do
+        if [[ ${file} == *.pub ]]; then
+            type="public"
+        else
+            type="private"
+        fi
 
-    if [ -r "${_ssh_user_dir}/id_rsa.pub" ]; then
-        message_success "User's public key exists"
-		if cmp --silent ${_ssh_user_dir}/id_rsa.pub ${container_dir}/id_rsa.pub; then
-			message_success "User's public key matches"
-		else
-			message_failure "User's public key does not match"
-		fi
-    else
-        message_failure "User's public key does not exist"
-        (( errors++ ))
-    fi
+        if [ -r "${_ssh_user_dir}/${file}" ]; then
+            message_success "User's ${type} key (${file}) exists"
+            if cmp --silent ${_ssh_user_dir}/${file} ${container_dir}/${file}; then
+                message_success "User's ${type} key (${file}) matches"
+            else
+                message_failure "User's ${type} key (${file}) does not match"
+            fi
+        else
+            message_failure "User's ${type} key (${file}) does not exist"
+            (( errors++ ))
+        fi
+    done
 
     su - ocs -c '2>/dev/null ssh-keyscan -H localhost >> ~/.ssh/known_hosts'
 

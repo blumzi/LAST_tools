@@ -45,6 +45,9 @@ else
 	ln -sf ${LAST_TOP}/bin/last-parallel-rsync              ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-parallel-rsync
 	ln -sf ${LAST_TOP}/bin/last-fetch-from-github 			${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
 	ln -sf ${LAST_TOP}/files/root/etc/profile.d/last.sh 	${PACKAGE_DIR}/etc/profile.d/last.sh
+	ln -sf ${LAST_TOP}/bin/last-asroot 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-asroot
+	ln -sf ${LAST_TOP}/bin/last-asocs 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-asocs
+	ln -sf ${LAST_TOP}/bin/last-askpass	    				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-askpass
 	mkdir -p  ${PACKAGE_DIR}/etc/systemd/system
 	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline.service
 endif

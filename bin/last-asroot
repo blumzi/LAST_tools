@@ -1,0 +1,79 @@
+#!/bin/bash
+
+. /etc/profile.d/last.sh
+
+PROG="$(basename ${0})"
+trap "exit 1" SIGINT
+
+function usage() {
+    echo ""
+    echo "  Usage: ${PROG} [-t|--timeout seconds] [[-H|--host <host>] ...] -c|--cmd command"
+    echo ""
+    echo "  Runs the specified command as root"
+    echo "   on the specified hosts (default: $(echo ${default_hosts[@]} | tr ' ' ','))"
+    echo ""
+}
+
+OPTS=$( getopt -o 'H:hc:t:' --long "help,host:,cmd:,timeout:" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+
+default_hosts=( $(last-hosts --deployed) )
+timeout=2
+
+hosts=()
+while true; do
+    case "${1}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+
+    -H|--host)
+        hosts+=( ${2} )
+        shift 2
+        ;;
+
+    -c|--cmd)
+        cmd="${2}"
+        shift 2
+        ;;
+
+    -t|--timeout)
+        timeout="${2}"
+        shift 2
+        ;;
+
+	--)
+		shift 1
+		break
+		;;
+    esac
+done
+
+if [ ! "${hosts[*]}" ]; then
+    hosts=( ${default_hosts[*]} )
+fi
+
+if [ ! "${cmd}" ]; then
+    cmd="${@}"
+fi
+
+if [ ! "${cmd}" ]; then
+    usage
+    exit 1
+fi
+
+module_include lib/message
+
+if [ ${#hosts[*]} -eq 1 ]; then
+    export LAST_TOOL_QUIET=true
+fi
+
+for host in ${hosts[*]}; do
+    message_info ">>> on ${host}:"
+    ssh -o ConnectTimeout=${timeout} -X ocs@${host} "SUDO_ASKPASS=/usr/local/share/last-tool/bin/last-askpass sudo -A bash -c '${cmd}'" 2>/dev/null
+    status=${?}
+    if [ ${status} -ne 0 ]; then
+        message_failure "Failed on ${host} (rc=${status})"
+    fi
+done

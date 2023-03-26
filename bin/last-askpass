@@ -1,0 +1,3 @@
+#!/bin/bash
+
+openssl rsautl -decrypt -inkey ~ocs/.ssh/id_rsa.pem -in ~ocs/.ssh/pass.enc
