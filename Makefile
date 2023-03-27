@@ -83,9 +83,10 @@ check-for-github-tokens:
 	test -r files/github-tokens
 
 distrib: package
-	@if [ ! -x ~ocs/bin/asroot ]; then echo '*** Missing ~ocs/bin/asroot ***'; exit 1; fi
-	@for host in $$(last-hosts --deployed); do \
-	    echo $${host}:; \
+	@source /etc/profile.d/last.sh; \
+    module_include lib/message; \
+    for host in $$(last-hosts --deployed); do \
+	    message_section $${host}:; \
         scp -o "ConnectTimeout 2" ${PACKAGE_NAME}.deb $${host}:/tmp; \
-        ~ocs/bin/asroot --host $${host} --cmd "dpkg --remove ${PACKAGE_SHORT_NAME}; dpkg --install /tmp/${PACKAGE_NAME}.deb"; \
+        last-asroot --host $${host} --cmd "dpkg --remove ${PACKAGE_SHORT_NAME}; dpkg --install /tmp/${PACKAGE_NAME}.deb"; \
      done
