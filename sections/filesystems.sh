@@ -171,7 +171,7 @@ function filesystems_enforce() {
         systemctl start autofs
     fi
 
-    filesystems_enforce_varlog
+    filesystems_enforce_
 }
 
 function filesystems_check() {
@@ -185,7 +185,6 @@ function filesystems_check() {
     filesystems_check_disk_sizes;   (( ret += $? ))
     filesystems_check_config;       (( ret += $? ))
     filesystems_check_mounts;       (( ret += $? ))
-    filesystems_check_varlog;       (( ret += $? ))
 
     return $(( ret ))
 }
@@ -343,72 +342,6 @@ function filesystems_check_mounts() {
     fi
 
     return $(( ret ))
-}
-
-function filesystems_check_varlog() {
-    local dir="/var/log/ocs"
-    local -i ret=0
-
-    if [ ! -d "${dir}" ]; then
-        message_failure "${dir}: Missing."
-        return 1
-    else
-        message_success "${dir}: exists."
-    fi
-
-    local existing_owner="$(stat --format "%U.%G" "${dir}")"
-    local wanted_owner="${user_name}.${user_group}"
-
-    if [ "${existing_owner}" != "${wanted_owner}" ]; then
-        message_failure "${dir}: owner is ${existing_owner} instead of ${wanted_owner}"
-        (( ret++ ))
-    else
-        message_success "${dir}: owner is ${existing_owner}"
-    fi
-
-    local existing_access="$(stat --format "%a" ${dir})"
-    local wanted_access=775
-
-    if [ "${existing_access}" != "${wanted_access}" ]; then
-        message_failure "${dir}: access is ${existing_access} instead of ${wanted_access}"
-        (( ret++ ))
-    else
-        message_success "${dir}: access is ${existing_access}"
-    fi
-
-    return ${ret}
-}
-
-
-function filesystems_enforce_varlog() {
-    local dir="/var/log/ocs"
-
-    if [ ! -d "${dir}" ]; then
-        mkdir -m 775 -p ${dir}
-        message_success "${dir}: created"
-    else
-        message_success "${dir}: exists."
-    fi
-
-    local existing_owner="$(stat --format "%U.%G" "${dir}")"
-    local wanted_owner="${user_name}.${user_group}"
-
-    if [ "${owner}" != "${wanted_owner}" ]; then
-        chown ${wanted_owner} ${dir}
-        message_success "${dir}: changed ownership to ${wanted_owner}"
-    else
-        message_success "${dir}: ownership is ${existing_owner}"
-    fi
-
-    local existing_access="$(stat --format "%a" ${dir})"
-    local wanted_access=775
-
-    if [ "${access}" != "${wanted_access}" ]; then
-        chmod ${wanted_access} ${dir}
-        message_success "${dir}: changed access to ${wanted_access}"
-    else
-        message_success "${dir}: access is ${existing_access}"
-    fi
 }
 
 export -A _filesystems_expected_sizes=(
