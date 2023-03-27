@@ -36,7 +36,7 @@ elif [[ "${ip_addr}" == 10.23.1.* ]]; then
         LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
     fi
 elif [[ "${ip_addr}" == 10.23.3.* ]]; then
-    if [ "${ip_addr}" = 10.23.3.5 ]; then
+    if [ "$(hostname -s)" = last12w ]; then
         LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "/last12w/data2/LAST-CONTAINER")"
     else
         # try to force automount of the container
