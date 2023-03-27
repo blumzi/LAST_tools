@@ -70,10 +70,10 @@ if [ ${#hosts[*]} -eq 1 ]; then
 fi
 
 for host in ${hosts[*]}; do
-    message_info ">>> on ${host}:"
+    message_section "${host}:"
     ssh -o ConnectTimeout=${timeout} -X ocs@${host} "SUDO_ASKPASS=/usr/local/share/last-tool/bin/last-askpass sudo -A bash -c '${cmd}'" 2>/dev/null
     status=${?}
     if [ ${status} -ne 0 ]; then
-        message_failure "Failed on ${host} (rc=${status})"
+        message_failure "Failed (rc=${status})"
     fi
 done
