@@ -9,9 +9,14 @@ sections_register_section "logs" "Handles the LAST logs" ""
 function logs_enforce() {
     local tmp=$(mktemp)
     local config_file="/etc/rsyslog.conf"
+    local on_last=false
     
+    if macmap_this_is_last0; then
+        on_last0=true
+    fi
+
     {
-        if macmap_this_is_last0; then
+        if ${on_last0}; then
             grep -v 'DynamicFile' ${config_file}
             echo '# DynamicFile template for receiving remote LAST logs'
             echo '$template DynamicFile,"'${logs_remote_dir}'/%FROMHOST%/%syslogfacility-text%.log"'
@@ -56,8 +61,11 @@ function logs_enforce() {
         message_success "directory: \"${dir}\" access is ${existing_access}"
     fi
 
-    chmod -R a+rx ${logs_remote_dir}
-    message_success "directory: \"${logs_remote_dir}\" added read and search access"
+    if ${on_last0}; then
+        find ${logs_remote_dir} -type d -exec chmod a+xr {} \; 2>/dev/null
+        find ${logs_remote_dir} -type f -exec chmod a+r {} \;  2>/dev/null
+        message_success "directory: \"${logs_remote_dir}\" added read and search access"
+    fi
 }
 
 function logs_check() {
