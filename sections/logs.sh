@@ -9,7 +9,7 @@ sections_register_section "logs" "Handles the LAST logs" ""
 function logs_enforce() {
     local tmp=$(mktemp)
     local config_file="/etc/rsyslog.conf"
-    local on_last=false
+    local on_last0=false
     
     if macmap_this_is_last0; then
         on_last0=true
@@ -74,13 +74,13 @@ function logs_check() {
     local pattern
     local config_file="/etc/rsyslog.conf"
     local -i ret=0
-    local on_last=false
+    local on_last0=false
 
     if macmap_this_is_last0; then
         on_last0=true
     fi
 
-    local nlines expected_nlines
+    local expected_nlines
     if ${on_last0}; then
         pattern="(LAST|NONLAST)messages"
         expected_nlines=4
@@ -89,7 +89,7 @@ function logs_check() {
         expected_nlines=1
     fi
 
-    local nlines=$(grep -c "${pattern}" ${config_file})
+    local nlines=$(grep -Ec "${pattern}" ${config_file})
     if [ ${nlines} -eq ${expected_nlines} ]; then
         message_success "config: \"${config_file}\" contains ${expected_nlines} \"${pattern}\" lines."
     else
