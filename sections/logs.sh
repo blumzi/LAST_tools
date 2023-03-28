@@ -17,11 +17,13 @@ function logs_enforce() {
 
     {
         if ${on_last0}; then
-            grep -v 'DynamicFile' ${config_file}
-            echo '# DynamicFile template for receiving remote LAST logs'
-            echo '$template DynamicFile,"'${logs_remote_dir}'/%FROMHOST%/%syslogfacility-text%.log"'
-            echo '*.* -?DynamicFile'
-
+            grep -v 'LAST' ${config_file}
+            echo '# LAST messages (with local0 facility)'
+            echo '$template LASTmessages,"'${logs_remote_dir}'/%FROMHOST%/last-messages.log"'
+            echo 'local0.* -?LASTmessages'
+            echo '# NONLAST messages (all other facilities)'
+            echo '$template NONLASTmessages,"'${logs_remote_dir}'/%FROMHOST%/last-messages.log"'
+            echo 'kern,user,mail,daemon,auth,syslog,lpr,news,uucp,cron,authpriv,ftp,local1,local2,local3,local4,local5,local6,local7.* -?NONLASTmessages'
         else
             grep -v '^\*\.\*' ${config_file}
             echo '*.* @last0'
@@ -29,7 +31,7 @@ function logs_enforce() {
     } < ${config_file} > ${tmp}
     /bin/mv ${tmp} ${config_file}
 
-    message_success "Updated the \"${config_file}\" configuration file"
+    message_success "Updated the \"${config_file}\" configuration file, restarting the rsyslog service"
     systemctl restart rsyslog
 
     local dir=${logs_global_dir}
@@ -79,15 +81,16 @@ function logs_check() {
     fi
 
     if ${on_last0}; then
-        pattern="template DynamicFile.*${logs_remote_dir}"
+        pattern="^\$template (LAST|NONLAST)messages.*${logs_remote_dir}"
     else
         pattern="\*\.\* @last0"
     fi
 
-    if grep -q "${pattern}" ${config_file}; then
-        message_success "config: \"${config_file}\" contains \"${pattern}\"."
+    local nlines=$(grep -c "${pattern}" ${config_file})
+    if [ ${nlines} -eq 4 ]; then
+        message_success "config: \"${config_file}\" contains four \"${pattern}\" lines."
     else
-        message_failure "config: \"${config_file}\" does not contain \"${pattern}\"."
+        message_failure "config: \"${config_file}\" contains ${nlines} \"${pattern}\" lines (instead of 4)."
         (( ret++ ))
     fi
 
