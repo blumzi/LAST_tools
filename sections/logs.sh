@@ -31,6 +31,9 @@ function logs_enforce() {
     } < ${config_file} > ${tmp}
     /bin/mv ${tmp} ${config_file}
 
+    sed -i -e '/imudp/s;^#;;' ${config_file}
+    message_success "config: Enabled \"imudp\"."
+
     message_success "Updated the \"${config_file}\" configuration file, restarting the rsyslog service"
     systemctl restart rsyslog
 
@@ -95,6 +98,13 @@ function logs_check() {
     else
         message_failure "config: \"${config_file}\" contains ${nlines} \"${pattern}\" lines (instead of ${expected_nlines})."
         (( ret++ ))
+    fi
+
+    if grep -q '^#.*imudp' ${config_file}; then
+        message_failure "config: \"imudp\" is disabled"
+        (( ret++ ))
+    else
+        message_success "config: \"imudp\" is enabled"
     fi
 
     local dir=${logs_global_dir}
