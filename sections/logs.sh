@@ -79,7 +79,7 @@ function logs_check() {
     fi
 
     if ${on_last0}; then
-        pattern="template DynamicFile\.\*${logs_remote_dir}"
+        pattern="template DynamicFile.*${logs_remote_dir}"
     else
         pattern="\*\.\* @last0"
     fi
@@ -122,7 +122,8 @@ function logs_check() {
     fi
 
     if ${on_last0}; then
-        if find /var/log/remote \! -readable -a \! -executable 2>/dev/null; then
+        if find ${logs_remote_dir} -type d -a \( \! -readable -o \! -executable \) 2>/dev/null ||
+            find ${logs_remote_dir} -type f -a \! -readable 2>/dev/null; then
             message_success "directory: \"${logs_remote_dir}\" and descendants are readable and searchable." 
         else
             message_failure "directory: \"${logs_remote_dir}\" has non-readable or non-searchable descendants"
