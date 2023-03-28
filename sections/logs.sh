@@ -80,17 +80,20 @@ function logs_check() {
         on_last0=true
     fi
 
+    local nlines expected_nlines
     if ${on_last0}; then
-        pattern="^\$template (LAST|NONLAST)messages.*${logs_remote_dir}"
+        pattern="(LAST|NONLAST)messages"
+        expected_nlines=4
     else
         pattern="\*\.\* @last0"
+        expected_nlines=1
     fi
 
     local nlines=$(grep -c "${pattern}" ${config_file})
-    if [ ${nlines} -eq 4 ]; then
-        message_success "config: \"${config_file}\" contains four \"${pattern}\" lines."
+    if [ ${nlines} -eq ${expected_nlines} ]; then
+        message_success "config: \"${config_file}\" contains ${expected_nlines} \"${pattern}\" lines."
     else
-        message_failure "config: \"${config_file}\" contains ${nlines} \"${pattern}\" lines (instead of 4)."
+        message_failure "config: \"${config_file}\" contains ${nlines} \"${pattern}\" lines (instead of ${expected_nlines})."
         (( ret++ ))
     fi
 
