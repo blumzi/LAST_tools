@@ -55,14 +55,22 @@ function logs_enforce() {
     else
         message_success "directory: \"${dir}\" access is ${existing_access}"
     fi
+
+    chmod -R a+rx ${logs_remote_dir}
+    message_success "directory: \"${logs_remote_dir}\" added read and search access"
 }
 
 function logs_check() {
     local pattern
     local config_file="/etc/rsyslog.conf"
     local -i ret=0
+    local on_last=false
 
     if macmap_this_is_last0; then
+        on_last0=true
+    fi
+
+    if ${on_last0}; then
         pattern="template DynamicFile\.\*${logs_remote_dir}"
     else
         pattern="\*\.\* @last0"
@@ -103,6 +111,15 @@ function logs_check() {
         (( ret++ ))
     else
         message_success "directory: \"${dir}\" access is ${existing_access}"
+    fi
+
+    if ${on_last0}; then
+        if find /var/log/remote \! -readable -a \! -executable 2>/dev/null; then
+            message_success "directory: \"${logs_remote_dir}\" and descendants are readable and searchable." 
+        else
+            message_failure "directory: \"${logs_remote_dir}\" has non-readable or non-searchable descendants"
+            (( ret++ ))
+        fi
     fi
 
     return ${ret}
