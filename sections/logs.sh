@@ -51,7 +51,7 @@ function logs_enforce() {
     sed -i -e '/imudp/s;^#;;' ${config_file}
     message_success "config: Enabled \"imudp\"."
 
-    message_success "Updated the \"${config_file}\" configuration file, restarting the rsyslog service"
+    message_success "config: Restarting the rsyslog service"
     systemctl restart rsyslog
 
     local dir=${logs_global_dir}
