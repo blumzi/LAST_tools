@@ -6,6 +6,23 @@ module_include lib/logs
 
 sections_register_section "logs" "Handles the LAST logs" ""
 
+function logs_mklogrotate_conf() {
+    cat <<- EOF
+/var/log/remote/*/*.log
+{
+	rotate 7
+	daily
+	missingok
+	notifempty
+	delaycompress
+	compress
+	postrotate
+		/usr/lib/rsyslog/rsyslog-rotate
+	endscript
+}
+EOF
+}
+
 function logs_enforce() {
     local tmp=$(mktemp)
     local config_file="/etc/rsyslog.conf"
@@ -70,6 +87,10 @@ function logs_enforce() {
         find ${logs_remote_dir} -type d -exec chmod a+xr {} \; 2>/dev/null
         find ${logs_remote_dir} -type f -exec chmod a+r {} \;  2>/dev/null
         message_success "directory: \"${logs_remote_dir}\" added read and search access"
+
+        config_file="/etc/logrotate.d/last-logs"
+        logs_mklogrotate_conf > ${config_file}
+        message_success "logrotate: Overwriten \"${config_file}\"."
     fi
 }
 
@@ -143,6 +164,16 @@ function logs_check() {
             message_success "directory: \"${logs_remote_dir}\" and descendants are readable and searchable." 
         else
             message_failure "directory: \"${logs_remote_dir}\" has non-readable or non-searchable descendants"
+            (( ret++ ))
+        fi
+
+        config_file="/etc/logrotate.d/last-logs"
+        local tmp=$(mktemp)
+        logs_mklogrotate_conf > ${tmp}
+        if cmp --quiet ${config_file} ${tmp}; then
+            message_success "logrotate: \"${config_file}\" is OK."
+        else
+            message_failure "logrotate: BAD \"${config_file}\"!"
             (( ret++ ))
         fi
     fi
