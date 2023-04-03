@@ -45,3 +45,4 @@ iperf
 ethtool
 jq
 libcanberra-gtk-module
+colorized-logs

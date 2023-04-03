@@ -25,7 +25,7 @@ function message_log() {
     fi
 
     if ! ${LAST_TOOL_DONTLOG}; then
-        logger -t "${PROG}[${pid}]" "${message}"
+        echo "${message}" | ansi2txt | logger -t "${PROG}[${pid}]"
     fi
 }
 
