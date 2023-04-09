@@ -69,17 +69,14 @@ function ssh_enforce_keys() {
         message_success "Created \"${_ssh_user_dir}\""
     fi
 
-    local container_dir
-    if [ "${selected_container}" ] && [ -d "${selected_container}/files/ssh" ]; then
-        # shellcheck disable=SC2034
-        container_dir="${selected_container}/files/ssh"
-    fi
+    local container_dir=$(container_lookup ssh)
 
 	if [ ! -d "${container_dir}" ]; then
-		message_failure "No LAST-CONTAINER ssh directory"
+		message_failure "No LAST-CONTAINER with files/ssh directory"
 		return
 	fi
 
+    container_dir=${container_dir}/files/ssh
     # install the private and public keys in ~ocs/.ssh
     local type file
     for file in id_rsa id_rsa.pem id_rsa.pub; do
@@ -123,16 +120,13 @@ function ssh_enforce_keys() {
 function ssh_check_keys() {
     local errors=0
 
-    local container_dir
-    if [ "${selected_container}" ] && [ -d "${selected_container}/files/ssh" ]; then
-        # shellcheck disable=SC2034
-        container_dir="${selected_container}/files/ssh"
-    fi
+    local container_dir=$(container_lookup ssh)
 
 	if [ ! -d "${container_dir}" ]; then
 		message_failure "No LAST-CONTAINER ssh directory"
 		return
 	fi
+    container_dir=${container_dir}/files/ssh
 
     if [ ! -d "${_ssh_user_dir}" ]; then
         message_failure "Missing ${_ssh_user_dir} directory"

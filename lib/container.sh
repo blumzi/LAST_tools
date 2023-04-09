@@ -4,103 +4,80 @@ module_include lib/path
 module_include lib/macmap
 
 export LAST_CONTAINER_LABEL="LAST-CONTAINER"
-export container_mpoint
+export container_selected
+export container_reason
 
-#
-# A container path can be supplied externally by setting the LAST_CONTAINER_PATH environment
-#  variable.  When the application starts it will automatically add to this path
-#  any mounted USB volumes labeled with the ${LAST_CONTAINER_LABEL} label.
-#
-# TBD: what happens when more than one such volume is mounted (can that happen?!?)
-#
+function container_init() {
+    #
+    # A container path can be supplied externally by setting the LAST_CONTAINER_PATH environment
+    #  variable.  When the application starts it will automatically add to this path
+    #  any mounted USB volumes labeled with the ${LAST_CONTAINER_LABEL} label.
+    #
+    # TBD: what happens when more than one such volume is mounted (can that happen?!?)
+    #
 
-# 0. If there is a selected_container in the environment, use it (set in last-tool)
-if [ "${selected_container}" ]; then
-    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${selected_container}")"
-fi
+    #
+    # 0. If there is a container_selected in the environment, use it (set in last-tool)
+    #
+    if [ "${container_selected}" ]; then
+        LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_selected}")"
+    fi
 
-# 1. If we have a local USB disk, it will be first-in-line
-read -r _ _ container_mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
-if [ "${container_mpoint}" ]; then
-    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
-fi
-
-ip_addr=$(macmap_get_local_ipaddr)
-if [ $(hostname -s) = last0 ]; then
-    container_mpoint="/last0/data2/LAST-CONTAINER"
-    LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
-elif [[ "${ip_addr}" == 10.23.1.* ]]; then
-    # try to force automount of the container
-    container_mpoint=/last0/LAST-CONTAINER
-    if [ "$(cd ${container_mpoint} >/dev/null 2>&1; echo cata*)" = catalogs ]; then
+    #
+    # 1. If we have a labeled local USB disk, it will be first-in-line
+    #
+    read -r _ _ container_mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
+    if [ "${container_mpoint}" ]; then
         LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
     fi
-elif [[ "${ip_addr}" == 10.23.3.* ]]; then
-    if [ "$(hostname -s)" = last12w ]; then
-        LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "/last12w/data2/LAST-CONTAINER")"
-    else
+
+    #
+    # 2. According to the local machine's IP address
+    #
+    local ip_addr=$(macmap_get_local_ipaddr)
+    if [ $(hostname -s) = last0 ]; then
+        container_mpoint="/last0/data2/LAST-CONTAINER"
+        LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
+    elif [[ "${ip_addr}" == 10.23.1.* ]]; then
         # try to force automount of the container
-        container_mpoint=/last12w/LAST-CONTAINER
+        container_mpoint=/last0/LAST-CONTAINER
         if [ "$(cd ${container_mpoint} >/dev/null 2>&1; echo cata*)" = catalogs ]; then
             LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
         fi
+    elif [[ "${ip_addr}" == 10.23.3.* ]]; then
+        if [ "$(hostname -s)" = last12w ]; then
+            container_lab_mpoint="/last12w/data2/LAST-CONTAINER"
+            LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_lab_mpoint}")"
+        else
+            # try to force automount of the container
+            container_lab_mpoint="/mnt/last12w/data2/LAST-CONTAINER"
+            mkdir -p ${container_lab_mpoint}
+            if [ ! "$(cd ${container_mpoint} >/dev/null 2>&1; echo cata*)" = catalogs ]; then
+                mount 10.23.3.24:/last12w/data2/LAST-CONTAINER ${container_lab_mpoint}
+                LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_lab_mpoint}")"
+            fi
+        fi
     fi
-fi
-unset container_mpoint ip_addr
+}
 
 function container_path() {
     echo "${LAST_CONTAINER_PATH}"
 }
 
 #
-# Searches for the first valid LAST-container along the LAST_CONTAINER_PATH
+# Searches for the first LAST-container along the LAST_CONTAINER_PATH
+#  that has what we're looking for
 #
 function container_lookup() {
+    local what="${1}"
     local container
 
     for container in $(path_to_list "${LAST_CONTAINER_PATH}"); do
-        if container_is_valid "${container}"; then
+        if container_has "${container}" "${what}"; then
             echo "${container}"
             return
         fi
     done
-}
-
-#
-# Check if a given path is a valid LAST deployment media container
-#
-function container_is_valid() {
-    declare container="${1}"
-    local -i errors=0
-
-    if [ ! -d "${container}" ]; then
-        # message_failure "\"${container}\" is not a directory" >&2
-        return 1
-    fi
-    
-    if [ ! -d "${container}/catalogs/GAIA/DRE3" ]; then
-        # message_failure "Missing \"catalogs/GAIA/DRE3\" in \"${container}\"" >&2
-        (( errors++ ))
-    fi
-    
-    if [ ! -d "${container}/catalogs/MergedCat" ]; then
-        # message_failure "Missing \"catalogs/MergedCat\" in \"${container}\"" >&2
-        (( errors++ ))
-    fi
-
-    if [ ! -d "${container}/matlab/R2020b" ]; then
-        # message_failure "Missing \"matlab/R2020b\" in \"${container}\"" >&2
-        (( errors++ ))
-    fi
-
-    local deb
-    deb="$( find "${container}"/packages -name 'last-tool-*.deb' )"
-    if [ ! "${deb}" ]; then
-        # message_failure "Missing \"last-tool\" debian package in \"${container}/packages\"" >&2
-        (( errors++ ))
-    fi
-
-    return $(( errors ))
 }
 
 #
@@ -121,7 +98,8 @@ function container_has() {
     case "${section}" in
 
     matlab)
-        if [ -d "${container_path}/matlab/R2020b" ]; then
+        local -a releases=( $(cd ${container_path}/matlab ; find -maxdepth 1 -type d -name 'R*' | sed -e 's;^..;;') )
+        if [ ${#releases[*]} -gt 0 ]; then
             return 0
         else
             return 1
@@ -129,27 +107,33 @@ function container_has() {
         ;;
     
     catalogs)
-        if [ -d "${container_path}/catalogs/GAIA/DRE3" ] && [ -d "${container_path}/catalogs/MergedCat/V1" ]; then
+        if [ -d "${container_path}/catalogs/GAIA/DR3" ] && [ -d "${container_path}/catalogs/MergedCat/V2" ]; then
             return 0
         else
             return 1
         fi
         ;;
 
-    software)
-        if [ -r "${container_path}/github-token" ]; then
-            return 0
-        else
-            return 1
-        fi
+    packages)
+        local package needed_packages=( nomachine_7.7.4_1_amd64.deb sdk_linux64_21.07.16.tgz wine+CME2.tgz )
+
+        for package in ${needed_packages[*]}; do
+            if [ ! -r ${container_path}/packages/${package} ]; then
+                return 1
+            fi
+        done
+        return 0
         ;;
 
-    wine)
-        if [ -r "${container_path}/wine.tgz" ]; then
-            return 0
-        else
-            return 1
-        fi
+
+    ssh)
+        local i
+        for i in id_rsa id_rsa.pub id_rsa.pem; do
+            if [ ! -r ${container_path}/files/ssh/${i} ]; then
+                return 1
+            fi
+        done
+        return 0
         ;;
 
     *)

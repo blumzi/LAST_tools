@@ -8,7 +8,7 @@ module_include lib/user
 sections_register_section "last-software" "Manages our own LAST software" "user ubuntu-packages"
 
 export fetcher last_software_github_repos_file
-fetcher="$(module_locate /bin/last-fetch-from-github)"
+fetcher="$(module_locate bin/last-fetch-from-github)"
 if [[ "${-}" == *x* ]]; then
     fetcher="bash -x ${fetcher}"
 fi
@@ -17,6 +17,12 @@ last_software_github_repos_file="$(module_locate files/github-repos)"
 declare -a last_software_selected_repos=()
 declare -g last_software_reclone=false
 declare -g -x last_software_list_only=false
+
+last_software_packages_container=
+
+function last_software_init() {
+    last_software_packages_container=$(container_lookup packages)
+}
 
 function last_software_helper() {
     cat <<- EOF
@@ -134,8 +140,8 @@ function last_software_enforce() {
         # Frome here on we need a LAST container
         #
 
-        if [ ! "${selected_container}" ] || [ ! -d "${selected_container}" ]; then
-            message_warning "No LAST-CONTAINER.  Only the github repositories were enforced"
+        if [ ! "${last_software_packages_container}" ]; then
+            message_warning "No LAST-CONTAINER with packages.  Only the github repositories were enforced"
             return
         fi
         
@@ -146,7 +152,7 @@ function last_software_enforce() {
         if ! macmap_this_is_last0; then
             # shellcheck disable=SC2154
             local wine_dir="${user_home}/.wine"
-            local wine_tgz="${selected_container}/packages/wine+CME2.tgz"
+            local wine_tgz="${last_software_packages_container}/packages/wine+CME2.tgz"
             message_info "Unpacking the wine+CME2 repository ..."
             if [ -d "${wine_dir}" ]; then
                 message_success "The directory ${wine_dir} exists"
@@ -168,7 +174,7 @@ function last_software_enforce() {
             # Unpack the QFY SDK
             #
             local libdir="/usr/local/lib"
-            local package="${selected_container}/packages/sdk_linux64_21.07.16.tgz"
+            local package="${last_software_packages_container}/packages/sdk_linux64_21.07.16.tgz"
 
             if [ -r "${libdir}/libqhyccd.so.21.7.16.13" ] && [ -L "${libdir}/libqhyccd.so" ] && [ -L "${libdir}/libqhyccd.so.20" ]; then
                 message_success "qhy: The QHY SDK (v21.7.16.13) is installed"
@@ -194,7 +200,7 @@ function last_software_enforce() {
         #
         if ! dpkg -L nomachine >/dev/null 2>&1; then
             local deb
-            deb="$( find "${selected_container}/packages" -name 'nomachine*' )"
+            deb="$( find "${last_software_packages_container}/packages" -name 'nomachine*' )"
 
             if [ "${deb}" ]; then
                 if dpkg --install "${deb}"; then
@@ -203,7 +209,7 @@ function last_software_enforce() {
                     message_failure "Could not install nomachine from \"${deb}\""
                 fi
             else
-                message_failure "Missing nomachine package in ${selected_container}/packages"
+                message_failure "Missing nomachine package in ${last_software_packages_container}/packages"
             fi
         else
             message_success "Nomachine is installed"

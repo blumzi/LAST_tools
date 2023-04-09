@@ -7,7 +7,6 @@ module_include lib/container
 module_include lib/service
 module_include lib/user
 
-export matlab_local_mac
 export matlab_selected_release _matlab_installed_release
 export -a _matlab_available_releases
 export matlab_releases_dir
@@ -17,6 +16,7 @@ matlab_selected_release="R2020b"
 matlab_default_release="R2020b"
 wis_account_number="40558509"
 matlab_hostname=$(hostname -s)
+matlab_container=
 
 # shellcheck disable=SC2154
 export user_startup="${user_matlabdir}/startup.m"
@@ -36,19 +36,18 @@ function matlab_available_releases() {
 function matlab_init() {
     sections_register_section "matlab" "Manages the MATLAB installation" "user apt last-software"
 
-    matlab_local_mac=$(macmap_get_local_mac)
-    
     read -r -a  _matlab_available_releases < <(
         cd "${matlab_releases_dir}" || return;
         find . -maxdepth 1 -name 'R*' -type d | sort | sed -e 's;^..;;'
     )
+    matlab_container=$( container_lookup matlab)
 }
 
 function matlab_enforce() {
     matlab_installation_enforce
     hash -r
 	matlab_startup_enforce
-    astropack_startup_enforce
+    matlab_astropack_startup_enforce
     matlab_support_enforce
     matlab_service_enforce
     matlab_config_enforce
@@ -73,7 +72,7 @@ function matlab_installed_release() {
     which matlab >& /dev/null
     status=${?}
     if (( status == 0 )); then
-        str="$( stat --format '%N' "$(which matlab)" | tr -d "'" | (read -r _ _ file; echo "${file}" ) )"
+	str=$(realpath $(which matlab))
         str="${str%/bin/matlab}"
         str="${str/*\/R/R}"
         echo "${str}"
@@ -90,7 +89,7 @@ function matlab_check() {
     
     matlab_installation_check;              (( ret += $? ))
     matlab_startup_check;                   (( ret += $? ))
-    astropack_startup_check;                (( ret += $? ))
+    matlab_astropack_startup_check;                (( ret += $? ))
     matlab_support_check;                   (( ret += $? ))
     matlab_service_check;                   (( ret += $? ))
     matlab_config_check;                    (( ret += $? ))
@@ -129,7 +128,7 @@ function matlab_installation_enforce() {
     else
         local_mac=$( macmap_get_local_mac )
 
-        container=${selected_container}
+        container=${matlab_container}
         installer=${container}/matlab/${matlab_selected_release}/install
         if [ ! -x "${installer}" ]; then
             message_fatal "Missing installer for Matlab ${matlab_selected_release} in ${installer}, exiting"
@@ -275,10 +274,10 @@ function matlab_installation_check() {
     #
     # It doesn't seem to be installed, can we install it?
     #
-    if [ "${selected_container}" ]; then
-        message_info "Checking available Matlab installations (for mac=${matlab_local_mac})"
+    if [ "${matlab_container}" ]; then
+        message_info "Checking available Matlab installations (for host=$(hostname -s))"
         local msg keys_file license_file
-        container="${selected_container}"
+        container="${matlab_container}"
         for deployable_release in $(cd "${container}/matlab" || exit; echo R*); do
 
             release_info_dir="${matlab_releases_dir}/${deployable_release}"
@@ -508,7 +507,7 @@ function matlab_support_check() {
 # AstroPack
 #
 
-function astropack_startup_check() {
+function matlab_astropack_startup_check() {
     local msg
     local -i ret=0
 
@@ -527,7 +526,7 @@ function astropack_startup_check() {
     return $(( ret ))
 }
 
-function astropack_startup_enforce() {
+function matlab_astropack_startup_enforce() {
     local script
     script="startup_Installer"
 
