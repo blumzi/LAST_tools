@@ -12,18 +12,7 @@ export LAST_TOOL_PID="${$}"
 
 module_include lib/message
 module_include lib/macmap
-
-#
-# Quick and dirty, use the user-supplied container argument
-#
-args=( ${@} )
-for ((i = 0; i < ${#args[*]}; i++ )); do
-	if [ ${args[${i}]} = -c ] || [ ${args[${i}]} = --container ]; then
-        export selected_container=${args[$((i+1))]}
-        break
-    fi
-done
-unset args i
+module_include lib/container
 
 module_include lib/container
 module_include lib/util
@@ -104,21 +93,22 @@ function show_environment() {
 
     export LAST_TOOL_DONTLOG=true   # inform message_xxx not to log
 
-    message_info ""
-    message_info "Environment:"
+    message_section "Environment:"
     message_info " LAST_MODULE_INCLUDE_PATH: ${LAST_MODULE_INCLUDE_PATH}"
     message_info "          LAST_TOOL_QUIET: ${LAST_TOOL_QUIET}"
 
-    message_info ""
-    message_info "Container(s):"
-    message_info "  Selected: ${selected_container:-$(container_lookup)}"
-    message_info "      Path: $(container_path)"
-    message_info ""
+    module_include lib/container
+
+    local -a last_container_path=( ${LAST_CONTAINER_PATH//:/ } )
+    message_section "Container(s):"
+    message_info "      Path: ${LAST_CONTAINER_PATH}"
+    message_info "   Default: ${last_container_path[0]}"
+    message_info "  Selected: ${container_selected:-No selected container}"
 
     local matlab_release
     matlab_release=$(matlab_installed_release)
     matlab_release=${matlab_release:-None}
-    message_info "Matlab:"
+    message_section "Matlab:"
     message_info "      Installed: ${matlab_release}"
     
     local -a available_matlabs available_matlab_dirs
@@ -140,8 +130,8 @@ function show_environment() {
         fi
     fi
 
-    local license_file
-    license_file="$(matlab_license_file)"
+    local license_file account="40558509"
+    license_file="/usr/local/MATLAB/${matlab_release}/licenses/license_$(hostname -s)_${account}_${matlab_release}.lic"
     msg="   License File: "       
     if [ -r "${license_file}" ]; then
         msg+="${license_file}"
@@ -149,15 +139,16 @@ function show_environment() {
         msg+="Missing"
     fi
     message_info "${msg}"
-    message_info ""
 
-    message_info "Sections:"
+    message_section "Sections:"
     message_info " Available:"
     list_sections
 
     message_info ""
-    message_info " Selected (ordered, including dependencies):"
-    for section in "${needed_sections[@]}"; do
+    message_info " In order of execution: (considering requirements)"
+    message_info "$(printf '   %-20s %-64s\n' "Section" "Description")"
+    message_info "$(printf '   %-20s %-64s\n' "-------" "-----------")"
+    for section in $(sections_ordered_sections "${registered_sections[*]}"); do
         message_info "$(printf '   %-20s %s\n' "${section}" "$(sections_section_description "${section}")")"
     done
 
@@ -168,12 +159,10 @@ function show_environment() {
     fi
     ipaddr="$(macmap_get_local_ipaddr)" || message_fatal "Cannot get IP address for local mac: ${mac}"
     hostname="$(macmap_get_local_hostname)" || message_fatal "Cannot get hostname for local mac: ${mac}"
-    message_info ""
-    message_info "Network:"
+    message_section "Network:"
     message_info "   MAC:        ${mac:-Could not get it}"
     message_info "   IP address: ${ipaddr:-Could not get it}"
     message_info "   hostname:   ${hostname:-Could not get it}"
-    message_info ""
 }
 
 function root_or_die() {
@@ -201,7 +190,6 @@ function show_version() {
 
 declare mode
 declare nodeps=false
-declare selected_container
 
 #
 # These modules will register sections
@@ -271,7 +259,7 @@ while [ "${#ARGV[@]}" -gt 0 ]; do
 			;;
 
 		-c|--container)
-			selected_container="${ARGV[1]}"
+			container_selected="${ARGV[1]}"
 			shiftARGV 2
 			continue
 			;;
@@ -291,10 +279,6 @@ while [ "${#ARGV[@]}" -gt 0 ]; do
 			;;
 	esac
 done
-
-if [ ! "${selected_container}" ]; then
-	selected_container="$( container_lookup )"
-fi
 
 # done with global flags, expect the mode
 case "${ARGV[0]}" in

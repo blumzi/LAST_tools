@@ -154,7 +154,7 @@ function filesystems_enforce() {
     if ! ${_filesystems_last0}; then
         tmp=$(mktemp)
         config_file="/etc/auto.master.d/last0.autofs"
-        mkdir -p $(dirname ${config_file})
+	mkdir -p $(dirname ${config_file})
         {
             grep -v last0 "${config_file}" 2> /dev/null
             echo "/last0 /etc/auto.last0"

@@ -22,18 +22,8 @@ function catalogs_init() {
     # shellcheck disable=SC1090
     source "$(module_locate sections/network.sh)"
     network_set_defaults
-    local container
 
-    if [ "${selected_container}" ]; then
-        container="${selected_container}"
-    else
-        container="$(container_lookup)"
-        if [ ! "${container}" ]; then
-            return
-        fi
-    fi
-
-    catalogs_container_top="${container}/catalogs"
+    catalogs_container_top="$(container_lookup catalogs)/catalogs"
 }
 
 #
