@@ -129,7 +129,7 @@ function container_has() {
         ;;
     
     catalogs)
-        if [ -d "${container_path}/catalogs/GAIA/DRE3" ] && [ -d "${container_path}/catalogs/MergedCat/V1" ]; then
+        if [ -d "${container_path}/catalogs/GAIA/DR3" ] && [ -d "${container_path}/catalogs/MergedCat/V2" ]; then
             return 0
         else
             return 1
