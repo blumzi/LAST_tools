@@ -68,3 +68,10 @@ function google_no_proxy() {
     google-chrome --user-data-dir=${tmp} --new-window --no-proxy-server "${@}" &
     /bin/rm -rf ${tmp}
 }
+
+#
+# Use 'less -R' as the git PAGER
+#
+function g() {
+    PAGER='less -R' git "${@}"
+}
