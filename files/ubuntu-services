@@ -1,0 +1,21 @@
+#
+# A list of ubuntu services that we stop and mask
+#
+
+# printing
+cups.service
+cups.socket
+cups.path
+cups-browsed
+
+avahi-daemon
+bluetooth
+apache2
+auditd
+ModemManager
+
+# one-wire services
+owfs
+owftpd
+owhttpd
+owserver

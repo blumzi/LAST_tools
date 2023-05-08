@@ -197,6 +197,7 @@ declare nodeps=false
 module_include sections/bios
 module_include sections/user
 module_include sections/ubuntu-packages
+module_include sections/ubuntu-services
 module_include sections/profile
 module_include sections/hostname
 module_include sections/apt
