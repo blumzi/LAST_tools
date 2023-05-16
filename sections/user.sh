@@ -102,6 +102,7 @@ function user_enforce() {
     user_enforce_mozilla_proxy
     user_enforce_pulseaudio    
     util_enforce_shortcut --override --favorite google-chrome
+    user_enforce_git_config
 
     local bash_aliases
     bash_aliases="$(module_locate files/root/home/ocs/.bash_aliases)"
@@ -181,6 +182,7 @@ function user_check() {
     user_check_mozilla_proxy;                       (( ret += ${?} ))
     user_check_pulseaudio;                          (( ret += ${?} ))
     util_check_shortcut --favorite google-chrome;   (( ret += ${?} ))
+    user_check_git_config;                          (( ret += ${?} ))
 
     return $(( ret ))
 }
@@ -242,6 +244,39 @@ function user_check_pulseaudio() {
 
 function user_enforce_chrome() {
     util_enforce_shortcut --override --favorite google-chrome
+}
+
+function user_enforce_git_config() {
+
+    git config --file ${user_git_global_config_file} user.name "${user_git_user_name}"
+    git config --file ${user_git_global_config_file} user.email "${user_git_user_email}"    # dummy
+    chown ${user_name}.${user_name} ${user_git_global_config_file}
+
+    message_success "git-config: Set dummy user name and email in \"${user_git_global_config_file}\""
+}
+
+
+function user_check_git_config() {
+    local ret=0
+
+    local user_name="$(git config --file ${user_git_global_config_file} user.name)"
+    local user_email="$(git config --file ${user_git_global_config_file} user.email)"
+
+    if [ "${user_name}" = "${user_git_user_name}" ]; then
+        message_success "git-config: The user name is set to \"${user_name}\" (in ${user_git_global_config_file})"
+    else
+        message_failure "git-config: The user name is set to \"${user_name}\" instead of \"${user_git_user_name}\" (in ${user_git_global_config_file})"
+        (( ret++ ))
+    fi
+
+    if [ "${user_email}" = "${user_git_user_email}" ]; then
+        message_success "git-config: The user email is set to \"${user_email}\" (in ${user_git_global_config_file})"
+    else
+        message_failure "git-config: The user email is set to \"${user_email}\" instead of \"${user_git_user_email}\" (in ${user_git_global_config_file})"
+        (( ret++ ))
+    fi
+
+    return $(( ret ))
 }
 
 
