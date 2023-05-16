@@ -118,10 +118,15 @@ function last_software_list_repos() {
 }
 
 function last_software_enforce() {
+    local -a non_ocs_files
+
     if ${last_software_list_only}; then
         last_software_list_repos
         return
     fi
+    
+    message_info "Forcing ${user_name}.${user_name} ownership in ${user_matlabdir}/{AstroPack,LAST} ..."
+    chown -R ${user_name}.${user_name} ${user_matlabdir}/AstroPack ${user_matlabdir}/LAST
     
     message_info "Fetching the LAST software from github ..."
 
@@ -135,9 +140,15 @@ function last_software_enforce() {
     # shellcheck disable=SC2154
     su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir}"
 
+    local dirs=( ${user_matlabdir}/AstroPack ${user_matlabdir}/LAST )
+    non_ocs_files=( $(find ${dirs[*]} \! -user ${user_name}) )
+    if [ ${#non_ocs_files[*]} -ne 0 ]; then
+        message_warning "There are ${#non_ocs_files[*]} files not owned by ${user_name} under ${dirs[*]}"
+    fi
+
     if ${last_software_extras} && ! ${last_software_repos_were_selected}; then
         #
-        # Frome here on we need a LAST container
+        # From here on we need a LAST container
         #
 
         if [ ! "${last_software_packages_container}" ]; then
@@ -236,6 +247,13 @@ function last_software_check() {
 
     su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir} --check"
     (( ret += $? ))
+
+    local dirs=( ${user_matlabdir}/AstroPack ${user_matlabdir}/LAST )
+    non_ocs_files=( $(find ${dirs[*]} \! -user ${user_name}) )
+    if [ ${#non_ocs_files[*]} -ne 0 ]; then
+        message_warning "There are ${#non_ocs_files[*]} files not owned by ${user_name} under ${dirs[*]}"
+        (( ret++ ))
+    fi
 
     if ${last_software_extras}; then
         if ! macmap_this_is_last0; then
