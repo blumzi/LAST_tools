@@ -63,17 +63,15 @@ if [ ! "${cmd}" ]; then
     exit 1
 fi
 
-if [ ${#hosts[*]} -eq 1 ]; then
-    export LAST_TOOL_QUIET=true
-fi
-
 module_include lib/message
 
 for host in ${hosts[*]}; do
     message_section "${host}"
-    ssh -o ConnectTimeout=${timeout} -X ocs@${host} "${cmd}" 2>/dev/null
+    err=$(mktemp)
+    ssh -o "ConnectTimeout=${timeout}" -X ocs@${host} "${cmd}" 2>${err}
     status=${?}
     if [ ${status} -ne 0 ]; then
-        message_failure "Failed (rc=${?})"
+        message_failure "ssh failure (status=${status}, err=\"$(tr -d '\r' <  ${err})\")"
     fi
+    /bin/rm ${err}
 done
