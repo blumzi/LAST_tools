@@ -40,7 +40,7 @@ function global_help() {
 
     Usage: ${PROG} [[flag] ...] <mode> [[section] ...] 
 
-     Flags:
+     $(ansi_bold Flags:)
      -h|--help:        show this help and exit
      -v|--version:     show version and exit
      -i|--info:        show info and exit
@@ -48,7 +48,7 @@ function global_help() {
      -n|--nodeps:      don't do section dependencies (default: dependant sections will be added)
      -c|--container:   select a LAST container (default: first valid container in LAST_CONTAINER_PATH, currently "$(container_path)"))
 
-     Running <mode>:
+     $(ansi_bold "Running <mode>":)
       One running <mode> must be selected from the following (no default):
         check:                Checks if the current machine complies with the LAST installation policy
         enforce|make:         Enforces the LAST installation policy upon the current machine
@@ -56,7 +56,7 @@ function global_help() {
         show-policy|policy:   Prints out the LAST policy for the seected section(s)
         list-sections:        Just list all the available sections
 
-     Sections:
+     $(ansi_bold Sections:)
       The workload is split into (possibly inter-dependant) sections.
       - To get a list of the defined sections run:
           $ $(ansi_bold "${PROG} list-sections")
@@ -275,6 +275,13 @@ while [ "${#ARGV[@]}" -gt 0 ]; do
             exit 0
             ;;
 
+		-*|--*)
+            message_failure ""
+			message_failure "Invalid flag \"${ARGV[0]}\", please see $(ansi_bold 'Flags:') in help message below"
+			global_help
+            exit 1
+            ;;
+
 		*)
 			break
 			;;
@@ -313,6 +320,13 @@ case "${ARGV[0]}" in
 		exit 0
 		;;
 
+    *)
+        message_failure ""
+        message_failure "Invalid running mode \"${ARGV[0]}\", please see $(ansi_bold 'Running <mode>:') in help message below"
+        global_help
+        exit 1
+        ;;
+
 esac
 
 if [ ! "${mode}" ]; then
@@ -337,7 +351,14 @@ while [ ${#ARGV[*]} -ne 0 ]; do
         fi
     done
     if ! ${valid_section}; then
-        message_fatal "Unknown section \"${ARGV[0]}\"."
+        message_info ""
+        message_failure "Invalid section $(ansi_bold ${ARGV[0]}). Valid sections are:"
+        sorted_sections=( $( for i in "${registered_sections[@]}"; do echo ${i}; done | sort) )
+        echo "${sorted_sections[@]}" | fmt -70 | while read line; do
+            message_info "    ${line}"
+        done
+        global_help
+        exit 1
     fi
 done
 
