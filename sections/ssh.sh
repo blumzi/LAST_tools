@@ -25,6 +25,7 @@ function ssh_enforce() {
 	fi
 
     ssh_enforce_keys
+    ssh_enforce_encoded_password
 }
 
 function ssh_check() {
@@ -35,6 +36,7 @@ function ssh_check() {
     fi
 
     ssh_check_keys
+    ssh_check_encoded_password
 }
 
 function ssh_policy() {
@@ -174,4 +176,36 @@ function ssh_check_keys() {
         message_success "Passwordless ${user_name} ssh to localhost works"
     fi
       
+}
+
+function ssh_check_encoded_password() {
+	local file=${user_home}/.ssh/pass.enc
+	local ret=0
+    local container_dir=$(container_lookup ssh)
+
+	if [ -r ${file} ]; then
+		message_success "Encrypted password exists"
+	else
+		if [ -r "${container_dir}/files/ssh/pass.enc" ]; then
+			message_failure "Encrypted password is missing (but there is one in the LAST_CONTAINER)"
+		else
+			message_failure "Encrypted password is missing"
+		fi
+		(( ret++ ))
+	fi
+	return $(( ret ))
+}
+
+function ssh_enforce_encoded_password() {
+    local container_dir=$(container_lookup ssh)
+	local container_file="${container_dir}/files/ssh/pass.enc"
+	local user_file="${user_home}/.ssh/pass.enc"
+
+	if [ ! -r ${container_file} ]; then
+		message_failure "Missing ${container_file}."
+	else
+		cp ${container_file} ${user_file}
+		chown ${user_name}.${user_group} ${user_file}
+		message_success "Copied encrypted password from container"
+	fi
 }
