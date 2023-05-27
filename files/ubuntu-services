@@ -19,3 +19,6 @@ owfs
 owftpd
 owhttpd
 owserver
+
+# apt daily upgrade
+apt-daily-upgrade
