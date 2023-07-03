@@ -1,0 +1,75 @@
+#!/bin/bash
+
+PROG=$(basename ${0})
+source /etc/profile.d/last.sh
+
+
+PROG=$(basename "${0}")
+hostname="$(hostname -s)"
+tops="/${hostname}/data[12]"
+
+# sync_user="ocs"
+# sync_host="euler1"
+# sync_top="/var/www/html/data"
+
+sync_user="last"
+sync_host="marvin"
+sync_top="/BIGDATA/last/data/temp"
+
+function usage() {
+    cat <<- EOF
+
+    The LAST pipeline generates products which need to be uploaded to WIS.  As soon as the pipeline 
+     finishes working with a specific directory it adds a 'ready-for-transfer' event to the status-change
+     file in that directory (a file named .status)
+
+    This program runs periodically (cron !?!) and initiates transfers of products that have not been
+     backed-up when they were produced (we had no link to WIS, etc.).
+
+    This host:
+        sources:      ${tops}
+
+    Backup host:
+        host:         ${sync_host}
+        user:         ${sync_user}
+        destination:  ${sync_top} 
+
+EOF
+}
+
+function initiate_transfer() {
+    local src="${1}"
+    local dst="${2}"
+    local rc
+
+    LAST_TOOL_QUIET=true last-parallel-rsync --source=${src} --target=${sync_user}@${sync_host}:${sync_top}
+    rc=${?}
+
+    if [ ${rc} -eq 0 ]; then
+        echo "$(date --iso-8601=seconds) transfered" >> ${status_file}
+    fi
+
+    return ${rc}
+}
+
+if [ "${1}" = '-h' ] || [ "${1}" = "--help" ]; then
+    usage
+    exit 0
+fi
+
+export RSYNC_RSH="ssh -T -c aes128-ctr -o Compression=no -x"
+
+while read -r path; do
+    if [[ "${path}" != */.status ]]; then
+        continue
+    fi
+
+    status_file=${path}
+    dir=$(dirname ${status_file})
+
+    if grep -qw ready-for-transfer "${status_file}" && ! grep -qw transfered "${status_file}"; then
+        initiate_transfer "${dir}" "${sync_user}@${sync_host}:${sync_top}/${dir}"
+        rc=${?}
+    fi
+
+done < <(find ${tops} -type f -name .status | sort -t/ --key=6n --key=8n)
