@@ -43,6 +43,8 @@ else
 	ln -sf ${LAST_TOP}/bin/last-ds9-feeder 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9-feeder
 	ln -sf ${LAST_TOP}/bin/last-ds9		 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9
 	ln -sf ${LAST_TOP}/bin/last-parallel-rsync              ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-parallel-rsync
+	ln -sf ${LAST_TOP}/bin/last-rsync-watcher               ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-rsync-watcher
+	ln -sf ${LAST_TOP}/bin/last-rsync-catchup               ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-rsync-catchup
 	ln -sf ${LAST_TOP}/bin/last-fetch-from-github 			${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
 	ln -sf ${LAST_TOP}/files/root/etc/profile.d/last.sh 	${PACKAGE_DIR}/etc/profile.d/last.sh
 	ln -sf ${LAST_TOP}/bin/last-asroot 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-asroot
