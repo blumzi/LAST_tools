@@ -41,7 +41,8 @@ function last_software_helper() {
          -R|--reclone      - discard local changes and re-clone the (selected) repos - $(ansi_bright_red OUCH)!
          -e|--extras       - Handle the 'extras' (see below)
         -ne|--no-extras    - Do not handle the 'extras' (see below)
-         -s|--space <name> - Instead of using the github-repos file, use github-repos.<name>
+         -s|--space <name> - Workspaces are defined by their github-repos map (in /usr/local/share/last-software/files)
+                              This flag selects github-repos.<name> (default: github-repos)
 
     Extras:
         These are packages that can be checked/enforced but are not maintained in the github repos.  They are
