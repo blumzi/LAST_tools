@@ -28,10 +28,10 @@ function last_software_helper() {
     cat <<- EOF
 
     Usage:
-        ${PROG} enforce|check|policy last-software -l|--list
+        ${PROG} enforce|check|policy last-software -l|--list [-s|--space <name>]
             - lists the managed LAST software repositories
 
-        ${PROG} enforce last-software [[-r|--repo <repo>] ...] [-R|--reclone]
+        ${PROG} enforce last-software [[-r|--repo <repo>] ...] [-R|--reclone] [-s|--space <name>]
             - clones or pulls the specified repos (default: all repos).
             - with --reclone, discards local changes and re-clones the repository(ies) - $(ansi_bright_red DANGEROUS)
 
@@ -41,6 +41,7 @@ function last_software_helper() {
          -R|--reclone      - discard local changes and re-clone the (selected) repos - $(ansi_bright_red OUCH)!
          -e|--extras       - Handle the 'extras' (see below)
         -ne|--no-extras    - Do not handle the 'extras' (see below)
+         -s|--space <name> - Instead of using the github-repos file, use github-repos.<name>
 
     Extras:
         These are packages that can be checked/enforced but are not maintained in the github repos.  They are
@@ -89,6 +90,11 @@ function last_software_arg_parser() {
             requested_no_extras=true
             shiftARGV 1
             ;;
+        
+        -s|--space)
+            export last_software_space="${ARGV[1]}"
+            shiftARGV 2
+            ;;
 
         *)
             if ${requested_extras} && ${requested_no_extras}; then
@@ -99,7 +105,7 @@ function last_software_arg_parser() {
                 if ${requested_extras}; then
                     last_software_extras=true
                 fi
-	    fi
+	        fi
 
             last_software_extras=${requested_extras}
             return
@@ -109,12 +115,20 @@ function last_software_arg_parser() {
 }
 
 function last_software_list_repos() {
+    if [ ! "${last_software_space}" ]; then
+        github_repos_file=$(module_locate files/github-repos)
+    else
+        github_repos_file=$(module_locate files/github-repos.${last_software_space})
+    fi
+
+    echo ""
+    echo "Working space file: $(ansi_bright_green "${github_repos_file}")"
     echo ""
     printf " %-40s %-70s %s\n" "Repository" "URL" "Flags"
     printf " %-40s %-70s %s\n" "==========" "===" "====="
     while read -r repo url flags _; do
         printf " %-40s %-70s %s\n" "${repo}" "${url}" "${flags}"
-    done < <(util_uncomment "$(module_locate files/github-repos)")    
+    done < <(util_uncomment "${github_repos_file}")    
 }
 
 function last_software_enforce() {
@@ -137,6 +151,11 @@ function last_software_enforce() {
     for repo in "${last_software_selected_repos[@]}"; do
         args+="--repo=${repo} "
     done
+
+    if [ "${last_software_space}" ]; then
+        args+="--space ${last_software_space}"
+    fi
+    
     # shellcheck disable=SC2154
     su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir}"
 
@@ -244,6 +263,10 @@ function last_software_check() {
     for repo in "${last_software_selected_repos[@]}"; do
         args+="--repo=${repo} "
     done
+
+    if [ "${last_software_space}" ]; then
+        args+="--space ${last_software_space}"
+    fi
 
     su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir} --check"
     (( ret += $? ))

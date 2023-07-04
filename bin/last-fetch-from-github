@@ -27,18 +27,20 @@ declare reclone=false
 # shellcheck disable=SC2154
 eval top_dir="${user_matlabdir}"
 
-declare line repo url checkout_info token_name
-while read -r line; do
-    read -r repo url checkout_info token_name _ <<< "${line}"
-    if [ ! "${repo}" ] || [ ! "${url}" ] || [ ! "${checkout_info}" ] || [ ! "${token_name}" ]; then
-        message_fatal "Badly formed line \"${line}\" in \"${github_repos_file}\"."
-    fi
+function load_repos_file() {
+    declare line repo url checkout_info token_name
+    while read -r line; do
+        read -r repo url checkout_info token_name _ <<< "${line}"
+        if [ ! "${repo}" ] || [ ! "${url}" ] || [ ! "${checkout_info}" ] || [ ! "${token_name}" ]; then
+            message_fatal "Badly formed line \"${line}\" in \"${github_repos_file}\"."
+        fi
 
- git_checkout_info["${repo}"]="${checkout_info}"
-    git_token_name["${repo}"]="${token_name}"
-          git_repo["${repo}"]="${url}"
+    git_checkout_info["${repo}"]="${checkout_info}"
+        git_token_name["${repo}"]="${token_name}"
+            git_repo["${repo}"]="${url}"
 
-done < <(util_uncomment "${github_repos_file}")
+    done < <(util_uncomment "${github_repos_file}")
+}
 
 function sorted_repos() {
     declare -a sorted
@@ -68,7 +70,7 @@ function help() {
 
     This tool clones (or pulls) the LAST software from github.
 
-    Usage: ${PROG} [[-r|--repo <repo>] ...] [-R|--reclone] [-d|--dir dir] [-c|--check] [-t|--token-file dir]
+    Usage: ${PROG} [[-r|--repo <repo>] ...] [-R|--reclone] [-d|--dir dir] [-c|--check] [-t|--token-file dir] [-s|--space <name>]
            ${PROG} --help
 
      -c|--check:         check only, don't enforce
@@ -77,6 +79,7 @@ function help() {
      -h|--help:          show this help
      -r|--repo <repo>:   specify repositories (default: all repositories)
      -R|--reclone:       discard local changes and re-clone the selected repositories (default: all) - DANGEROUS!!!
+     -s|--space <name>:  use the named working space (default: as defined by $(module_locate files/github-repos))
 
      NOTE: This tool must be run as ${user_name}
 
@@ -96,10 +99,11 @@ function list_repos() {
     done
 }
 
-OPTS=$( getopt -o 'hd:clt:r:R' --long "help,dir:,check,list,token-file:,repo:,reclone" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'hd:clt:r:Rs:' --long "help,dir:,check,list,token-file:,repo:,reclone,space:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 check=false
+list=false
 while true; do
 	case "${1}" in
 
@@ -119,8 +123,8 @@ while true; do
         ;;
 
     -l|--list)
-        list_repos
-        exit 0
+        list=true
+        shift 1
         ;;
 
     -t|--token-file)
@@ -141,6 +145,11 @@ while true; do
         reclone=true
         shift 1
         ;;
+    
+    -s|--space)
+        space="${2}"
+        shift 2
+        ;;
 
 	--)
 		shift 1
@@ -148,6 +157,18 @@ while true; do
 		;;
 	esac
 done
+
+if [ "${space}" ]; then
+    github_repos_file=$(module_locate files/github-repos.${space})
+else
+    github_repos_file=$(module_locate files/github-repos)
+fi
+load_repos_file
+
+if ${list}; then
+    list_repos
+    exit 0
+fi
 
 if ${check}; then
     if [ ! -d "${top_dir}" ]; then
@@ -157,6 +178,9 @@ if ${check}; then
 
     declare -i errors=0
     cd "${top_dir}" || exit 1
+    echo ""
+    echo "Workspace file: $(ansi_bright_green ${github_repos_file})"
+    echo ""
     for dir in $( sorted_repos ); do
         if ! repo_was_selected "${dir}"; then
             continue
@@ -170,7 +194,7 @@ if ${check}; then
             git status >/dev/null 2>&1
             status=$?
             if (( status == 0 )); then
-                message_success "Repository \"${top_dir}/${dir}\" is OK"
+                message_success "Repository \"${top_dir}/${dir}\" ($(ansi_bold "${git_checkout_info[${dir}]}")) is OK"
             else
                 message_failure "Git status on repository \"${top_dir}/${dir}\" failed (status: ${status})"
                 (( errors++ ))
