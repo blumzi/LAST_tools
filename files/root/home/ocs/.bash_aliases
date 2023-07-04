@@ -75,3 +75,11 @@ function google_no_proxy() {
 function g() {
     PAGER='less -R' git "${@}"
 }
+
+
+function startUnit() {
+    local hostname=$(hostname -s)
+    local id=${hostname:4:2}
+
+    last-matlab -nosplash -nodesktop -r "Unit=obs.unitCS('"${id}"'); for i=1:4, Unit.Slave{i}.RemoteTerminal='none'; Unit.Slave{i}.Logging=true; Unit.Slave{i}.LoggingDir='~/log/SlaveLogs'; end"
+}
