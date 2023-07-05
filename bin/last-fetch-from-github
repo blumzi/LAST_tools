@@ -36,8 +36,8 @@ function load_repos_file() {
         fi
 
     git_checkout_info["${repo}"]="${checkout_info}"
-        git_token_name["${repo}"]="${token_name}"
-            git_repo["${repo}"]="${url}"
+       git_token_name["${repo}"]="${token_name}"
+             git_repo["${repo}"]="${url}"
 
     done < <(util_uncomment "${github_repos_file}")
 }
@@ -170,6 +170,8 @@ if ${list}; then
     exit 0
 fi
 
+load_repos_file
+
 if ${check}; then
     if [ ! -d "${top_dir}" ]; then
         message_fatal "No such directory \"${top_dir}\""
@@ -190,14 +192,35 @@ if ${check}; then
             #
             # TBD: check branch and tag
             #
+            branch=''
+            tag=''
+            checkout_info=${git_checkout_info[${dir}]}
+            for info in ${checkout_info//,/ }; do
+                eval "${info/:/=}"
+            done
             pushd "${dir}" >/dev/null || true
+            current_branch="$(git branch --show-current)"
+            current_tag="$(git describe --tags --abbrev=0 2>/dev/null)"
             git status >/dev/null 2>&1
             status=$?
-            if (( status == 0 )); then
-                message_success "Repository \"${top_dir}/${dir}\" ($(ansi_bold "${git_checkout_info[${dir}]}")) is OK"
-            else
+            if (( status != 0 )); then
                 message_failure "Git status on repository \"${top_dir}/${dir}\" failed (status: ${status})"
                 (( errors++ ))
+            else
+                badies=()
+                if [ "${branch}" != "${current_branch}" ]; then
+                    badies+=( "branch \"${current_branch}\" instead of \"${branch}\"" )
+                fi
+                if [ "${tag}" ] && [ "${tag}" != "${current_tag}" ]; then
+                    badies+=( "tag \"${current_tag}\" instead of \"${tag}\"" )
+                fi
+
+                if [ ${#badies[@]} -ne 0 ]; then
+                    message_failure "Repository \"${top_dir}/${dir}\": $(util_str_join ", " "${badies[@]}")"
+                    (( errors++ ))
+                else
+                    message_success "Repository \"${top_dir}/${dir}\" OK"
+                fi
             fi
             popd >/dev/null || true
         else

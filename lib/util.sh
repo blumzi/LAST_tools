@@ -145,3 +145,11 @@ function util_check_shortcut() {
 
     return $(( ret ))
 }
+
+function util_str_join() {
+  local d=${1-} f=${2-}
+  
+  if shift 2; then
+    printf %s "$f" "${@/#/$d}"
+  fi
+}
