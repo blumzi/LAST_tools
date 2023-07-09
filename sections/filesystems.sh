@@ -75,11 +75,6 @@ function filesystems_enforce() {
                 fi
                 echo "${dev} /${local_hostname}/${_filesystems_devmap[${key}]}  ext4 defaults 0 0"
             done
-
-            # add cross-mount lines
-            echo ""
-            echo "${peer_hostname}:/${peer_hostname}/data1 /${peer_hostname}/data1 nfs defaults 0 0"
-            echo "${peer_hostname}:/${peer_hostname}/data2 /${peer_hostname}/data2 nfs defaults 0 0"
         } > "${tmp}"
     fi
     mv "${tmp}" "${config_file}"
@@ -137,14 +132,6 @@ function filesystems_enforce() {
         message_failure "Failed to (re)mount the local filesystems"
     fi
 
-    if timeout 2 ping -w 1 -c 1 "${peer_hostname}" >&/dev/null; then
-        message_info "Mounting filesystems from peer machine \"${peer_hostname}\"."
-        mount --all --type nfs &
-    else
-        message_warning "Backgrounding mounting of filesystems from peer machine \"${peer_hostname}\"."
-        mount --all --type nfs &
-    fi
-
     chmod 755 /"${local_hostname}"/data*
     message_success "Changed permission to 755 on exported filesystems /${local_hostname}/data* ... "
 
@@ -154,13 +141,14 @@ function filesystems_enforce() {
     if ! ${_filesystems_last0}; then
         tmp=$(mktemp)
         config_file="/etc/auto.master.d/last0.autofs"
-	mkdir -p $(dirname ${config_file})
+        mkdir -p $(dirname ${config_file})
         {
             grep -v last0 "${config_file}" 2> /dev/null
             echo "/last0 /etc/auto.last0"
         } > "${tmp}"
         mv "${tmp}" "${config_file}"
         chmod 644 "${config_file}"
+        mkdir -p /last0
         message_success "Updated autofs master map (${config_file})."
 
         config_file="/etc/auto.last0"
@@ -168,7 +156,28 @@ function filesystems_enforce() {
         chmod 644 ${config_file}
         message_success "Updated autofs last0 map (${config_file})."
 
-        mkdir -p /last0
+        config_file=/etc/auto.master.d/${peer_hostname}.autofs
+        {
+            grep -vq "^/${peer_hostname}" ${config_file}
+            echo "/${peer_hostname} /etc/auto.${peer_hostname}"
+        } > ${tmp}
+        mv "${tmp}" "${config_file}"
+        chmod 644 "${config_file}"
+        message_success "Updated autofs master map (${config_file})."
+
+        config_file=/etc/auto.${peer_hostname}
+        {
+            grep -vq "^/data[12]" ${config_file}
+            for d in data1 data2; do
+                echo "/${d} -rw,hard,bg ${peer_hostname}:/${peer_hostname}/${d}"
+            done
+        } > ${tmp}
+        mv "${tmp}" "${config_file}"
+        chmod 644 "${config_file}"
+        message_success "Updated autofs map (${config_file})."
+
+        mkdir -p ${peer_hostname}/data{1,2}
+
         systemctl start autofs
     fi
 }
@@ -247,17 +256,6 @@ function filesystems_check_config() {
         fi
     done
 
-    # check fstab entries for mounting peer machine's filesystems
-    for d in /${peer_hostname}/{data1,data2}; do    
-        read -r -a entry <<< "$( grep "^${peer_hostname}:${d}[[:space:]]*${d}[[:space:]]*nfs[[:space:]]*defaults[[:space:]]*0[[:space:]]*0" "${config_file}" )"
-        if [ ${#entry[*]} -eq 6 ]; then
-            message_success "Entry for ${d} in ${config_file} exists and is valid"
-        else
-            message_failure "Missing or botched entry for ${d} in ${config_file}"
-            (( ret++ ))
-        fi
-    done
-
     # check filesytem export entries
     config_file="/etc/exports"
     for d in /${local_hostname}/data{1,2}; do
@@ -301,6 +299,43 @@ function filesystems_check_config() {
     else
         message_success "last0: ${dir} is accessible"
     fi
+
+    config_file=/etc/auto.master.d/${peer_hostname}.autofs
+    if [ -r ${config_file} ]; then
+        local line="/${peer_hostname} /etc/auto.${peer_hostname}"
+        if grep -q '^'"${line}"'$' ${config_file}; then
+            message_success "Peer automount: The file ${config_file} contains a line for ${peer_hostname}"
+        else
+            message_failure "Peer automount: The file ${config_file} misses a line for ${peer_hostname}"
+            (( ret++ ))
+        fi
+    else
+        message_failure "Peer automount: Missing ${config_file}"
+    fi
+
+    config_file=/etc/auto.${peer_hostname}
+    if [ -r ${config_file} ]; then
+        local line1="/data1 -rw,hard,bg ${peer_hostname}:/last06w/data1"
+        local line2="/data2 -rw,hard,bg ${peer_hostname}:/last06w/data2"
+
+        if grep -q '^'"${line1}"'$' ${config_file}; then
+            message_success "Peer automount: ${config_file} contains a line for data1"
+        else
+            message_failure "Peer automount: ${config_file} misses a line for data1"
+            (( ret++ ))
+        fi
+
+        if grep -q '^'"${line2}"'$' ${config_file}; then
+            message_success "Peer automount: ${config_file} contains a line for data2"
+        else
+            message_failure "Peer automount: ${config_file} misses a line for data2"
+            (( ret++ ))
+        fi
+    else
+        message_failure "Peer automount: Missing ${config_file}"
+        (( ret++ ))
+    fi
+
 
     return $(( ret ))
 }
