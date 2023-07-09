@@ -62,7 +62,8 @@ function filesystems_enforce() {
         local_hostname=$( macmap_get_local_hostname )
          peer_hostname=$( macmap_get_peer_hostname  )
 
-        mkdir -p /"${local_hostname}"/{data,data1,data2} /"${peer_hostname}"/{data1,data2}
+        mkdir -p /"${local_hostname}"/{data,data1,data2}
+	mkdir -p /"${peer_hostname}"/{data1,data2} 2>/dev/null
 
         {
             grep -vE "(/dev/sd[abc]|${local_hostname}|${peer_hostname})" ${config_file} | grep -v '^[[:space:]]*$'		# keep non-related lines
@@ -86,7 +87,7 @@ function filesystems_enforce() {
     tmp=$(mktemp)
     config_file="/etc/exports"
     {
-        local line="/usr/local/LAST-CONTAINER " net
+        local line="/last0/data2/LAST-CONTAINER " net
         
         for net in $(macmap_last_networks); do
             line+=" ${net}(${_filesystems_mount_options})"
@@ -167,16 +168,16 @@ function filesystems_enforce() {
 
         config_file=/etc/auto.${peer_hostname}
         {
-            grep -vq "^/data[12]" ${config_file}
+            grep -vq "data[12]" ${config_file}
             for d in data1 data2; do
-                echo "/${d} -rw,hard,bg ${peer_hostname}:/${peer_hostname}/${d}"
+                echo "${d} -rw,hard,bg ${peer_hostname}:/${peer_hostname}/${d}"
             done
         } > ${tmp}
         mv "${tmp}" "${config_file}"
         chmod 644 "${config_file}"
         message_success "Updated autofs map (${config_file})."
 
-        mkdir -p ${peer_hostname}/data{1,2}
+        mkdir -p /${peer_hostname}/data{1,2}
 
         systemctl start autofs
     fi
@@ -304,9 +305,9 @@ function filesystems_check_config() {
     if [ -r ${config_file} ]; then
         local line="/${peer_hostname} /etc/auto.${peer_hostname}"
         if grep -q '^'"${line}"'$' ${config_file}; then
-            message_success "Peer automount: The file ${config_file} contains a line for ${peer_hostname}"
+            message_success "Peer automount: The file ${config_file} contains \"${line}\"."
         else
-            message_failure "Peer automount: The file ${config_file} misses a line for ${peer_hostname}"
+            message_failure "Peer automount: The file ${config_file} misses \"${line}\"."
             (( ret++ ))
         fi
     else
@@ -315,20 +316,20 @@ function filesystems_check_config() {
 
     config_file=/etc/auto.${peer_hostname}
     if [ -r ${config_file} ]; then
-        local line1="/data1 -rw,hard,bg ${peer_hostname}:/last06w/data1"
-        local line2="/data2 -rw,hard,bg ${peer_hostname}:/last06w/data2"
+        local line1="data1 -rw,hard,bg ${peer_hostname}:/${peer_hostname}/data1"
+        local line2="data2 -rw,hard,bg ${peer_hostname}:/${peer_hostname}/data2"
 
         if grep -q '^'"${line1}"'$' ${config_file}; then
-            message_success "Peer automount: ${config_file} contains a line for data1"
+            message_success "Peer automount: ${config_file} contains \"${line1}\""
         else
-            message_failure "Peer automount: ${config_file} misses a line for data1"
+            message_failure "Peer automount: ${config_file} misses \"${line1}\""
             (( ret++ ))
         fi
 
         if grep -q '^'"${line2}"'$' ${config_file}; then
-            message_success "Peer automount: ${config_file} contains a line for data2"
+            message_success "Peer automount: ${config_file} contains \"${line2}\""
         else
-            message_failure "Peer automount: ${config_file} misses a line for data2"
+            message_failure "Peer automount: ${config_file} misses \"${line2}\""
             (( ret++ ))
         fi
     else
