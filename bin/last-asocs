@@ -70,7 +70,7 @@ for host in ${hosts[*]}; do
     err=$(mktemp)
     ssh -o "ConnectTimeout=${timeout}" -X ocs@${host} "${cmd}" 2>${err}
     status=${?}
-    if [ ${status} -ne 0 ]; then
+    if [ ${status} -eq 255 ]; then
         message_failure "ssh failure (status=${status}, err=\"$(tr -d '\r' <  ${err})\")"
     fi
     /bin/rm ${err}
