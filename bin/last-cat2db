@@ -1,0 +1,83 @@
+#!/bin/bash
+
+. /etc/profile.d/last.sh
+
+module_include lib/message
+module_include lib/postgres
+
+#
+# Gets the path to a ".status" file created by the LAST pipeline
+# If the file:
+#  - contains a "ready-for-db" line but
+#  - does not a contain an "inserted-to-db" line
+# It looks for files named "*_Cat_*.csv" and inserts the contents into the last_operational
+#  database.  It then adds a "inserted-to-db" line in the ".status" file
+#
+
+PROG=$(basename ${0})
+LAST_TOOL_PID=${$}
+
+if [ ${#} -ne 1 ] || [[ "$(basename ${1})" != .status ]]; then
+    message_fatal "Argument must be a path ending in \".status\""
+fi
+
+status_file=${1}
+status_dir=$(dirname ${status_file})
+
+ready_flag="ready-for-DB"
+inserted_flag="inserted-to-DB"
+backslash=$'\x5c'
+
+if grep -q "${ready_flag}" ${status_file}; then
+    if grep -q "${inserted_flag}" ${status_file}; then
+        exit 0
+    fi
+else
+    exit 0
+fi
+
+#
+# We have a ready-for-db line but not a inserted-to-db line
+#
+
+stderr=$(mktemp)
+stdout=$(mktemp)
+
+for csv_file in $(find ${status_dir} -maxdepth 1 -name '*_Cat_*.csv'); do
+    header=$(read line < ${csv_file}; echo "${line}")
+    if [[ "${csv_file}" == *_proc_* ]]; then
+        table=${postgres_proc_catalog_table}
+    elif [[ "${csv_file}" == *_coadd_* ]]; then
+        table=${postgres_coadd_catalog_table}
+    else
+        continue
+    fi
+
+    sql_query="${backslash}copy ${table} ("${header}") FROM '$(realpath ${csv_file})' WITH (FORMAT csv, DELIMITER ',',HEADER);"
+
+    psql --dbname ${postgres_db} \
+        --username ${postgres_user} \
+        --host ${postgres_host} \
+        --port ${postgres_port} \
+        --command "${sql_query}" >${stdout} 2>${stderr}
+    status=${?}
+
+    if [ ${status} -ne 0 ] || [ -s ${stderr} ]; then
+        message_fatal "psql exited with code=${status} stderr=\"$(< ${stderr})\"."
+    fi
+
+    read word nlines < ${stdout}
+    if [ "${word}" != COPY ]; then
+        message_failure "psql output does not start with \"COPY\" (stdout=$(< ${stdout}))."
+    else
+        expected_nlines=$(wc -l < ${csv_file})
+        (( expected_nlines-- ))
+        if [ ${expected_nlines} != ${nlines} ]; then
+            message_failure "psql inserted ${nlines} instead of ${expected_nlines}"
+        fi
+    fi
+
+    message_success "${nlines} lines were inserted into table \"${table}\" for ${csv_file}"
+
+    /bin/rm ${stdout} ${stderr}
+done

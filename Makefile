@@ -50,6 +50,7 @@ else
 	ln -sf ${LAST_TOP}/bin/last-asroot 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-asroot
 	ln -sf ${LAST_TOP}/bin/last-asocs 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-asocs
 	ln -sf ${LAST_TOP}/bin/last-askpass	    				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-askpass
+	ln -sf ${LAST_TOP}/bin/last-cat2db	    				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-cat2db
 	mkdir -p  ${PACKAGE_DIR}/etc/systemd/system
 	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline.service
 endif
