@@ -20,7 +20,7 @@ function onSIGTERM() {
 function get_pids() {
     local -a pids
     
-    mapfile -t pids < <(pgrep -a MATLAB | grep 'pipeline\.last\.runPipeLAST' | cut -d ' ' -f1)
+    mapfile -t pids < <(pgrep -a MATLAB | grep 'pipeline\.DemonLAST' | cut -d ' ' -f1)
     echo "${pids[@]}"
 }
 
@@ -33,7 +33,7 @@ case "${1}" in
     start)
 		# The last-pipeline service is set to run as 'ocs'
         for (( i = 1; i < 3; i++ )); do
-            matlab -nodisplay -batch "startup_LAST(false,true); pipeline.last.runPipeLAST(${i})"  &
+            last-matlab -nodisplay -batch "D=pipeline.DemonLAST; D.Logger.Console=false; D.Logger.Syslog.ProgName='last-pipeline'; D.DataDir=${i}; D.main('StopButton', false);"  &
         done
         
 		sleep 5             # wait for matlabs to start running

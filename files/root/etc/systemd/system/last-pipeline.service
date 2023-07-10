@@ -5,7 +5,7 @@ Description=LAST pipeline service
 User=ocs
 WorkingDirectory=/home/ocs/matlab
 ExecStart=/usr/local/share/last-tool/bin/last-pipeline start
-ExecStop=pkill -f last.pipeline.runPipeLAST
+ExecStop=pkill -f pipeline.DemonLAST
 Restart=always
 
 [Install]
