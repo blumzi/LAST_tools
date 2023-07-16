@@ -67,7 +67,7 @@ function last_software_arg_parser() {
         case "${ARGV[0]}" in
 
         -r|--repo)
-            export last_software_selected_repos+=( "${2}" )
+            export last_software_selected_repos+=( "${ARGV[1]}" )
             export last_software_repos_were_selected=true
             shiftARGV 2
             ;;

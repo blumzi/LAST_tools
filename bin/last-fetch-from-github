@@ -56,7 +56,7 @@ function repo_was_selected() {
         return 0
     fi
 
-    for r in ${selected_repos[@]}; do
+    for r in "${selected_repos[@]}"; do
         if [ "${r}" = "${repo}" ]; then
             return 0
         fi
