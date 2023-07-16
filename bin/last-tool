@@ -19,6 +19,8 @@ module_include lib/util
 
 util_test_and_set_http_proxy
 
+message_log "[INFO] Invoked as \"${PROG} ${*}\""
+
 declare mode
 
 function list_sections() {
