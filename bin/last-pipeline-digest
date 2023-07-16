@@ -1,0 +1,16 @@
+#!/bin/bash
+
+addressees="eran.ofek@weizmann.ac.il theblumz@gmail.com"
+
+if [ "$(hostname -s)" != last0 ]; then
+    exit 0
+fi
+
+
+pushd /var/log/remote
+zgrep -i 'last-pipeline.*err' */last* 2>/dev/null | (
+    echo "Subject: last-pipeline errors"
+    sed 's;^;== ;'
+) | ssmtp -Flast-pipeline-errors ${addressees}
+
+
