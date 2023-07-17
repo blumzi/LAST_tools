@@ -4,6 +4,7 @@
 
 module_include lib/message
 module_include lib/postgres
+module_include lib/const
 
 #
 # Gets the path to a ".status" file created by the LAST pipeline
@@ -24,12 +25,10 @@ fi
 status_file=${1}
 status_dir=$(dirname ${status_file})
 
-ready_flag="ready-for-DB"
-inserted_flag="inserted-to-DB"
 backslash=$'\x5c'
 
-if grep -q "${ready_flag}" ${status_file}; then
-    if grep -q "${inserted_flag}" ${status_file}; then
+if grep -q "${const_ready_for_db}" ${status_file}; then
+    if grep -q "${const_inserted}" ${status_file}; then
         exit 0
     fi
 else
@@ -87,7 +86,7 @@ for csv_file in "${csv_files[@]}"; do
 done
 
 if (( successes = ${#csv_files[*]} )); then
-    echo "$(date --iso-8601=seconds) ${inserted_flag}" >> ${status_file}
+    echo "$(date --iso-8601=seconds) ${const_inserted}" >> ${status_file}
 fi
 
 exit 0

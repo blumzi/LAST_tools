@@ -3,6 +3,7 @@
 PROG=$(basename ${0})
 source /etc/profile.d/last.sh
 
+module_include lib/const
 
 PROG=$(basename "${0}")
 hostname="$(hostname -s)"
@@ -23,9 +24,8 @@ function usage() {
      finishes working with a specific directory it adds a 'ready-for-transfer' event to the status-change
      file in that directory (a file named .status)
 
-    This program runs as a long-term service.  It watches for changes to the .status files.  If a 
-     'ready-for-transfer' line exists (but not a 'transfered' line), it initiates a transfer to the backup host.
-     If the transfer succeeds, it adds a 'transfered' line to the .status file.
+    This program runs periodically (cron !?!) and initiates transfers of products that have not been
+     backed-up when they were produced (we had no link to WIS, etc.).
 
     This host:
         sources:      ${tops}
@@ -73,4 +73,6 @@ while read -r path; do
         rc=${?}
     fi
 
-done < <(inotifywait --event close_write --monitor --recursive --format "%w%f" ${tops} 2>/dev/null)
+    last-cat2db "$(realpath ${status_file})"
+
+done < <(find ${tops} -type f -name .status | sort -t/ --key=6n --key=8n)
