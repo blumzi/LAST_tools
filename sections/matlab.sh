@@ -52,6 +52,16 @@ function matlab_enforce() {
     matlab_service_enforce
     matlab_config_enforce
     util_enforce_shortcut --favorite matlab
+    matlab_crontab_enforce
+}
+
+function matlab_crontab_enforce() {
+    local tmp=$(mktemp)
+
+    echo '0 8 * * * /usr/local/share/last-tool/bin/last-products-catchup' > ${tmp}
+    crontab -u ${user_name} ${tmp}
+    message_success "crontab: Created an entry for last-products-catchup"
+    /bin/rm ${tmp}
 }
 
 #
@@ -59,7 +69,7 @@ function matlab_enforce() {
 #
 function matlab_service_enforce() {
     service_enforce last-pipeline lastx
-    service_enforce last-rsync-watcher lastx
+    service_enforce last-products-watcher lastx
 }
 
 function matlab_delivered_license_file() {
@@ -94,13 +104,26 @@ function matlab_check() {
     matlab_service_check;                   (( ret += $? ))
     matlab_config_check;                    (( ret += $? ))
     util_check_shortcut --favorite matlab;  (( ret += $? ))
+    matlab_crontab_check;                   (( ret += $? ))
 
     return $(( ret ))
 }
 
+function matlab_crontab_check() {
+    local contents="$(crontab -l -u ${user_name})"
+    local ret=0
+
+    if [ "${contents}" = "no crontab for ${user_name}" ]; then
+        message_failure "crontab: No crontab for ${user_name}"
+        (( ret++ ))
+    elif [[ "${contents}" == *last-products-catchup* ]]; then
+        message_success "crontab: We have an entry for last-products-catchup."
+    fi
+}
+
 function matlab_service_check() {
     service_check last-pipeline lastx
-    service_check last-rsync-watcher lastx
+    service_check last-products-watcher lastx
 }
 
 #
