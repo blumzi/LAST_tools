@@ -181,7 +181,7 @@ if ${check}; then
     declare -i errors=0
     cd "${top_dir}" || exit 1
     echo ""
-    echo "Workspace file: $(ansi_bright_green ${github_repos_file})"
+    echo "   Workspace: $(ansi_bright_green ${space:-production}) (file: ${github_repos_file})"
     echo ""
     for dir in $( sorted_repos ); do
         if ! repo_was_selected "${dir}"; then
@@ -219,7 +219,7 @@ if ${check}; then
                     message_failure "Repository \"${top_dir}/${dir}\": $(util_str_join ", " "${badies[@]}")"
                     (( errors++ ))
                 else
-                    message_success "Repository \"${top_dir}/${dir}\" OK"
+                    message_success "Repository \"${top_dir}/${dir}\" OK (${checkout_info})"
                 fi
             fi
             popd >/dev/null || true

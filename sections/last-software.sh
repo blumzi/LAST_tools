@@ -281,6 +281,8 @@ function last_software_check() {
 
     if ${last_software_extras}; then
         if ! macmap_this_is_last0; then
+            message_section "Last-software - extras"
+            echo ""
             if [ -d "${wine_dir}" ]; then
                 message_success "The directory ${wine_dir} exists"
             else
