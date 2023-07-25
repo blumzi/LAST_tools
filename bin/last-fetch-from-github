@@ -24,6 +24,8 @@ declare -A git_repo git_checkout_info git_token_name
 declare -a selected_repos
 declare reclone=false
 
+declare last_workspace_file=~ocs/.last-workspace
+
 # shellcheck disable=SC2154
 eval top_dir="${user_matlabdir}"
 
@@ -158,11 +160,15 @@ while true; do
 	esac
 done
 
-if [ "${space}" ]; then
-    github_repos_file=$(module_locate files/github-repos.${space})
-else
-    github_repos_file=$(module_locate files/github-repos)
+if [ ! "${space}" ]; then
+    if [ -r ${last_workspace_file} ]; then
+        read space_date space < <( tail -1 ${last_workspace_file})
+    else
+        space="production"
+    fi
 fi
+
+github_repos_file=$(module_locate files/github-repos.${space})
 load_repos_file
 
 if ${list}; then
@@ -181,7 +187,7 @@ if ${check}; then
     declare -i errors=0
     cd "${top_dir}" || exit 1
     echo ""
-    echo "   Workspace: $(ansi_bright_green ${space:-production}) (file: ${github_repos_file})"
+    echo "   Workspace: $(ansi_bright_green ${space}) (file: ${github_repos_file})"
     echo ""
     for dir in $( sorted_repos ); do
         if ! repo_was_selected "${dir}"; then
@@ -208,11 +214,10 @@ if ${check}; then
                 (( errors++ ))
             else
                 badies=()
-                if [ "${branch}" != "${current_branch}" ]; then
-                    badies+=( "branch \"${current_branch}\" instead of \"${branch}\"" )
-                fi
                 if [ "${tag}" ] && [ "${tag}" != "${current_tag}" ]; then
                     badies+=( "tag \"${current_tag}\" instead of \"${tag}\"" )
+                elif [ "${branch}" != "${current_branch}" ]; then
+                    badies+=( "branch \"${current_branch}\" instead of \"${branch}\"" )
                 fi
 
                 if [ ${#badies[@]} -ne 0 ]; then
@@ -254,6 +259,14 @@ if [ ! -d "${top_dir}" ]; then
     mkdir -p "${top_dir}"
 fi
 cd "${top_dir}" || exit 1
+
+#
+# If we enforce anything, we remember the workspace and date
+#
+space_date=$(date --rfc-3339=ns)
+space_date=${space_date:0:23}
+space_date=${space_date/ /@}
+echo "${space_date} ${space}" >> ${last_workspace_file}
 
 declare repo status url checkout_info token_name token
 for key in $( sorted_repos ); do
