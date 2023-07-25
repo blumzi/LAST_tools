@@ -5,7 +5,7 @@
 #
 
 # set the debug-mode prompt (set -x)
-export PS4='+ [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]:-main}] '
+export PS4='+ $(d=$(date --rfc-3339=ns); d=${d/ /@}; echo ${d:0:23}) [$SHLVL,$BASH_SUBSHELL] [${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]:-main}] '
 
 function append_to_module_include_path() {
     local subpath="${1}"
