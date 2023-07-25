@@ -1,16 +1,18 @@
 #!/bin/bash
 
-addressees="eran.ofek@weizmann.ac.il theblumz@gmail.com"
+addressees=( eran.ofek@weizmann.ac.il agioffe@gmail.com theblumz@gmail.com )
 
 if [ "$(hostname -s)" != last0 ]; then
     exit 0
 fi
 
 
+tmp=/tmp/pipeline-errors.gz
 pushd /var/log/remote
-zgrep -i 'last-pipeline.*err' */last* 2>/dev/null | (
-    echo "Subject: last-pipeline errors"
+zgrep -i 'last-pipeline.*err' last*/last-messages* 2>/dev/null | (
     sed 's;^;== ;'
-) | ssmtp -Flast-pipeline-errors ${addressees}
+) | gzip > ${tmp}
 
+echo "This is an automatic digest of last-pipeline errors" | mail --attach=${tmp} --debug-level=10 --return-address=noone --subject="last-pipeline-errors" ${addressees[*]}
 
+/bin/rm ${tmp}

@@ -5,6 +5,10 @@
 PROG="$(basename ${0})"
 trap "exit 1" SIGINT
 
+module_include lib/util
+
+util_log_invokation ${*}
+
 function usage() {
     echo ""
     echo "  Usage: ${PROG} [-t|--timeout seconds] [[-H|--host <host>] ...] -c|--cmd command"

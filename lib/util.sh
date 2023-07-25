@@ -2,6 +2,7 @@
 
 module_include lib/user
 module_include lib/wget
+module_include lib/message
 
 #
 # Utility functions
@@ -152,4 +153,10 @@ function util_str_join() {
   if shift 2; then
     printf %s "$f" "${@/#/$d}"
   fi
+}
+
+function util_log_invokation() {
+    local args="${*}"
+
+    message_log "[INFO] Invoked as \"${PROG} ${args}\""
 }
