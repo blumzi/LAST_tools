@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 function cleanup() {
     local failures=( $(if [ -s ${tmp}/.failures ]; then cat ${tmp}/.failures 2>/dev/null; fi) )
     local running_processes=( $(jobs -pr) )
@@ -8,6 +9,7 @@ function cleanup() {
         if (( ${#failures[*]} == 0 )); then
             message_success "All ${nchunks} chunks have been synchronized"
         else
+            failures=( $(list_sort "${failures[@]}" ) )
             message_fatal "Chunks ${failures[*]} have failed to synchronize!"
         fi
     else
@@ -25,6 +27,7 @@ source /etc/profile.d/last.sh
 
 module_include lib/message
 module_include lib/util
+module_include lib/list
 
 util_log_invokation ${*}
 
@@ -156,7 +159,7 @@ message_info "Target: \"${target}/${target_dir}\""
 message_info "Gathering list of files ..."
 
 #set -x
-rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${target}/${target_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
+sudo -u ocs rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${target}/${target_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
 # cat ${files_list}
 # cleanup
 # exit 0
@@ -173,14 +176,14 @@ split --lines=${nlines} < ${files_list}
 chunks=( x?? )
 
 remote_dir=${target}/${target_dir}
-ssh last@marvin.weizmann.ac.il mkdir -p ${remote_dir#*:}
+sudo -u ocs ssh last@marvin.weizmann.ac.il mkdir -p ${remote_dir#*:}
 
 tmp=$(mktemp -d)
 for ((i = 0; i < ${#chunks[*]}; i++)); do
     (
         message_info "Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
         stat_file=${tmp}/stat.${i}
-        rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${target}/${target_dir} 2>/dev/null > ${stat_file}
+        sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${target}/${target_dir} 2>/dev/null > ${stat_file}
         status=${?}
         if [ "${status}" ] && [ ${status} -eq 0 ]; then
             Speedup=$(grep speedup ${stat_file}  | cut -d' ' -f8)
