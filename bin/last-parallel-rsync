@@ -176,7 +176,7 @@ split --lines=${nlines} < ${files_list}
 chunks=( x?? )
 
 remote_dir=${target}/${target_dir}
-sudo -u ocs ssh last@marvin.weizmann.ac.il mkdir -p ${remote_dir#*:}
+sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${remote_dir%:*} last@marvin.weizmann.ac.il mkdir -p ${remote_dir#*:}
 
 tmp=$(mktemp -d)
 for ((i = 0; i < ${#chunks[*]}; i++)); do
