@@ -22,66 +22,6 @@ function cleanup() {
 
 trap cleanup SIGHUP SIGINT
 
-function check_all_sources() {
-    local -a local_files remote_files
-    local stat_file local_dir data_dir status padded_local_dir
-    local ok_message fail_message
-
-    #
-    # Look for all .status files (created by the pipeline) in the /data[12] directories
-    #
-    for stat_file in $(find /$(hostname -s)/data[12] -name .status | grep -vE '(Trash)' | sort); do
-        local_dir=$(dirname ${stat_file})
-        data_dir=${local_dir#*/archive/}
-        padded_local_dir=$(printf "%-56s" ${local_dir})
-
-        # Check the backup directory exists
-        sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${remote_user}@${remote_host} "test -d ${remote_top}/${data_dir} >/dev/null 2>/dev/null"
-        status=${?}
-
-        if (( status != 0 )); then
-            message_failure "${padded_local_dir} was not backed up"
-            continue # no backup directory, skip to the next local directory
-        fi
-
-        local tmp=$(mktemp -d)
-        chmod 755 ${tmp}
-
-        pushd ${local_dir} >/dev/null 2>&1 
-
-        # Get local and remote file sizes
-        du -b $(ls -1 | sort) > ${tmp}/local-sizes
-        sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${remote_user}@${remote_host} "cd ${remote_top}/${data_dir} >/dev/null 2>/dev/null; du -b \$(ls -1 | sort)" > ${tmp}/remote-sizes
-        local local_nfiles=$(wc -l < ${tmp}/local-sizes)
-        local remote_nfiles=$(wc -l < ${tmp}/remote-sizes)
-
-        if (( local_nfiles == remote_nfiles )); then
-            #
-            # We have the same number of local and backup files, a good start :)
-            #
-            ok_message="${padded_local_dir} all files have been backed up"
-            if diff -q ${tmp}/local-sizes ${tmp}/remote-sizes > ${tmp}/diff 2>/dev/null; then
-                ok_message+=", file sizes match"
-                message_success "${ok_message}"
-
-                if ${remove}; then
-                    message_warning "At this point-in-time we don't actually remove the local directory"
-                fi
-            else
-                message_warning "${ok_message}, file sizes don't match, list below"
-                sed 's;^;    ;' < ${tmp}/diff
-            fi
-        elif (( remote_nfiles > local_nfiles )); then
-            message_warning "${padded_local_dir} too many remote files (${remote_nfiles} instead of ${local_nfiles})"
-        else
-            message_failure "${padded_local_dir} ${remote_nfiles} files out of ${local_nfiles} were backed up"
-        fi
-
-        popd >/dev/null 2>&1
-        /bin/rm -rf ${tmp}
-    done
-}
-
 
 PROG=$(basename ${0})
 source /etc/profile.d/last.sh
@@ -89,11 +29,11 @@ source /etc/profile.d/last.sh
 module_include lib/message
 module_include lib/util
 module_include lib/list
+module_include lib/backup
 
 util_log_invokation ${*}
 
 # defaults
-default_ssh_target="last@marvin.weizmann.ac.il:/BIGDATA/last/data/temp"
 identity=
 default_nproc=10
 rsync_extra_args=
@@ -120,7 +60,7 @@ function usage() {
      -q|--quiet       - Be quiet
      -s|--source      - Specifies the source-directory
      -f|--from        - Specifies the source-directory
-     -t|--to|--target - Specifies the target-directory (default: ${default_ssh_target})
+     -t|--to|--target - Specifies the target-directory (default: ${backup_default_target})
      -p|--processes   - Specifies the number of processes to use (default: ${default_nproc})
      -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
      -c|--check       - Check if the source directory was backed up
@@ -136,6 +76,8 @@ eval set -- "${OPTS}"
 check=false
 check_all=false
 remove=false
+source=
+target=
 
 while true; do
 	case "${1}" in
@@ -167,10 +109,10 @@ while true; do
 
     -t|--target|--to)
         if [[ ${2} != *@*:* ]]; then
-            message_fatal "Bad target \"${2}\". It must have the format username@hostname:path-to-top-directory"
+            message_fatal "Bad target \"${2}\". It must have the format user-name@host-name:path-to-top-directory"
             exit 1
         fi
-        ssh_target="${2}"
+        target="${2}"
         shift 2
         ;;
 
@@ -201,42 +143,31 @@ while true; do
 	esac
 done
 
-if [ ! "${ssh_target}" ]; then
-    ssh_target="${default_ssh_target}"
+if ! ${check_all} && [ ! "${source}" ]; then
+    message_fatal "Must specify a source directory with -s|--source|-f|--from <path>"
+    usage
+    exit 1
+fi
+
+if [ ! "${target}" ]; then
+    target="${backup_default_target}"
 fi
 
 if ${quiet}; then
     export LAST_TOOL_QUIET=true
 fi
 
-ssh_target=$( echo ${ssh_target} | sed -e 's;[/]*$;;' )
-ssh_target=${ssh_target}
 
-remote_user=${ssh_target%@*}
-remote_host=${ssh_target#${remote_user}@}
-remote_host=${remote_host%:*}
-remote_top=${ssh_target#*:}
-
-if ${check_all}; then
-    check_all_sources
-    exit 0
+if ! ${check_all}; then
+    source=$(realpath ${source})
+    if [ ! -d "${source}" ]; then
+        message_failure "Bad source directory \"${source}\" (not a directory)"
+        exit 1
+    fi
 fi
 
-if [ ! "${source}" ]; then
-    echo -e "\n"
-    message_failure "Missing source-directory (use -s|--source|-f|--from argument)"
-    usage
-    exit 1
-fi
 
-source=$(realpath ${source})
-
-if [ ! -d "${source}" ]; then
-    echo -e "\n"
-    message_failure "Bad source directory \"${source}\""
-    exit 1
-fi
-
+backup_set_target "${target}"
 
 if [ ! "${nprocs}" ]; then
     nprocs=${default_nproc}
@@ -253,52 +184,22 @@ if [[ "${data_dir}"  == */archive/* ]]; then
     data_dir="${data_dir#*/archive/}"
 fi
 
-remote_dir=${ssh_target}/${data_dir}
-remote_ssh_host=${remote_dir%:*}
-
-function check_source() {
-    local -a local_files remote_files
-    local status
-
-    local_files=( $(cd ${source}; find .) )
-    remote_files=( $(sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${remote_ssh_host} "cd ${remote_dir#*:} >/dev/null 2>/dev/null; find .") )
-    status=${?}
-
-    if (( status != 0 )); then
-        message_failure "${source} was not backed up"
-        return
-    fi
-
-    if (( ${#local_files[*]} == ${#remote_files[*]} )); then
-        message_success "${source} was backed up"
-        if ${remove}; then
-            message_warning "Don't know how to remove"
-        fi
-    else
-        message_failure "${source} ${#remote_files[*]} files out of ${#local_files[*]} were backed up"
-    fi
-}
-
 if ${check}; then
-    check_source
+    backup_check_one "${source}"
     exit 0
 fi
 
 if ${check_all}; then
-    check_all_sources
+    backup_check_all
     exit 0
 fi
 
 message_info "Source: \"${source}\""
-message_info "Target: \"${ssh_target}/${data_dir}\""
+message_info "Target: \"${backup_target}/${data_dir}\""
 
 message_info "Gathering list of files ..."
 
-#set -x
-sudo -u ocs rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${ssh_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
-# cat ${files_list}
-# cleanup
-# exit 0
+sudo -u ocs rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
 
 if (( $(wc -l < ${files_list}) == 0 )); then
     message_success "The source and target directories are synchronized"
@@ -311,13 +212,13 @@ nlines=$( awk -v lines=$(wc -l < ${files_list}) -v nprocs=${nprocs} 'BEGIN {prin
 split --lines=${nlines} < ${files_list}
 chunks=( x?? )
 
-sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${remote_dir%:*} mkdir -p ${remote_dir#*:}
+sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_topdir}/${data_dir}
 
 for ((i = 0; i < ${#chunks[*]}; i++)); do
     (
         message_info "Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
         stat_file=stat.${i}
-        (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${ssh_target}/${data_dir} 2>/dev/null ) > ${stat_file}
+        (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target}/${data_dir} 2>/dev/null ) > ${stat_file}
         status=${?}
 
         if [ "${status}" ] && [ ${status} -eq 0 ]; then

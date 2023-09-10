@@ -42,7 +42,7 @@ else
 	ln -sf ${LAST_TOP}/bin/last-lights 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-lights
 	ln -sf ${LAST_TOP}/bin/last-ds9-feeder 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9-feeder
 	ln -sf ${LAST_TOP}/bin/last-ds9		 					${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-ds9
-	ln -sf ${LAST_TOP}/bin/last-parallel-rsync              ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-parallel-rsync
+	ln -sf ${LAST_TOP}/bin/last-backup              		${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-backup
 	ln -sf ${LAST_TOP}/bin/last-products-watcher            ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-products-watcher
 	ln -sf ${LAST_TOP}/bin/last-products-catchup            ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-products-catchup
 	ln -sf ${LAST_TOP}/bin/last-fetch-from-github 			${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github

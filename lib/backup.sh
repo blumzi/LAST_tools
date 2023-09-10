@@ -23,7 +23,7 @@ function backup_set_target() {
 
     backup_target="${target}"
     backup_user=${backup_target%@*}
-    backup_host=${backup_target#${user}@}
+    backup_host=${backup_target#*@}
     backup_host=${backup_host%:*}
     backup_topdir=${backup_target#*:}
 }
@@ -50,7 +50,7 @@ function backup_check_one() {
 
     if (( status != 0 )); then
         message_failure "${padded_backup_dir} was not backed up"
-        continue # no backup directory, skip to the next local directory
+        return
     fi
 
     local tmp=$(mktemp -d)
@@ -92,8 +92,6 @@ function backup_check_one() {
 #
 backup_check_all() {
     for stat_file in $(find /$(hostname -s)/data[12] -name .status | grep -vE '(Trash)' | sort); do
-        local_dir=$(dirname ${stat_file})
-
-        backup_check_one ${local_dir}
+        backup_check_one $(dirname ${stat_file})
     done
 }

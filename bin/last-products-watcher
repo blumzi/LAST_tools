@@ -44,7 +44,7 @@ function initiate_transfer() {
     local dst="${2}"
     local rc
 
-    LAST_TOOL_QUIET=true last-parallel-rsync --source=${src} --target=${sync_user}@${sync_host}:${sync_top}
+    LAST_TOOL_QUIET=true last-backup --source=${src} --target=${sync_user}@${sync_host}:${sync_top}
     rc=${?}
 
     if [ ${rc} -eq 0 ]; then
