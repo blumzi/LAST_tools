@@ -49,7 +49,7 @@ function backup_check_one() {
     status=${?}
 
     if (( status != 0 )); then
-        message_failure "${padded_backup_dir} was not backed up"
+        message_failure "${padded_backup_dir} was not backed up (no ${backup_topdir}/${backup_dir} on ${backup_host})"
         return
     fi
 
