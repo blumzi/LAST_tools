@@ -19,7 +19,7 @@
 #
 
 # Name                              URL                                                                 Checkout-Info            Token-name
-AstroPack                           https://github.com/EranOfek/AstroPack.git                           branch:dev1,tag:v1.0     Development
+AstroPack                           https://github.com/EranOfek/AstroPack.git                           branch:dev1,tag:v1.1     Development
 LAST/LAST_iOptronCEM120             https://github.com/EastEriq/LAST_iOptronCEM120.git                  branch:mastrolindo       Development
 LAST/LAST_tinycontrolIPpowerSocket  https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git       branch:master            Development
 LAST/LAST_ZWOASICamera              https://github.com/EastEriq/LAST_ZWOASICamera.git                   branch:mastrolindo       Development
