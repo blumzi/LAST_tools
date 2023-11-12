@@ -214,17 +214,23 @@ if ${check}; then
                 (( errors++ ))
             else
                 badies=()
-                if [ "${tag}" ] && [ "${tag}" != "${current_tag}" ]; then
-                    badies+=( "tag \"${current_tag}\" instead of \"${tag}\"" )
-                elif [ "${branch}" != "${current_branch}" ]; then
-                    badies+=( "branch \"${current_branch}\" instead of \"${branch}\"" )
+                if [ "${tag}" ]; then
+                    if [ "${tag}" != "${current_tag}" ]; then
+                        badies+=( "tag \"${current_tag}\" instead of \"${tag}\"" )
+                    else
+                        message_success "Repository \"${top_dir}/${dir}\" OK (tag=${tag})"
+                    fi
+                else
+                    if [ "${branch}" != "${current_branch}" ]; then
+                        badies+=( "branch \"${current_branch}\" instead of \"${branch}\"" )
+                    else
+                        message_success "Repository \"${top_dir}/${dir}\" OK (branch=${branch})"
+                    fi
                 fi
 
                 if [ ${#badies[@]} -ne 0 ]; then
                     message_failure "Repository \"${top_dir}/${dir}\": $(util_str_join ", " "${badies[@]}")"
                     (( errors++ ))
-                else
-                    message_success "Repository \"${top_dir}/${dir}\" OK (${checkout_info})"
                 fi
             fi
             popd >/dev/null || true
