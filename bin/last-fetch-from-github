@@ -230,8 +230,6 @@ if ${check}; then
                 else
                     if [ "${branch}" != "${current_branch}" ]; then
                         badies+=( "branch \"${current_branch}\" instead of \"${branch}\"" )
-                    else
-                        message_success "Repository \"${top_dir}/${dir}\" OK (branch=${branch})"
                     fi
                 fi
 
