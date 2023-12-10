@@ -11,14 +11,14 @@ util_log_invokation ${*}
 
 function usage() {
     echo ""
-    echo "  Usage: ${PROG} [-t|--timeout seconds] [[-H|--host <host>] ...] -c|--cmd command"
+    echo "  Usage: ${PROG} [-t|--timeout seconds] [[-H|--host <host>] ...] -c|--cmd|--command command"
     echo ""
     echo "  Runs the specified command as ocs"
     echo "   on the specified hosts (default: $(echo ${default_hosts[@]} | tr ' ' ','))"
     echo ""
 }
 
-OPTS=$( getopt -o 'H:hc:t:' --long "help,host:,cmd:,timeout:" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'H:hc:t:' --long "help,host:,cmd:,command:,timeout:" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 default_hosts=( $(last-hosts --deployed) )
@@ -37,7 +37,7 @@ while true; do
         shift 2
         ;;
 
-    -c|--cmd)
+    -c|--cmd|--command)
         cmd="${2}"
         shift 2
         ;;
