@@ -27,14 +27,21 @@ declare reclone=false
 declare last_workspace_file=~ocs/.last-workspace
 
 # shellcheck disable=SC2154
-eval top_dir="${user_matlabdir}"
+eval top_dir="${user_home}"
+repo_name_len=0
 
 function load_repos_file() {
-    declare line repo url checkout_info token_name
+    declare line repo url checkout_info token_name len full_path
+
     while read -r line; do
         read -r repo url checkout_info token_name _ <<< "${line}"
         if [ ! "${repo}" ] || [ ! "${url}" ] || [ ! "${checkout_info}" ] || [ ! "${token_name}" ]; then
             message_fatal "Badly formed line \"${line}\" in \"${github_repos_file}\"."
+        fi
+        full_path="\"${top_dir}/${repo}\""
+        len="${#full_path}"
+        if (( ${len} > repo_name_len )); then
+            repo_name_len=${len}
         fi
 
     git_checkout_info["${repo}"]="${checkout_info}"
@@ -220,14 +227,38 @@ if ${check}; then
                     badies+=( "branch \"${current_branch}\" instead of \"${branch}\"" )
                 fi
 
+                msg=$(printf "Repository %-*s" ${repo_name_len} "\"${top_dir}/${dir}\"")
                 if [ ${#badies[@]} -ne 0 ]; then
-                    message_failure "Repository \"${top_dir}/${dir}\": $(util_str_join ", " "${badies[@]}")"
+                    message_failure "${msg} $(ansi_bright_red BAD) $(util_str_join ", " "${badies[@]}")"
                     (( errors++ ))
                 else
-                    message_success "Repository \"${top_dir}/${dir}\" OK (${checkout_info})"
+                    message_success "${msg} $(ansi_bright_green 'OK ') ${checkout_info}"
                 fi
             fi
             popd >/dev/null || true
+
+            # virtual environment
+            if [[ ${dir} == python/* ]]; then
+                venv_dir=${dir}/.venv
+                if [ -r ${venv_dir}/bin/activate ] && [ -x ${venv_dir}/bin/python3 ] && [ -x ${venv_dir}/bin/pip3 ]; then
+                    message_success "A valid python virtual environment exists in ${venv_dir}"
+                    req=${dir}/requirements.txt
+                    tmp=$(mktemp /tmp/req.XXXXXX)
+                    if [ -r ${req} ]; then
+                        source ${venv_dir}/bin/activate
+                        pip3 freeze > ${tmp}
+                        if ! diff -q ${tmp} ${req}; then
+                            message_failure "Not all the requirements in ${req} are satisfied"
+                        else
+                            message_success "All the requirements in ${req} are satisfied"
+                        fi
+                        deactivate
+                    fi
+                else
+                    message_failure "Missing python3 virtual environment in ${venv_dir}"
+                fi
+            fi
+
         else
             message_failure "Missing local repository ${top_dir}/${dir}"
             (( errors++ ))
@@ -296,6 +327,7 @@ for key in $( sorted_repos ); do
 
     tmp=$(mktemp -d)
 
+    # handle Git
     if [ ! -d "${dir}/.git" ]; then
         mkdir -p "${dir}"
         pushd "$(dirname "${dir}")" >/dev/null || continue
@@ -421,6 +453,22 @@ for key in $( sorted_repos ); do
                 while read -r line; do
                     message_failure "${repo_msg} ${line}"
                 done < ${tmp}/err
+            fi
+        fi
+
+        # handle the python virtual environment
+        venv_path=./.venv
+        if [[ ${key} == python/* ]]; then
+            if [ ! -d ${venv_path} ]; then
+                message_info "Creating python3 virtual environment in $(realpath ${venv_path})"
+                python3 -m virtualenv .venv 
+                req=./requirements.txt
+                if [ -r ${req} ]; then
+                    message_info "Populating the virtual environment in $(realpath ${venv_path}) from ${req}"
+                    source .venv/bin/activate
+                    pip3 install -r ${req}
+                    deactivate
+                fi
             fi
         fi
 

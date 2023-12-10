@@ -158,7 +158,7 @@ function last_software_enforce() {
     fi
     
     # shellcheck disable=SC2154
-    su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir}"
+    su "${user_name}" -c "${fetcher} ${args} --dir ${user_home}"
 
     local dirs=( ${user_matlabdir}/AstroPack ${user_matlabdir}/LAST )
     non_ocs_files=( $(find ${dirs[*]} \! -user ${user_name}) )
@@ -269,10 +269,10 @@ function last_software_check() {
         args+="--space ${last_software_space}"
     fi
 
-    su "${user_name}" -c "${fetcher} ${args} --dir ${user_matlabdir} --check"
+    su "${user_name}" -c "${fetcher} ${args} --dir ${user_home} --check"
     (( ret += $? ))
 
-    local dirs=( ${user_matlabdir}/AstroPack ${user_matlabdir}/LAST )
+    local dirs=( ${user_matlabdir}/AstroPack ${user_matlabdir}/LAST ${user_pythondir})
     non_ocs_files=( $(find ${dirs[*]} \! -user ${user_name}) )
     if [ ${#non_ocs_files[*]} -ne 0 ]; then
         message_warning "There are ${#non_ocs_files[*]} files not owned by ${user_name} under ${dirs[*]}"

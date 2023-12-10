@@ -4,7 +4,9 @@
 #
 #   <repo-name> <repo-url> <checkout-info> <repo-token-name>
 #
-# The checkout-info column is a comma-separated list of:
+# The <repo-name> is actually the path under ~ocs where the repository will be cloned
+#
+# The <checkout-info> column is a comma-separated list of:
 #  branch:<branch-name>
 #  tag:<tag-name>
 # or
@@ -18,24 +20,25 @@
 #   The fields MUST NOT contain spaces or tabs
 #
 
-# Name                              URL                                                                 Checkout-Info            Token-name
-AstroPack                           https://github.com/EranOfek/AstroPack.git                           branch:dev1,tag:v1.0     Development
-LAST/LAST_iOptronCEM120             https://github.com/EastEriq/LAST_iOptronCEM120.git                  branch:mastrolindo       Development
-LAST/LAST_tinycontrolIPpowerSocket  https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git       branch:master            Development
-LAST/LAST_ZWOASICamera              https://github.com/EastEriq/LAST_ZWOASICamera.git                   branch:mastrolindo       Development
-LAST/LAST_CelestronFocusMotor       https://github.com/EastEriq/LAST_CelestronFocusMotor.git            branch:mastrolindo       Development
-LAST/LAST_USBserial                 https://github.com/EastEriq/LAST_USBserial.git                      branch:master            Development
-LAST/LAST_QHYccd                    https://github.com/EastEriq/LAST_QHYccd.git                         branch:mastrolindo       Development
-LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    branch:mastrolindo       Development
-LAST/LAST_OCS                       https://github.com/PolishookDavid/LAST_OCS.git                      branch:mastrolindo       Development
-LAST/LAST_Messaging                 https://github.com/EastEriq/LAST_Messaging.git                      branch:main              Development
-LAST/LAST_EnvironmentArduinoSensors https://github.com/EastEriq/LAST_EnvironmentArduinoSensors.git      branch:master            Cecco
-LAST/LAST_MountArduinoSensors       https://github.com/EastEriq/LAST_MountArduinoSensors.git            branch:master            Cecco
-LAST/LAST_AtikCamera                https://github.com/EastEriq/LAST_AtikCamera.git                     branch:main              Cecco
-LAST/LAST_config                    https://github.com/EranOfek/LAST_config.git                         branch:mastrolindo       Development
-LAST/LAST_Handle                    https://github.com/EastEriq/LAST_Handle.git                         branch:mastrolindo       Development
-LAST/LAST_EnclosureControl          https://github.com/EastEriq/LAST_EnclosureControl                   branch:main              Cecco
-LAST/LAST_tools                     https://github.com/blumzi/LAST_tools                                branch:main              Development
-LAST/LAST_WebApi                    https://github.com/blumzi/LAST_WebApi                               branch:webapi_transition Development
-LAST/LAST_Api                       https://github.com/blumzi/LAST_Api                                  branch:webapi_transition Development
-LAST/LAST_SerialDevice              https://github.com/blumzi/LAST_SerialDevice                         branch:main              Development
+# Name                                     URL                                                                 Checkout-Info            Token-name
+matlab/AstroPack                           https://github.com/EranOfek/AstroPack.git                           branch:dev1,tag:v1.1     Development
+matlab/LAST/LAST_iOptronCEM120             https://github.com/EastEriq/LAST_iOptronCEM120.git                  branch:mastrolindo       Development
+matlab/LAST/LAST_tinycontrolIPpowerSocket  https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git       branch:master            Development
+matlab/LAST/LAST_ZWOASICamera              https://github.com/EastEriq/LAST_ZWOASICamera.git                   branch:mastrolindo       Development
+matlab/LAST/LAST_CelestronFocusMotor       https://github.com/EastEriq/LAST_CelestronFocusMotor.git            branch:mastrolindo       Development
+matlab/LAST/LAST_USBserial                 https://github.com/EastEriq/LAST_USBserial.git                      branch:master            Development
+matlab/LAST/LAST_QHYccd                    https://github.com/EastEriq/LAST_QHYccd.git                         branch:mastrolindo       Development
+matlab/LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    branch:mastrolindo       Development
+matlab/LAST/LAST_OCS                       https://github.com/PolishookDavid/LAST_OCS.git                      branch:mastrolindo       Development
+matlab/LAST/LAST_Messaging                 https://github.com/EastEriq/LAST_Messaging.git                      branch:main              Development
+matlab/LAST/LAST_EnvironmentArduinoSensors https://github.com/EastEriq/LAST_EnvironmentArduinoSensors.git      branch:master            Cecco
+matlab/LAST/LAST_MountArduinoSensors       https://github.com/EastEriq/LAST_MountArduinoSensors.git            branch:master            Cecco
+matlab/LAST/LAST_AtikCamera                https://github.com/EastEriq/LAST_AtikCamera.git                     branch:main              Cecco
+matlab/LAST/LAST_config                    https://github.com/EranOfek/LAST_config.git                         branch:mastrolindo       Development
+matlab/LAST/LAST_Handle                    https://github.com/EastEriq/LAST_Handle.git                         branch:mastrolindo       Development
+matlab/LAST/LAST_EnclosureControl          https://github.com/EastEriq/LAST_EnclosureControl                   branch:main              Cecco
+matlab/LAST/LAST_tools                     https://github.com/blumzi/LAST_tools                                branch:main              Development
+matlab/LAST/LAST_WebApi                    https://github.com/blumzi/LAST_WebApi                               branch:webapi_transition Development
+matlab/LAST/LAST_Api                       https://github.com/blumzi/LAST_Api                                  branch:webapi_transition Development
+matlab/LAST/LAST_SerialDevice              https://github.com/blumzi/LAST_SerialDevice                         branch:main              Development
+python/LAST_next_generation                https://github.com/blumzi/LAST_next_generation                      branch:main              Development
