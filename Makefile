@@ -54,7 +54,8 @@ else
 	ln -sf ${LAST_TOP}/bin/last-pipeline-digest	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pipeline-digest
 	ln -sf ${LAST_TOP}/bin/last-serials     	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-serials
 	mkdir -p  ${PACKAGE_DIR}/etc/systemd/system
-	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline.service
+	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline.service 	    ${PACKAGE_DIR}/etc/systemd/system/last-pipeline.service
+	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-unit-server.service 	${PACKAGE_DIR}/etc/systemd/system/last-unit-server.service
 endif
 	@(  \
         repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
