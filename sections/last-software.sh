@@ -115,6 +115,21 @@ function last_software_arg_parser() {
     done
 }
 
+mkdir -p ${user_pythondir}
+chown ${user}.${user} ${user_pythondir}
+
+if ! command -v pip3 >/dev/null 2>&1; then
+	message_info "Installing pip3 ..."
+	apt update
+	apt install -y python3-pip
+	hash -r
+fi
+
+if ! pip3 list | grep virtualenv >/dev/null 2>&1; then
+	message_info "Installing virtualenv ..."
+	pip3 install virtualenv
+fi
+
 function last_software_list_repos() {
     if [ ! "${last_software_space}" ]; then
         github_repos_file=$(module_locate files/github-repos)
