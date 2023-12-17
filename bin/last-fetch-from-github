@@ -467,6 +467,10 @@ for key in $( sorted_repos ); do
         if [[ ${key} == python/* ]]; then
             if [ ! -d ${venv_path} ]; then
                 message_info "Creating python3 virtual environment in $(realpath ${venv_path})"
+                if ! pip3 list | grep virtualenv >/dev/null 2>&1; then
+                    message_info "Installing virtualenv"
+                    pip3 install virtualenv
+                fi
                 python3 -m virtualenv .venv 
                 req=./requirements.txt
                 if [ -r ${req} ]; then
