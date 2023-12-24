@@ -65,17 +65,19 @@ function usage() {
      -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
      -c|--check       - Check if the source directory was backed up
      -r|--remove      - Remove source directory if it was backed up (only works with -c|--check or -C|--check-all)
+     -F|--force       - Force removal of local directory (only works with -r|--remove)
      -C|--check-all   - Same as -c|--check but for all the local directories
 
 EOF
 }
 
-OPTS=$( getopt -o 'qs:f:t:hi:p:xcrC' --long "quiet:,help,extra:,processes:,identity:,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'qs:f:t:hi:p:xcrCF' --long "quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 check=false
 check_all=false
 remove=false
+force=false
 source=
 target=
 
@@ -94,6 +96,11 @@ while true; do
 
     -r|--remove)
         remove=true
+        shift 1
+        ;;
+
+    -F|--force)
+        force=true
         shift 1
         ;;
 
