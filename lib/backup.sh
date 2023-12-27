@@ -74,7 +74,12 @@ function backup_check_one() {
             message_success "${ok_message}"
 
             if ${remove}; then
-                message_warning "At this point-in-time we don't actually remove the local directory"
+                if ${force}; then
+                    message_info "Removing ${local_dir}"
+                    /bin/rm -rf ${local_dir}
+                else
+                    message_info "Directory ${local_dir} not removed (add --force)"
+                fi
             fi
         else
             message_warning "${ok_message}, file sizes don't match, list below"
