@@ -46,3 +46,5 @@ ethtool
 jq
 libcanberra-gtk-module
 colorized-logs
+libcfitsio-bin
+qfits-tools
