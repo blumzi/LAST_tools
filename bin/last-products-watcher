@@ -4,6 +4,7 @@ PROG=$(basename ${0})
 source /etc/profile.d/last.sh
 
 module_include lib/const
+module_include lib/message
 
 PROG=$(basename "${0}")
 hostname="$(hostname -s)"
@@ -54,6 +55,29 @@ function initiate_transfer() {
     return ${rc}
 }
 
+function initiate_compression() {
+    local dir="${1}"
+
+    #
+    # Start compressing the raw files in ${dir}
+    #
+    if ! command -v fpack >/dev/null 2>&1; then
+        message_failure "Missing command 'fpack'"
+        return
+    fi
+
+    if [ ! -d "${dir}" ]; then
+        message_failure "No such directory \"${dir}\""
+        return
+    fi
+
+    pushd ${dir} >/dev/null 2>&1
+    for fits_file in *.fits; do
+        fpack -D -Y ${fits_file} # compress into .fz and delete original .fits
+    done
+    popd >/dev/null 2>&1
+}
+
 if [ "${1}" = '-h' ] || [ "${1}" = "--help" ]; then
     usage
     exit 0
@@ -69,11 +93,20 @@ while read -r path; do
     status_file=${path}
     dir=$(dirname ${status_file})
 
-    if grep -qw "${const_ready_for_transfer}" "${status_file}" && ! grep -qw "${const_transfered}" "${status_file}"; then
-        initiate_transfer "${dir}" "${sync_user}@${sync_host}:${sync_top}/${dir}"
-        rc=${?}
+    if [[ ${dir} == */raw/* ]]; then
+        #
+        # raw directories get their files compressed
+        #
+        initiate_compression "${dir}"
+    else
+        #
+        # proc directories get their files backed up, if not already transfered
+        #
+        if grep -qw "${const_ready_for_transfer}" "${status_file}" && ! grep -qw "${const_transfered}" "${status_file}"; then
+            initiate_transfer "${dir}" "${sync_user}@${sync_host}:${sync_top}/${dir}"
+            last-cat2db "$(realpath ${status_file})"
+        fi
+        # rc=${?}
     fi
-
-    last-cat2db "$(realpath ${status_file})"
 
 done < <(inotifywait --event close_write --monitor --recursive --format "%w%f" ${tops} 2>/dev/null)
