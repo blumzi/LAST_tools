@@ -31,15 +31,14 @@ eval top_dir="${user_home}"
 repo_name_len=0
 
 function load_repos_file() {
-    declare line repo url checkout_info token_name len full_path
+    declare line repo url checkout_info token_name len
 
     while read -r line; do
         read -r repo url checkout_info token_name _ <<< "${line}"
         if [ ! "${repo}" ] || [ ! "${url}" ] || [ ! "${checkout_info}" ] || [ ! "${token_name}" ]; then
             message_fatal "Badly formed line \"${line}\" in \"${github_repos_file}\"."
         fi
-        full_path="\"${top_dir}/${repo}\""
-        len="${#full_path}"
+        len=$(( ${#repo} + 2 ))
         if (( ${len} > repo_name_len )); then
             repo_name_len=${len}
         fi
@@ -225,7 +224,7 @@ if ${check}; then
                     if [ "${tag}" != "${current_tag}" ]; then
                         badies+=( "tag \"${current_tag}\" instead of \"${tag}\"" )
                     else
-                        message_success "Repository \"${top_dir}/${dir}\" OK (tag=${tag})"
+                        message_success "Repository \"${dir}\" OK (tag=${tag})"
                     fi
                 else
                     if [ "${branch}" != "${current_branch}" ]; then
@@ -233,7 +232,7 @@ if ${check}; then
                     fi
                 fi
 
-                msg=$(printf "Repository %-*s" ${repo_name_len} "\"${top_dir}/${dir}\"")
+                msg=$(printf "Repository %-*s" ${repo_name_len} "\"${dir}\"")
                 if [ ${#badies[@]} -ne 0 ]; then
                     message_failure "${msg} $(ansi_bright_red BAD) $(util_str_join ", " "${badies[@]}")"
                     (( errors++ ))
@@ -467,10 +466,6 @@ for key in $( sorted_repos ); do
         if [[ ${key} == python/* ]]; then
             if [ ! -d ${venv_path} ]; then
                 message_info "Creating python3 virtual environment in $(realpath ${venv_path})"
-                if ! pip3 list | grep virtualenv >/dev/null 2>&1; then
-                    message_info "Installing virtualenv"
-                    pip3 install virtualenv
-                fi
                 python3 -m virtualenv .venv 
                 req=./requirements.txt
                 if [ -r ${req} ]; then
