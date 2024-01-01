@@ -22,3 +22,4 @@ owserver
 
 # apt daily upgrade
 apt-daily-upgrade
+apt-daily
