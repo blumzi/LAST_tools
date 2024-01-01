@@ -16,12 +16,15 @@ function container_init() {
     # TBD: what happens when more than one such volume is mounted (can that happen?!?)
     #
 
-    #
-    # 0. If there is a container_selected in the environment, use it (set in last-tool)
-    #
-    if [ "${container_selected}" ]; then
-        LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_selected}")"
-    fi
+#
+# This doesn't work because of order of call of module_include lib/container and parsing of argv
+#
+#     #
+#     # 0. If there is a container_selected in the environment, use it (set in last-tool)
+#     #
+#     if [ "${container_selected}" ]; then
+#         LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_selected}")"
+#     fi
 
     #
     # 1. If we have a labeled local USB disk, it will be first-in-line
@@ -29,6 +32,7 @@ function container_init() {
     read -r _ _ container_mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
     if [ "${container_mpoint}" ]; then
         LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
+        return
     fi
 
     #
@@ -38,25 +42,25 @@ function container_init() {
     if [ $(hostname -s) = last0 ]; then
         container_mpoint="/last0/data2/LAST-CONTAINER"
         LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
-    elif [[ "${ip_addr}" == 10.23.1.* ]]; then
+    elif [[ "${ip_addr}" == 10.23.[13].* ]]; then
         # try to force automount of the container
         container_mpoint=/last0/LAST-CONTAINER
         if [ "$(cd ${container_mpoint} >/dev/null 2>&1; echo cata*)" = catalogs ]; then
             LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
         fi
-    elif [[ "${ip_addr}" == 10.23.3.* ]]; then
-        if [ "$(hostname -s)" = last12w ]; then
-            container_lab_mpoint="/last12w/data2/LAST-CONTAINER"
-            LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_lab_mpoint}")"
-        else
-            # try to force automount of the container
-            container_lab_mpoint="/mnt/last12w/data2/LAST-CONTAINER"
-            mkdir -p ${container_lab_mpoint}
-            if [ ! "$(cd ${container_mpoint} >/dev/null 2>&1; echo cata*)" = catalogs ]; then
-                mount 10.23.3.24:/last12w/data2/LAST-CONTAINER ${container_lab_mpoint}
-                LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_lab_mpoint}")"
-            fi
-        fi
+#    elif [[ "${ip_addr}" == 10.23.3.* ]]; then
+#        if [ "$(hostname -s)" = last12w ]; then
+#            container_lab_mpoint="/last12w/data2/LAST-CONTAINER"
+#            LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_lab_mpoint}")"
+#        else
+#            # try to force automount of the container
+#            container_lab_mpoint="/mnt/last12w/data2/LAST-CONTAINER"
+#            mkdir -p ${container_lab_mpoint}
+#            if [ ! "$(cd ${container_mpoint} >/dev/null 2>&1; echo cata*)" = catalogs ]; then
+#                mount 10.23.3.24:/last12w/data2/LAST-CONTAINER ${container_lab_mpoint}
+#                LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_lab_mpoint}")"
+#            fi
+#        fi
     fi
 }
 
