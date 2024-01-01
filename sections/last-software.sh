@@ -116,7 +116,7 @@ function last_software_arg_parser() {
 }
 
 mkdir -p ${user_pythondir}
-chown ${user}.${user} ${user_pythondir}
+chown ${user_name}.${user_group} ${user_pythondir}
 
 if ! command -v pip3 >/dev/null 2>&1; then
 	message_info "Installing pip3 ..."
