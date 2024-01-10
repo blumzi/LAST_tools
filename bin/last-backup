@@ -207,6 +207,10 @@ message_info "Target: \"${backup_target}/${data_dir}\""
 message_info "Gathering list of files ..."
 
 sudo -u ocs rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
+if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    message_failure "Failed getting files list from ${backup_target}/${data_dir}"
+    exit 1
+fi
 
 if (( $(wc -l < ${files_list}) == 0 )); then
     message_success "The source and target directories are synchronized"
