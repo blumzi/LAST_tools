@@ -1,35 +1,53 @@
 #!/bin/bash
 
 #
-# This script manages the LAST pipeline
+# This script executes one LAST pipeline process
 #
-
-trap onSIGTERM SIGTERM
-
-declare -a pids
-
-function onSIGTERM() {
-	if [ "${pids[*]}" ]; then
-        #shellcheck disable=SC2086
-        kill -SIGTERM ${pids[*]}
-    fi
-}
 
 export LANG=en_US
 export LANGUAGE="en_US:en"
+PROG=$(basename ${0})
 
-case "${1}" in
+function usage() {
+    echo ""
+    echo "Usage: ${PROG} start|stop id"
+    echo "       ${PROG} status"
+    echo ""
+}
+
+if [ $# -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+action=${1}
+    id=${2}
+
+case "${action}" in
     start)
-		# The last-pipeline service is set to run as 'ocs'
-        for (( i = 1; i < 3; i++ )); do
-            last-matlab -nodisplay -batch "D=pipeline.DemonLAST; D.Logger.Console=false; D.Logger.Syslog.ProgName='last-pipeline'; D.DataDir=${i}; D.main('StopButton', false);"  &
-            pids+=( ${!} )
+        if [ ! "${id}" ]; then
+            usage
+            exit 1
+        fi
+        exec last-matlab -nodisplay -batch "D=pipeline.DemonLAST; D.Logger.Console=false; D.Logger.Syslog.ProgName=last-pipeline${id}; D.DataDir=${id}; tools.systemd.mex.notify_ready; D.main('StopButton', false);" 
+        ;;
+
+    stop)
+        if [ ! "${id}" ]; then
+            usage
+            exit 1
+        fi
+        pkill -f "DataDir=${id}" >/dev/null 2>&1
+        ;;
+
+    status)
+        expected_ids=( 1 2 )
+        for id in ${expected_ids[*]}; do
+            systemctl status last-pipeline${id}
         done
-        
-		sleep 5             # wait for matlabs to start running
-		if [ "${pids[*]}" ]; then
-            #shellcheck disable=SC2086
-			wait ${pids[*]}
-		fi
+        ;;
+
+    *)
+        usage
         ;;
 esac
