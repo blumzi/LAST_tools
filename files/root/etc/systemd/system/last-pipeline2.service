@@ -1,5 +1,5 @@
 [Unit]
-Description=LAST pipeline service (2 of 2)
+Description=LAST pipeline service 2 (of 2)
 
 [Service]
 User=ocs
@@ -9,6 +9,8 @@ ExecStop=/usr/local/share/last-tool/bin/last-pipeline stop 2
 Restart=always
 Environment="SYSTEMD=1"
 WatchdogSec=1800
+NotifyAccess=all
+Type=forking
 
 [Install]
 WantedBy=multi-user.target
