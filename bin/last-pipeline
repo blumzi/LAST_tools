@@ -29,7 +29,7 @@ case "${action}" in
             usage
             exit 1
         fi
-        exec last-matlab -nodisplay -batch "D=pipeline.DemonLAST; D.Logger.Console=false; D.Logger.Syslog.ProgName=\"last-pipeline${id}\"; D.DataDir=${id}; tools.systemd.mex.notify_ready; D.main('StopButton', false, 'RunAsSerice',true);" 
+        exec last-matlab -nodisplay -batch "D=pipeline.DemonLAST; D.Logger.Console=false; D.Logger.Syslog.ProgName=\"last-pipeline${id}\"; D.DataDir=${id}; tools.systemd.mex.notify_ready; D.main('StopButton', false, 'RunAsService',true);" 
         ;;
 
     stop)
