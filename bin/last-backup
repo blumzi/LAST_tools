@@ -36,7 +36,7 @@ util_log_invokation ${*}
 # defaults
 identity=
 default_nproc=10
-rsync_extra_args=
+rsync_extra_args="--exclude '*/raw/*'"
 rsync_info_args="--info=STATS0 --info=FLIST0"
 quiet=false
 
