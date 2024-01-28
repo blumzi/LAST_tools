@@ -93,11 +93,12 @@ while read -r path; do
     status_file=${path}
     dir=$(dirname ${status_file})
 
-    if [[ ${dir} == */raw/* ]]; then
+    if [[ ${dir} == */raw* ]]; then
         #
         # raw directories get their files compressed
         #
-        initiate_compression "${dir}"
+
+        : # initiate_compression "${dir}"
     else
         #
         # proc directories get their files backed up, if not already transfered
