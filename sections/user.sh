@@ -58,10 +58,8 @@ function user_enforce() {
 	fi
 
     # make sure the user owns it's home
-    if [ "$(stat --format '%U.%G' "${user_home}")" != "${user_name}.${user_group}" ]; then
-        chown ${user_name}.${user_group} "${user_home}"
-        message_success "Changed ownership of ${user_home} to ${user_name}.${user_group}"
-    fi
+    chown --recursive ${user_name}.${user_group} "${user_home}"
+    message_success "Changed ownership (recursively) of ${user_home} to ${user_name}.${user_group}"
 
     # add the HTTP proxy incantations to the .bash_profile
 	local bash_profile
