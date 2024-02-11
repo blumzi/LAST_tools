@@ -3,7 +3,7 @@
 source /etc/profile.d/last.shmodule_include lib/user
 
 #
-# This script manages the LAST meteo logger
+# This script manages the LAST enclosure logger
 #
 
 trap onSIGTERM SIGTERM
@@ -22,7 +22,7 @@ function onSIGTERM() {
 function get_pids() {
     local -a pids
     
-    mapfile -t pids < <(pgrep -a MATLAB | grep 'Meteologger' | cut -d ' ' -f1)
+    mapfile -t pids < <(pgrep -a MATLAB | grep 'Enclosurelogger' | cut -d ' ' -f1)
     echo "${pids[@]}"
 }
 
@@ -33,9 +33,9 @@ declare pids
 
 case "${1}" in
     start)
-		# The last-meteologger service is set to run as 'ocs'
+		# The last-enclosurelogger service is set to run as 'ocs'
         cd ${user_matlabdir}
-        last-matlab -nodisplay -batch 'addpath("/home/ocs/matlab/AstroPack/matlab/startup");startup_LAST(false,true); obs.MeteoLogger; pause(inf)'
+        last-matlab -nodisplay -batch 'addpath("/home/ocs/matlab/AstroPack/matlab/startup");startup_LAST(false,true); obs.EnclosureLogger; pause(inf)'
         
 		sleep 5             # wait for matlabs to start running
 		pids="$(get_pids)"
