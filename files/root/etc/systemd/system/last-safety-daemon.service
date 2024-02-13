@@ -1,0 +1,12 @@
+[Unit]
+Description=LAST safety data-gathering service
+
+[Service]
+User=ocs
+WorkingDirectory=/home/ocs/python/WeatherSafety
+ExecStart=/home/ocs/python/WeatherSafety/bin/last-safety-daemon start
+ExecStop=/home/ocs/python/WeatherSafety/bin/last-safety-daemon stop
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
