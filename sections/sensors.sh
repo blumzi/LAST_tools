@@ -20,8 +20,10 @@ EOF
 
 function sensors_enforce() {
     service_enforce last-enclosurelogger last0
+    service_enforce last-safety-daemon last0
 }
 
 function sensors_check() {
     service_check last-enclosurelogger last0
+    service_check last-safety-daemon last0
 }

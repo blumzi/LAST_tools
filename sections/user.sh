@@ -101,6 +101,7 @@ function user_enforce() {
     user_enforce_pulseaudio    
     util_enforce_shortcut --override --favorite google-chrome
     user_enforce_git_config
+    user_enforce_astropack
 
     local bash_aliases
     bash_aliases="$(module_locate files/root/home/ocs/.bash_aliases)"
@@ -181,6 +182,7 @@ function user_check() {
     user_check_pulseaudio;                          (( ret += ${?} ))
     util_check_shortcut --favorite google-chrome;   (( ret += ${?} ))
     user_check_git_config;                          (( ret += ${?} ))
+    user_check_astropack;                           (( ret += ${?} ))
 
     return $(( ret ))
 }
@@ -253,7 +255,6 @@ function user_enforce_git_config() {
     message_success "git-config: Set dummy user name and email in \"${user_git_global_config_file}\""
 }
 
-
 function user_check_git_config() {
     local ret=0
 
@@ -277,6 +278,29 @@ function user_check_git_config() {
     return $(( ret ))
 }
 
+function user_enforce_astropack() {
+    local file=${user_home}/.astropack/Passwords.yml
+
+    mkdir -p $(dirname ${file})
+    echo "last_operational : ['postgres', 'postgres', '', '']" > ${file}
+    chown ${user_name}.${user_group} $(dirname ${file})
+    message_success "astropack-passwords: Created ${file}"
+}
+
+function user_check_astropack() {
+    local file=${user_home}/.astropack/Passwords.yml
+
+    if [ -r ${file} ]; then
+        message_success "astropack-passwords: ${file} is readable"
+	    if grep -q '^last_operational' ${file} >/dev/null 2>&1; then
+		message_success "astropack-passwords: ${file} has line for 'last_operational'"
+	    else
+		message_failure "astropack-passwords: ${file} does not have a line for 'last_operational'"
+	    fi
+    else
+        message_failure "astropack-passwords: ${file} is missing"
+    fi
+}
 
 function user_policy() {
     cat <<- EOF
