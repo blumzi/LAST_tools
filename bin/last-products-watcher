@@ -105,7 +105,7 @@ while read -r path; do
         #
         if grep -qw "${const_ready_for_transfer}" "${status_file}" && ! grep -qw "${const_transfered}" "${status_file}"; then
             initiate_transfer "${dir}" "${sync_user}@${sync_host}:${sync_top}/${dir}"
-            # last-cat2db "$(realpath ${status_file})"
+            last-cat2db "$(realpath ${status_file})"
         fi
         # rc=${?}
     fi

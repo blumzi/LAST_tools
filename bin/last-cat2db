@@ -43,16 +43,20 @@ stderr=$(mktemp)
 stdout=$(mktemp)
 
 successes=0
-csv_files=( $(find ${status_dir} -maxdepth 1 -name '*_Cat_*.csv') )
+csv_files=( $(find ${status_dir} -maxdepth 1 -name '*_Cat_*.csv' -o -name '*_Image_*csv') )
 for csv_file in "${csv_files[@]}"; do
     header=$(read line < ${csv_file}; echo "${line}")
-    if [[ "${csv_file}" == *_proc_* ]]; then
-        table=${postgres_proc_catalog_table}
-    elif [[ "${csv_file}" == *_coadd_* ]]; then
-        table=${postgres_coadd_catalog_table}
-    else
-        continue
-    fi
+
+    case "${csv_file}" in
+        *_proc_Cat*)    table=${postgres_proc_catalog_table} ;;
+        *_coadd_Cat*)   table=${postgres_coadd_catalog_table} ;;
+        *_raw_Image*)   table=${postgres_raw_image_table} ;;
+        *_proc_Image*)  table=${postgres_proc_image_table} ;;
+        *_coadd_Image*) table=${postgres_coadd_image_table} ;;
+        *)              continue ;;
+    esac
+
+    message_info "inserting into $table"
 
     sql_query="${backslash}copy ${table} ("${header}") FROM '$(realpath ${csv_file})' WITH (FORMAT csv, DELIMITER ',',HEADER);"
 
