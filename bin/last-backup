@@ -7,7 +7,8 @@ function cleanup() {
 
     if [ ${#running_processes[*]} -eq 0 ]; then
         if (( ${#failures[*]} == 0 )); then
-            message_success "All chunks have been synchronized"
+            # message_success "All chunks have been synchronized"
+            :
         else
             failures=( $(list_sort "${failures[@]}" ) )
             message_fatal "Chunks ${failures[*]} have failed to synchronize!"
@@ -36,7 +37,7 @@ util_log_invokation ${*}
 # defaults
 identity=
 default_nproc=10
-rsync_extra_args="--exclude '*/raw/*'"
+rsync_extra_args="--exclude '*/raw'"
 rsync_info_args="--info=STATS0 --info=FLIST0"
 quiet=false
 
