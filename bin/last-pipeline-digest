@@ -7,12 +7,21 @@ if [ "$(hostname -s)" != last0 ]; then
 fi
 
 
-tmp=/tmp/pipeline-errors.gz
+attachment=/last0/data2/last-mail/$(date  +'%Y-%m-%d').gz
 pushd /var/log/remote
 zgrep -i 'last-pipeline.*err' last*/last-messages* 2>/dev/null | (
     sed 's;^;== ;'
 ) | gzip > ${tmp}
 
-echo "This is an automatic digest of last-pipeline errors" | mail --attach=${tmp} --debug-level=10 --return-address=noone --subject="last-pipeline-errors" ${addressees[*]}
+file_size=$(stat -c '%s' ${attachment})
+tenMB=$(( 10 * 1024 * 1024 ))
+
+if $(( file_size >= tenMB )); then
+    echo "The last-pipeline errors file is too big (more than 10MB).  It was left on last0 in ${attachment}" | \
+        mail -return-address=noone --subject="last-pipeline-errors left in ${attachment}" ${addressees[*]}
+else
+    echo "This is an automatic digest of last-pipeline errors" | \
+        mail --attach=${attachment} --debug-level=10 --return-address=noone --subject="last-pipeline-errors" ${addressees[*]}
+fi
 
 /bin/rm ${tmp}
