@@ -67,12 +67,15 @@ while read -r path; do
 
     status_file=${path}
     dir=$(dirname ${status_file})
+    if [[ "${dir}" == */raw ]]; then
+	    continue
+    fi
 
     if grep -qw ready-for-transfer "${status_file}" && ! grep -qw transfered "${status_file}"; then
         initiate_transfer "${dir}" "${sync_user}@${sync_host}:${sync_top}/${dir}"
         rc=${?}
     fi
 
-    last-cat2db "$(realpath ${status_file})"
+    # last-cat2db "$(realpath ${status_file})"
 
-done < <(find ${tops} -type f -name .status | sort -t/ --key=6n --key=8n)
+done < <(find ${tops} -type f -name .status 2>/dev/null | sort -t/ --key=6n --key=8n)

@@ -1,0 +1,12 @@
+[Unit]
+Description=LAST enclosure logging service
+
+[Service]
+User=ocs
+WorkingDirectory=/home/ocs/matlab
+ExecStart=/usr/local/share/last-tool/bin/last-enclosurelogger start
+ExecStop=pkill -f obs.EnclosureLogger
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

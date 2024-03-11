@@ -68,7 +68,8 @@ function matlab_crontab_enforce() {
 # The Matlab service is responsible for running the LAST pipeline at system startup
 #
 function matlab_service_enforce() {
-    service_enforce last-pipeline lastx
+    service_enforce last-pipeline1 lastx
+    service_enforce last-pipeline2 lastx
     service_enforce last-products-watcher lastx
 }
 
@@ -122,7 +123,8 @@ function matlab_crontab_check() {
 }
 
 function matlab_service_check() {
-    service_check last-pipeline lastx
+    service_check last-pipeline1 lastx
+    service_check last-pipeline2 lastx
     service_check last-products-watcher lastx
 }
 
