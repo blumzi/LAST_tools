@@ -104,7 +104,7 @@ function usage() {
 EOF
 }
 
-OPTS=$( getopt -o 'qs:f:t:hi:p:xcrCFA' --long "all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'qs:f:t:hi:p:xcrCFa' --long "all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 check=false
@@ -118,7 +118,7 @@ target=
 while true; do
 	case "${1}" in
 
-    -A|--all)
+    -a|--all)
         backup_all=true
         shift 1
         ;;
@@ -232,7 +232,7 @@ fi
 
 if [ "${#sources[@]}" -eq 0 ]; then
     echo ''
-    message_fatal "You have not selected any backup sources. Use either -A|--all or -s|--source <directory>"
+    message_fatal "You have not selected any backup sources. Use either -a|--all or -s|--source <directory>"
     usage
     exit 0
 fi
