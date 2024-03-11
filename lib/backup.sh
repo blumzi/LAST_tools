@@ -42,6 +42,11 @@ function backup_check_one() {
         message_fatal 'Expected */archive/* path'
         return
     fi
+
+    if [[ ${local_dir} == */raw ]]; then
+	    return
+    fi
+
     padded_backup_dir=$(printf "%-56s" ${local_dir})
 
     # Check the backup directory exists
@@ -96,7 +101,7 @@ function backup_check_one() {
 # Checks all the pipeline directories on the local machine
 #
 backup_check_all() {
-    for stat_file in $(find /$(hostname -s)/data[12] -name .status | grep -vE '(Trash)' | sort); do
+    for stat_file in $(find /$(hostname -s)/data[12] -name .status 2>/dev/null | grep '/proc/' | sort); do
         backup_check_one $(dirname ${stat_file})
     done
 }

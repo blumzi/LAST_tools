@@ -1,13 +1,29 @@
 #!/bin/bash
 
 
+function stamp_as_transfered() {
+    local dir="${1}"
+    local stat_file=${dir}/.status
+
+    if [ ! -e ${stat_file} ]; then
+        echo "$(date --iso-8601=seconds) transfered" >> ${stat_file}
+        message_success "Stamped \"${source}\" as \"transfered\"."
+    elif ! grep -qw transfered ${stat_file}; then
+        echo "$(date --iso-8601=seconds) transfered" >> ${stat_file}
+        message_success "Stamped \"${source}\" as \"transfered\"."
+    else
+        : # message_warning "File ${stat_file} already stamped as \"transfered\"!"
+    fi
+}
+
 function cleanup() {
     local failures=( $(if [ -s ${tmp}/.failures ]; then cat ${tmp}/.failures 2>/dev/null; fi) )
     local running_processes=( $(jobs -pr) )
 
     if [ ${#running_processes[*]} -eq 0 ]; then
         if (( ${#failures[*]} == 0 )); then
-            message_success "All chunks have been synchronized"
+            # message_success "All chunks have been synchronized"
+            :
         else
             failures=( $(list_sort "${failures[@]}" ) )
             message_fatal "Chunks ${failures[*]} have failed to synchronize!"
@@ -36,16 +52,20 @@ util_log_invokation ${*}
 # defaults
 identity=
 default_nproc=10
-rsync_extra_args="--exclude '*/raw/*'"
+rsync_extra_args="--exclude '*/raw'"
 rsync_info_args="--info=STATS0 --info=FLIST0"
 quiet=false
 
 function usage() {
     cat <<- EOF
 
-    Usage: ${PROG} -s|--source|-f|--from <source-directory> [ -t|--to|--target [<user@host>:]<target-directory> ]
+    Usage: ${PROG} [flags] -s|--source|-f|--from <source-directory> [ -t|--to|--target [<user@host>:]<target-directory> ]
 
-    The <source-directory> will be recursivelly synchronized with the <target-directory>.
+    Either one or more <source-directories> may be specified with --source.
+    If no <source-directories> were specified, all the directories named */proc/* under /$(hostname -s)/data[12] will
+     be backed up.
+
+    Every <source-directory> will be recursivelly synchronized with the <target-directory>.
     Both source and target may reside on the current machine.
 
     This utility:
@@ -55,8 +75,9 @@ function usage() {
     - Starts the relevant number of rsync processes, one-per-chunk
     - Waits for all the rsync processes to end.
 
-    Arguments:
+    Flags:
      -h|--help        - Show usage and exit
+     -a|--all         - Backup all */proc/* directories
      -q|--quiet       - Be quiet
      -s|--source      - Specifies the source-directory
      -f|--from        - Specifies the source-directory
@@ -71,18 +92,24 @@ function usage() {
 EOF
 }
 
-OPTS=$( getopt -o 'qs:f:t:hi:p:xcrCF' --long "quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'qs:f:t:hi:p:xcrCFA' --long "all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 check=false
 check_all=false
+backup_all=false
 remove=false
 force=false
-source=
+sources=()
 target=
 
 while true; do
 	case "${1}" in
+
+    -A|--all)
+        backup_all=true
+        shift 1
+        ;;
 
     -C|--check-all)
         check_all=true
@@ -111,6 +138,11 @@ while true; do
 
     -s|--source|-f|--from)
         source="$(realpath ${2})"
+        if [ $? -ne 0 ]; then
+            message_fatal "Bad source \"${2}\", no such directory"
+            exit 1
+        fi
+        sources+=( ${2} )
         shift 2
         ;;
 
@@ -150,11 +182,6 @@ while true; do
 	esac
 done
 
-if ! ${check_all} && [ ! "${source}" ]; then
-    message_fatal "Must specify a source directory with -s|--source|-f|--from <path>"
-    usage
-    exit 1
-fi
 
 if [ ! "${target}" ]; then
     target="${backup_default_target}"
@@ -162,15 +189,6 @@ fi
 
 if ${quiet}; then
     export LAST_TOOL_QUIET=true
-fi
-
-
-if ! ${check_all}; then
-    source=$(realpath ${source})
-    if [ ! -d "${source}" ]; then
-        message_failure "Bad source directory \"${source}\" (not a directory)"
-        exit 1
-    fi
 fi
 
 
@@ -186,11 +204,6 @@ cd ${tmp}
 
 files_list=files
 
-data_dir=${source}
-if [[ "${data_dir}"  == */archive/* ]]; then
-    data_dir="${data_dir#*/archive/}"
-fi
-
 if ${check}; then
     backup_check_one "${source}"
     exit 0
@@ -201,51 +214,89 @@ if ${check_all}; then
     exit 0
 fi
 
-message_info "Source: \"${source}\""
-message_info "Target: \"${backup_target}/${data_dir}\""
-
-message_info "Gathering list of files ..."
-
-sudo -u ocs rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
-if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    message_failure "Failed getting files list from ${backup_target}/${data_dir}"
-    exit 1
+if ${backup_all}; then
+    sources=( $( find /$(hostname -s)/data[12] -type d -path '*/proc/*' | sort ) )
 fi
 
-if (( $(wc -l < ${files_list}) == 0 )); then
-    message_success "The source and target directories are synchronized"
-    #cleanup
+if [ "${#sources[@]}" -eq 0 ]; then
+    echo ''
+    message_fatal "You have not selected any backup sources. Use either -A|--all or -s|--source <directory>"
+    usage
     exit 0
 fi
 
-message_info "Splitting workload among ${nproc} processes ..."
-nlines=$( awk -v lines=$(wc -l < ${files_list}) -v nprocs=${nprocs} 'BEGIN {print int(lines/nprocs) + 1}' )
-split --lines=${nlines} < ${files_list}
-chunks=( x?? )
 
-sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_topdir}/${data_dir}
+for source in "${sources[@]}"; do
 
-for ((i = 0; i < ${#chunks[*]}; i++)); do
-    (
-        message_info "Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
-        stat_file=stat.${i}
-        (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target}/${data_dir} 2>/dev/null ) > ${stat_file}
-        status=${?}
+    data_dir=${source}
+    if [[ "${data_dir}"  == */archive/* ]]; then
+        data_dir="${data_dir#*/archive/}"
+    fi
 
-        if [ "${status}" ] && [ ${status} -eq 0 ]; then
-            Speedup=$(grep speedup ${stat_file}  | cut -d' ' -f8)
-                Bps=$(grep '^sent ' ${stat_file} | cut -d' ' -f9 | tr -d ,)
-               Mbps=$(awk -v Bps=${Bps} 'BEGIN { printf "%.3f\n", Bps / 125000 }')
-            message_success "Chunk #$((i+1)) (of ${#chunks[*]}) succeeded (${Mbps} Mbps, speedup ${Speedup})"
-        else
-            # rsync returns 20 when killed
-            if [ "${status}" != 20 ]; then
-                message_failure "Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
-            fi
-            echo ${i} >> ${tmp}/.failures
+    echo ''
+    message_info "Source: \"${source}\""
+    message_info "Target: \"${backup_target}/${data_dir}\""
+
+    message_info "Gathering list of files ..."
+
+    sudo -u ocs rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+        message_failure "Failed getting files list from ${backup_target}/${data_dir}"
+        continue
+    fi
+
+    if (( $(wc -l < ${files_list}) == 0 )); then
+        message_success "The source and target directories are synchronized"
+        stamp_as_transfered ${source}
+
+        if ${remove} && ${force}; then
+            message_success "Removing \"${source}\" ..."
+            /bin/rm -rf ${source}
         fi
-    ) &
+
+        continue
+    fi
+
+    message_info "Splitting workload among ${nproc} processes ..."
+    nlines=$( awk -v lines=$(wc -l < ${files_list}) -v nprocs=${nprocs} 'BEGIN {print int(lines/nprocs) + 1}' )
+    split --lines=${nlines} < ${files_list}
+    chunks=( x?? )
+
+    sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_topdir}/${data_dir}
+
+    for ((i = 0; i < ${#chunks[*]}; i++)); do
+        (
+            message_info "Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
+            stat_file=stat.${i}
+            (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target}/${data_dir} 2>/dev/null ) > ${stat_file}
+            status=${?}
+
+            if [ "${status}" ] && [ ${status} -eq 0 ]; then
+                Speedup=$(grep speedup ${stat_file}  | cut -d' ' -f8)
+                    Bps=$(grep '^sent ' ${stat_file} | cut -d' ' -f9 | tr -d ,)
+                   Mbps=$(awk -v Bps=${Bps} 'BEGIN { printf "%.3f\n", Bps / 125000 }')
+                message_success "Chunk #$((i+1)) (of ${#chunks[*]}) succeeded (${Mbps} Mbps, speedup ${Speedup})"
+            else
+                # rsync returns 20 when killed
+                if [ "${status}" != 20 ]; then
+                    message_failure "Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
+                fi
+                echo ${i} >> ${tmp}/.failures
+            fi
+        ) &
+    done
+
+    wait
+
+    if [[ ${source} == */proc/* ]] && [ ! -e ${tmp}/.failures ]; then
+        # the backup succeeded
+        stamp_as_transfered ${source}
+
+        if ${remove} && ${force}; then
+            message_success "Removing \"${source}\" ..."
+            /bin/rm -rf ${source}
+        fi
+    fi
 done
 
-wait
 cleanup
