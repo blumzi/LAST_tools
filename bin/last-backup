@@ -1,19 +1,30 @@
 #!/bin/bash
 
 
+#
+# Stamps a directory as "transfered"
+# Removes previous (supposedly bogus) stamps 
+# Syncs the .status file to the target
+#
 function stamp_as_transfered() {
     local dir="${1}"
     local stat_file=${dir}/.status
+    local date=$(date --iso-8601=seconds)   # 2024-03-11T08:23+00:00
+    local stamp_line="${date%+*} transfered"
 
     if [ ! -e ${stat_file} ]; then
-        echo "$(date --iso-8601=seconds) transfered" >> ${stat_file}
+        echo "${stamp_line}" > ${stat_file}
         message_success "Stamped \"${source}\" as \"transfered\"."
-    elif ! grep -qw transfered ${stat_file}; then
-        echo "$(date --iso-8601=seconds) transfered" >> ${stat_file}
-        message_success "Stamped \"${source}\" as \"transfered\"."
-    else
-        : # message_warning "File ${stat_file} already stamped as \"transfered\"!"
+	else
+        (
+            grep -vw transfered ${stat_file}
+            echo "${stamp_line}"
+        ) > ${stat_file}.new
+        mv ${stat_file}.new ${stat_file}
     fi
+    chown ${user_name}.${user_group} ${stat_file}
+    message_success "Stamped \"${source}\" as \"transfered\"."
+    sudo -u ${user_name} scp -o "StrictHostKeyChecking accept-new" ${stat_file} ${backup_user}@${backup_host}:${backup_topdir}/${data_dir}
 }
 
 function cleanup() {
@@ -46,6 +57,7 @@ module_include lib/message
 module_include lib/util
 module_include lib/list
 module_include lib/backup
+module_include lib/user
 
 util_log_invokation ${*}
 
