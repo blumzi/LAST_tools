@@ -1,0 +1,53 @@
+#!/bin/bash
+
+PROG=$(basename ${0})
+source /etc/profile.d/last.sh
+
+module_include lib/message
+module_include lib/util
+module_include lib/user
+
+util_log_invokation ${*}
+
+function usage() {
+    cat <<- EOF
+
+    Usage: ${PROG} 
+
+        A utility that compresses the raw LAST images on the current machine.
+        It is typically called via crontab at NOON each day.
+
+        Finds raw image files using the pattern /$(hostname -s)/data[12]/archive/*/raw/*.fits and uses fpack(1) to compress them.
+
+    Flags:
+     -h|--help        - Show usage and exit
+
+EOF
+}
+
+OPTS=$( getopt -o 'h' --long "help" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+
+while true; do
+	case "${1}" in
+
+    -h|--help)
+        usage
+        exit 0
+        ;;
+
+	esac
+done
+
+
+find /$(hostname -s)/data[12]/archive -path '*/raw/*.fits' 2>/dev/null | while read file; do
+    fpack -r -Y -D ${file}
+    rc=$?
+
+    if [ ${rc} -eq 0 ]; then
+        message_success "${file}} => ${file}.fz"
+        chown ${user_name}.${user_group} ${file}.fz
+    else
+        message_failure "${file}: failed with rc=${rc}"
+    fi
+done

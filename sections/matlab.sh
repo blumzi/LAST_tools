@@ -58,9 +58,12 @@ function matlab_enforce() {
 function matlab_crontab_enforce() {
     local tmp=$(mktemp)
 
-    echo '0 8 * * * /usr/local/share/last-tool/bin/last-products-catchup' > ${tmp}
+    {
+	    echo '0  8 * * * /usr/local/share/last-tool/bin/last-products-catchup'
+	    echo '0 12 * * * /usr/local/share/last-tool/bin/last-compress-raw-images'
+    } > ${tmp}
     crontab -u ${user_name} ${tmp}
-    message_success "crontab: Created an entry for last-products-catchup"
+    message_success "crontab: Created entries for last-products-catchup and last-compress-raw-images"
     /bin/rm ${tmp}
 }
 
@@ -117,8 +120,20 @@ function matlab_crontab_check() {
     if [ "${contents}" = "no crontab for ${user_name}" ]; then
         message_failure "crontab: No crontab for ${user_name}"
         (( ret++ ))
-    elif [[ "${contents}" == *last-products-catchup* ]]; then
-        message_success "crontab: We have an entry for last-products-catchup."
+    else 
+        if [[ "${contents}" == *last-products-catchup* ]]; then
+            message_success "crontab: We have an entry for last-products-catchup."
+        else
+            message_failure "crontab: Missing entry for last-product-catchup"
+            (( ret++ ))
+        fi
+
+        if [[ "${contents}" == *last-compress-raw-images* ]]; then
+            message_success "crontab: We have an entry for last-compress-raw-images."
+        else
+            message_failure "crontab: Missing entry for last-compress-raw-images"
+            (( ret++ ))
+        fi
     fi
 }
 
