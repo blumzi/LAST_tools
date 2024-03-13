@@ -107,14 +107,14 @@ function service_check() {
     if systemctl is-enabled ${service} >/dev/null 2>&1; then
         message_success "Service \"${service}\" is enabled"
     else
-        message_failure "Service \"${service}\" is disabled"
+        message_warning "Service \"${service}\" is disabled"
         (( errors++ ))
     fi
 
     if systemctl is-active ${service} >/dev/null 2>&1; then
         message_success "Service \"${service}\" is active"
     else
-        message_failure "Service \"${service}\" is not active"
+        message_warning "Service \"${service}\" is not active"
         (( errors++ ))
     fi
 
