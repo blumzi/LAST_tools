@@ -28,27 +28,58 @@ function service_enforce() {
     message_success "Linked \"${our_file}\" to \"${system_file}\"."
     systemctl daemon-reload
     
-    if [ "$(systemctl is-enabled ${service})" != enabled ]; then
-        if systemctl enable ${service} >/dev/null 2>&1 ; then
-            message_success "Enabled the \"${service}\" service"
+    local enable=true
+    if [ "${arg}" ]; then
+        case ${arg} in
+		"--enable")
+		    enable=true
+		    ;;
+
+        "--disable")
+            enable=false
+            ;;
+        esac
+    fi
+
+    if ${enable}; then
+        if [ "$(systemctl is-enabled ${service})" != enabled ]; then
+            if systemctl enable ${service} >/dev/null 2>&1 ; then
+                message_success "Enabled the \"${service}\" service"
+            else
+                message_failure "Failed to enable the \"${service}\" service"
+            fi
         else
-            message_failure "Failed to enable the \"${service}\" service"
+            message_success "Service \"${service}\" is enabled"
+        fi
+
+        if systemctl is-active ${service} >/dev/null 2>&1; then
+            message_success "Service \"${service}\" is active"
+        else
+            if systemctl start ${service} >/dev/null 2>&1; then
+                message_success "Started service \"${service}\"."
+            else
+                message_failure "Failed to start service \"${service}\"."
+            fi
         fi
     else
-        message_success "Service \"${service}\" is enabled"
-    fi
-
-    if [ "${arg}" ] && [ "${arg}" = "--no-start" ]; then
-	    return
-    fi
-
-    if systemctl is-active ${service} >/dev/null 2>&1; then
-        message_success "Service \"${service}\" is active"
-    else
-        if systemctl start ${service} >/dev/null 2>&1; then
-            message_success "Started service \"${service}\"."
+        if [ "$(systemctl is-enabled ${service})" != disabled ]; then
+            if systemctl disable ${service} >/dev/null 2>&1 ; then
+                message_success "Disabled the \"${service}\" service"
+            else
+                message_failure "Failed to disable the \"${service}\" service"
+            fi
         else
-            message_failure "Failed to start service \"${service}\"."
+            message_success "Service \"${service}\" is disabled"
+        fi
+
+        if ! systemctl is-active ${service} >/dev/null 2>&1; then
+            message_success "Service \"${service}\" is not active"
+        else
+            if systemctl stop ${service} >/dev/null 2>&1; then
+                message_success "Stopped service \"${service}\"."
+            else
+                message_failure "Failed to stop service \"${service}\"."
+            fi
         fi
     fi
 }

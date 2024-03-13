@@ -59,11 +59,11 @@ function matlab_crontab_enforce() {
     local tmp=$(mktemp)
 
     {
-	    echo '0  8 * * * /usr/local/share/last-tool/bin/last-products-catchup'
+	    echo '0  8 * * * /usr/local/share/last-tool/bin/last-backup --all'
 	    echo '0 12 * * * /usr/local/share/last-tool/bin/last-compress-raw-images'
     } > ${tmp}
     crontab -u ${user_name} ${tmp}
-    message_success "crontab: Created entries for last-products-catchup and last-compress-raw-images"
+    message_success "crontab: Created entries for 'last-backup --all' at noon and last-compress-raw-images at 08:00"
     /bin/rm ${tmp}
 }
 
@@ -71,8 +71,8 @@ function matlab_crontab_enforce() {
 # The Matlab service is responsible for running the LAST pipeline at system startup
 #
 function matlab_service_enforce() {
-    service_enforce last-pipeline1 lastx
-    service_enforce last-pipeline2 lastx
+    service_enforce last-pipeline1 lastx --disable
+    service_enforce last-pipeline2 lastx --disable
     service_enforce last-products-watcher lastx
 }
 
@@ -103,7 +103,7 @@ function matlab_check() {
     
     matlab_installation_check;              (( ret += $? ))
     matlab_startup_check;                   (( ret += $? ))
-    matlab_astropack_startup_check;                (( ret += $? ))
+    matlab_astropack_startup_check;         (( ret += $? ))
     matlab_support_check;                   (( ret += $? ))
     matlab_service_check;                   (( ret += $? ))
     matlab_config_check;                    (( ret += $? ))
@@ -121,10 +121,10 @@ function matlab_crontab_check() {
         message_failure "crontab: No crontab for ${user_name}"
         (( ret++ ))
     else 
-        if [[ "${contents}" == *last-products-catchup* ]]; then
-            message_success "crontab: We have an entry for last-products-catchup."
+        if [[ "${contents}" == *last-backup* ]]; then
+            message_success "crontab: We have an entry for last-backup."
         else
-            message_failure "crontab: Missing entry for last-product-catchup"
+            message_failure "crontab: Missing entry for last-backup"
             (( ret++ ))
         fi
 
