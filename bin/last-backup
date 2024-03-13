@@ -89,7 +89,7 @@ function usage() {
 
     Flags:
      -h|--help        - Show usage and exit
-     -a|--all         - Backup all */proc/* directories
+     -a|--all         - Backup all /$(hostname -s)/data[12]/archive/*/proc/* directories (default)
      -q|--quiet       - Be quiet
      -s|--source      - Specifies the source-directory
      -f|--from        - Specifies the source-directory
@@ -109,7 +109,7 @@ eval set -- "${OPTS}"
 
 check=false
 check_all=false
-backup_all=false
+backup_all=true
 remove=false
 force=false
 sources=()
@@ -154,7 +154,7 @@ while true; do
             message_fatal "Bad source \"${2}\", no such directory"
             exit 1
         fi
-        sources+=( ${2} )
+        sources+=( ${source} )
         shift 2
         ;;
 
@@ -226,17 +226,17 @@ if ${check_all}; then
     exit 0
 fi
 
-if ${backup_all}; then
-    sources=( $( find /$(hostname -s)/data[12] -type d -path '*/proc/*' | sort ) )
+if [ "${#sources[@]}" -eq 0 ]; then     # no sources were selected with --source
+	if ${backup_all}; then
+	    sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | sort ) )
+	fi
 fi
 
+# Neither manually specified nor automatically found sources
 if [ "${#sources[@]}" -eq 0 ]; then
-    echo ''
-    message_fatal "You have not selected any backup sources. Use either -a|--all or -s|--source <directory>"
-    usage
+    message_info "Nothing to backup, bye!"
     exit 0
 fi
-
 
 for source in "${sources[@]}"; do
 
