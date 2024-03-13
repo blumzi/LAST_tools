@@ -59,7 +59,7 @@ function matlab_crontab_enforce() {
     local tmp=$(mktemp)
 
     {
-	    echo '0  8 * * * /usr/local/share/last-tool/bin/last-backup --all'
+	    echo '0  8 * * * /usr/local/share/last-tool/bin/last-backup --all --remove --force'
 	    echo '0 12 * * * /usr/local/share/last-tool/bin/last-compress-raw-images'
     } > ${tmp}
     crontab -u ${user_name} ${tmp}
