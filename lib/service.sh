@@ -14,6 +14,7 @@ module_include lib/macmap
 function service_enforce() {
     local service="${1}"
     local   scope="${2}"
+    local     arg="${3}"
 
     if ! _service_is_relevant_to_this_machine ${scope}; then
         message_success "Service \"${service}\" is not relevant to this machine"
@@ -35,6 +36,10 @@ function service_enforce() {
         fi
     else
         message_success "Service \"${service}\" is enabled"
+    fi
+
+    if [ "${arg}" ] && [ "${arg}" = "--no-start" ]; then
+	    return
     fi
 
     if systemctl is-active ${service} >/dev/null 2>&1; then
