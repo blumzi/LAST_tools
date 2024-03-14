@@ -24,7 +24,7 @@ function stamp_as_transfered() {
     fi
     chown ${user_name}.${user_group} ${stat_file}
     message_success "Stamped \"${source}\" as \"transfered\"."
-    sudo -u ${user_name} scp -o "StrictHostKeyChecking accept-new" ${stat_file} ${backup_user}@${backup_host}:${backup_topdir}/${data_dir}
+    sudo -u ${user_name} scp -q -o "StrictHostKeyChecking accept-new" ${stat_file} ${backup_user}@${backup_host}:${backup_topdir}/${data_dir}
 }
 
 function cleanup() {
@@ -251,7 +251,7 @@ for source in "${sources[@]}"; do
 
     message_info "Gathering list of files ..."
 
-    sudo -u ocs rsync -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
+    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
         message_failure "Failed getting files list from ${backup_target}/${data_dir}"
         continue
