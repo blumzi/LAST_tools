@@ -4,10 +4,10 @@ module_include lib/logs
 module_include lib/macmap
 module_include lib/logs
 
-sections_register_section "logs" "Handles the LAST logs" ""
+sections_register_section "logs" "Handles forwarding and rotation of the LAST logs and files" ""
 
-function logs_mklogrotate_conf() {
-    cat <<- EOF
+function logs_mklogrotate_last0_conf() {
+    cat <<- "EOF"
 /var/log/remote/*/*.log
 {
 	rotate 7
@@ -89,7 +89,47 @@ function logs_enforce() {
         message_success "directory: \"${logs_remote_dir}\" added read and search access"
 
         config_file="/etc/logrotate.d/last-logs"
-        logs_mklogrotate_conf > ${config_file}
+        logs_mklogrotate_last0_conf > ${config_file}
+        message_success "logrotate: Overwriten \"${config_file}\"."
+    else
+        config_file="/etc/logrotate.d/last-logs"
+        cat << "EOF" > ${config_file}
+/var/log/ocs/api/.logrotate {
+    daily
+    rotate 1
+    missingok
+    notifempty
+    create 644 ocs ocs
+    su ocs ocs
+    postrotate
+        # Find all subdirectories (max depth 1), sort them by modification time (newest first),
+        # skip the first 10, and remove the rest.
+        /usr/bin/find /var/log/ocs/api -mindepth 1 -maxdepth 1 -type d -print0 | \
+        /usr/bin/xargs -0 -r ls -td | \
+        /usr/bin/tail -n +11 | \
+        /usr/bin/xargs -r rm -rf
+        echo hiho /var/log/ocs/api/.logrotate
+    endscript
+}
+
+/var/log/last/.logrotate {
+    daily
+    rotate 1
+    missingok
+    notifempty
+    create 644 ocs ocs
+    su ocs ocs
+    postrotate
+        # Find all subdirectories (max depth 1), sort them by modification time (newest first),
+        # skip the first 10, and remove the rest.
+        /usr/bin/find /var/log/last -mindepth 1 -maxdepth 1 -type d -print0 | \
+        /usr/bin/xargs -0 -r ls -td | \
+        /usr/bin/tail -n +11 | \
+        /usr/bin/xargs -r rm -rf
+        echo hiho /var/log/last/.logrotate
+    endscript
+}
+EOF
         message_success "logrotate: Overwriten \"${config_file}\"."
     fi
 }
@@ -169,13 +209,14 @@ function logs_check() {
 
         config_file="/etc/logrotate.d/last-logs"
         local tmp=$(mktemp)
-        logs_mklogrotate_conf > ${tmp}
+        logs_mklogrotate_last0_conf > ${tmp}
         if cmp --quiet ${config_file} ${tmp}; then
             message_success "logrotate: \"${config_file}\" is OK."
         else
             message_failure "logrotate: BAD \"${config_file}\"!"
             (( ret++ ))
         fi
+
     fi
 
     return ${ret}
