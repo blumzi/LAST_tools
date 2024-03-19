@@ -52,19 +52,6 @@ function matlab_enforce() {
     matlab_service_enforce
     matlab_config_enforce
     util_enforce_shortcut --favorite matlab
-    matlab_crontab_enforce
-}
-
-function matlab_crontab_enforce() {
-    local tmp=$(mktemp)
-
-    {
-	    echo '0  8 * * * /usr/local/share/last-tool/bin/last-backup --all --remove --force'
-	    echo '0 12 * * * /usr/local/share/last-tool/bin/last-compress-raw-images'
-    } > ${tmp}
-    crontab -u ${user_name} ${tmp}
-    message_success "crontab: Created entries for 'last-backup --all' at noon and last-compress-raw-images at 08:00"
-    /bin/rm ${tmp}
 }
 
 #
@@ -108,33 +95,8 @@ function matlab_check() {
     matlab_service_check;                   (( ret += $? ))
     matlab_config_check;                    (( ret += $? ))
     util_check_shortcut --favorite matlab;  (( ret += $? ))
-    matlab_crontab_check;                   (( ret += $? ))
 
     return $(( ret ))
-}
-
-function matlab_crontab_check() {
-    local contents="$(crontab -l -u ${user_name})"
-    local ret=0
-
-    if [ "${contents}" = "no crontab for ${user_name}" ]; then
-        message_failure "crontab: No crontab for ${user_name}"
-        (( ret++ ))
-    else 
-        if [[ "${contents}" == *last-backup* ]]; then
-            message_success "crontab: We have an entry for last-backup."
-        else
-            message_failure "crontab: Missing entry for last-backup"
-            (( ret++ ))
-        fi
-
-        if [[ "${contents}" == *last-compress-raw-images* ]]; then
-            message_success "crontab: We have an entry for last-compress-raw-images."
-        else
-            message_failure "crontab: Missing entry for last-compress-raw-images"
-            (( ret++ ))
-        fi
-    fi
 }
 
 function matlab_service_check() {

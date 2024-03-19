@@ -213,6 +213,7 @@ module_include sections/postgres
 module_include sections/sensors
 module_include sections/images
 module_include sections/logs
+module_include sections/crontab
 
 read -r -a registered_sections <<< "$( sections_registered_sections )"
 
