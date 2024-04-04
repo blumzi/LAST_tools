@@ -93,19 +93,18 @@ while read -r path; do
     status_file=${path}
     dir=$(dirname ${status_file})
 
-    if [[ ${dir} == */raw* ]]; then
+    if [[ ${dir} == */raw/* ]]; then
         #
-        # raw directories get their files compressed
+        # raw directories get their files compressed via crontab
         #
 
-        : # initiate_compression "${dir}"
+        :
     else
         #
         # proc directories get their files backed up, if not already transfered
         #
         if grep -qw "${const_ready_for_transfer}" "${status_file}" && ! grep -qw "${const_transfered}" "${status_file}"; then
             initiate_transfer "${dir}" "${sync_user}@${sync_host}:${sync_top}/${dir}"
-            last-cat2db "$(realpath ${status_file})"
         fi
         # rc=${?}
     fi

@@ -14,6 +14,7 @@ module_include lib/macmap
 function service_enforce() {
     local service="${1}"
     local   scope="${2}"
+    local     arg="${3}"
 
     if ! _service_is_relevant_to_this_machine ${scope}; then
         message_success "Service \"${service}\" is not relevant to this machine"
@@ -27,23 +28,58 @@ function service_enforce() {
     message_success "Linked \"${our_file}\" to \"${system_file}\"."
     systemctl daemon-reload
     
-    if [ "$(systemctl is-enabled ${service})" != enabled ]; then
-        if systemctl enable ${service} >/dev/null 2>&1 ; then
-            message_success "Enabled the \"${service}\" service"
-        else
-            message_failure "Failed to enable the \"${service}\" service"
-        fi
-    else
-        message_success "Service \"${service}\" is enabled"
+    local enable=true
+    if [ "${arg}" ]; then
+        case ${arg} in
+		"--enable")
+		    enable=true
+		    ;;
+
+        "--disable")
+            enable=false
+            ;;
+        esac
     fi
 
-    if systemctl is-active ${service} >/dev/null 2>&1; then
-        message_success "Service \"${service}\" is active"
-    else
-        if systemctl start ${service} >/dev/null 2>&1; then
-            message_success "Started service \"${service}\"."
+    if ${enable}; then
+        if [ "$(systemctl is-enabled ${service})" != enabled ]; then
+            if systemctl enable ${service} >/dev/null 2>&1 ; then
+                message_success "Enabled the \"${service}\" service"
+            else
+                message_failure "Failed to enable the \"${service}\" service"
+            fi
         else
-            message_failure "Failed to start service \"${service}\"."
+            message_success "Service \"${service}\" is enabled"
+        fi
+
+        if systemctl is-active ${service} >/dev/null 2>&1; then
+            message_success "Service \"${service}\" is active"
+        else
+            if systemctl start ${service} >/dev/null 2>&1; then
+                message_success "Started service \"${service}\"."
+            else
+                message_failure "Failed to start service \"${service}\"."
+            fi
+        fi
+    else
+        if [ "$(systemctl is-enabled ${service})" != disabled ]; then
+            if systemctl disable ${service} >/dev/null 2>&1 ; then
+                message_success "Disabled the \"${service}\" service"
+            else
+                message_failure "Failed to disable the \"${service}\" service"
+            fi
+        else
+            message_success "Service \"${service}\" is disabled"
+        fi
+
+        if ! systemctl is-active ${service} >/dev/null 2>&1; then
+            message_success "Service \"${service}\" is not active"
+        else
+            if systemctl stop ${service} >/dev/null 2>&1; then
+                message_success "Stopped service \"${service}\"."
+            else
+                message_failure "Failed to stop service \"${service}\"."
+            fi
         fi
     fi
 }
@@ -71,14 +107,14 @@ function service_check() {
     if systemctl is-enabled ${service} >/dev/null 2>&1; then
         message_success "Service \"${service}\" is enabled"
     else
-        message_failure "Service \"${service}\" is disabled"
+        message_warning "Service \"${service}\" is disabled"
         (( errors++ ))
     fi
 
     if systemctl is-active ${service} >/dev/null 2>&1; then
         message_success "Service \"${service}\" is active"
     else
-        message_failure "Service \"${service}\" is not active"
+        message_warning "Service \"${service}\" is not active"
         (( errors++ ))
     fi
 
