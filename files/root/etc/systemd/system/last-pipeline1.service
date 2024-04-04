@@ -8,7 +8,7 @@ ExecStart=/usr/local/share/last-tool/bin/last-pipeline start 1
 ExecStop=/usr/local/share/last-tool/bin/last-pipeline stop 1
 Restart=always
 Environment="SYSTEMD=1"
-WatchdogSec=1800
+WatchdogSec=2700
 NotifyAccess=all
 Type=forking
 
