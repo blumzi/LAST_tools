@@ -3,9 +3,9 @@ Description=LAST safety data-gathering service
 
 [Service]
 User=ocs
-WorkingDirectory=/home/ocs/python/WeatherSafety
-ExecStart=/home/ocs/python/WeatherSafety/bin/last-safety-daemon start
-ExecStop=/home/ocs/python/WeatherSafety/bin/last-safety-daemon stop
+WorkingDirectory=/home/ocs/python/WAO_Safety
+ExecStart=/home/ocs/python/WAO_Safety/bin/last-safety-daemon start
+ExecStop=/home/ocs/python/WAO_Safety/bin/last-safety-daemon stop
 Restart=always
 
 [Install]
