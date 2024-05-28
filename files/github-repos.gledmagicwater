@@ -28,7 +28,7 @@ matlab/LAST/LAST_ZWOASICamera              https://github.com/EastEriq/LAST_ZWOA
 matlab/LAST/LAST_CelestronFocusMotor       https://github.com/EastEriq/LAST_CelestronFocusMotor.git            branch:protectedSerialQuery       Development
 matlab/LAST/LAST_USBserial                 https://github.com/EastEriq/LAST_USBserial.git                      branch:master            Development
 matlab/LAST/LAST_QHYccd                    https://github.com/EastEriq/LAST_QHYccd.git                         branch:mastrolindo       Development
-matlab/LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    branch:protectedBinaryQuery       Development
+matlab/LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    branch:eventCallbackQuery       Development
 matlab/LAST/LAST_OCS                       https://github.com/PolishookDavid/LAST_OCS.git                      branch:gledmagicwater    Development
 matlab/LAST/LAST_Messaging                 https://github.com/EastEriq/LAST_Messaging.git                      branch:gledmagicwater    Development
 matlab/LAST/LAST_EnvironmentArduinoSensors https://github.com/EastEriq/LAST_EnvironmentArduinoSensors.git      branch:master            Cecco
