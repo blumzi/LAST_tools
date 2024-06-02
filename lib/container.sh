@@ -29,7 +29,7 @@ function container_init() {
     #
     # 1. If we have a labeled local USB disk, it will be first-in-line
     #
-    read -r _ _ container_mpoint _ <<< "$( mount -l | grep "\[${LAST_CONTAINER_LABEL}\]")"
+    read -r _ _ container_mpoint _ <<< "$( mount -l | grep -w "${LAST_CONTAINER_LABEL}")"
     if [ "${container_mpoint}" ]; then
         LAST_CONTAINER_PATH="$(path_append "${LAST_CONTAINER_PATH}" "${container_mpoint}")"
         return

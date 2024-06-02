@@ -18,11 +18,8 @@ declare -a last_software_selected_repos=()
 declare -g last_software_reclone=false
 declare -g -x last_software_list_only=false
 
-last_software_packages_container=
+last_software_packages_container=$(container_lookup packages)
 
-function last_software_init() {
-    last_software_packages_container=$(container_lookup packages)
-}
 
 function last_software_helper() {
     cat <<- EOF
