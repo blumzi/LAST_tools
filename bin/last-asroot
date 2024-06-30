@@ -11,18 +11,19 @@ util_log_invokation ${*}
 
 function usage() {
     echo ""
-    echo "  Usage: ${PROG} [-t|--timeout seconds] [[-H|--host <host>] ...] -c|--cmd|--command command"
+    echo "  Usage: ${PROG} [-t|--timeout seconds] [-u|--units|--units-only] [[-H|--host <host>] ...] -c|--cmd|--command command"
     echo ""
     echo "  Runs the specified command as root"
     echo "   on the specified hosts (default: $(echo ${default_hosts[@]} | tr ' ' ','))"
     echo ""
 }
 
-OPTS=$( getopt -o 'H:hc:t:' --long "help,host:,cmd:,command:,timeout:" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'H:hc:t:u' --long "help,host:,cmd:,command:,timeout:,units,units-only" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 default_hosts=( $(last-hosts --deployed) )
 timeout=2
+units_only=false
 
 hosts=()
 while true; do
@@ -30,6 +31,11 @@ while true; do
     -h|--help)
         usage
         exit 0
+        ;;
+
+    -u|--units|--units-only)
+        units_only=true
+        shift 1
         ;;
 
     -H|--host)
@@ -58,6 +64,16 @@ if [ ! "${hosts[*]}" ]; then
     hosts=( ${default_hosts[*]} )
 fi
 
+if ${units_only}; then
+    units=()
+    for h in ${hosts[*]}; do
+        if [ ${h} != last0 ]; then
+            units+=( ${h} )
+        fi
+    done
+    hosts=( ${units[*]} )
+fi
+        
 if [ ! "${cmd}" ]; then
     cmd="${@}"
 fi
