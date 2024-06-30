@@ -25,7 +25,7 @@ function stamp_as_transfered() {
     chown ${user_name}.${user_group} ${stat_file}
     message_success "Stamped \"${source}\" as \"transfered\"."
     sudo -u ${user_name} scp -q -o "StrictHostKeyChecking accept-new" ${stat_file} ${backup_user}@${backup_host}:${backup_topdir}/${data_dir}
-    sudo -u ${user_name} scp -q -o "StrictHostKeyChecking accept-new" ${info_dir} ${backup_user}@${backup_host}:${backup_topdir}/${data_dir}
+    sudo -u ${user_name} scp -r -q -o "StrictHostKeyChecking accept-new" ${info_dir} ${backup_user}@${backup_host}:${backup_topdir}/${data_dir}
 }
 
 function cleanup() {
@@ -101,11 +101,12 @@ function usage() {
      -r|--remove      - Remove source directory if it was backed up (only works with -c|--check or -C|--check-all)
      -F|--force       - Force removal of local directory (only works with -r|--remove)
      -C|--check-all   - Same as -c|--check but for all the local directories
+     -j|--jobs N      - Run upto N jobs (default: 5) in parallel
 
 EOF
 }
 
-OPTS=$( getopt -o 'qs:f:t:hi:p:xcrCFa' --long "all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'qs:f:t:hi:p:xcrCFaj:' --long "jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 check=false
@@ -115,9 +116,15 @@ remove=false
 force=false
 sources=()
 target=
+jobs=5
 
 while true; do
-	case "${1}" in
+    case "${1}" in
+
+    -j|--jobs)
+        jobs=${1}
+        shift 2
+        ;;
 
     -a|--all)
         backup_all=true
@@ -241,38 +248,39 @@ if [ "${#sources[@]}" -eq 0 ]; then
     exit 0
 fi
 
-for source in "${sources[@]}"; do
+function backup_one_source() {
+    local data_dir=${1}
+    local job_tag="[${job_id}/${#sources[@]}]"
 
-    data_dir=${source}
     if [[ "${data_dir}"  == */archive/* ]]; then
         data_dir="${data_dir#*/archive/}"
     fi
 
     echo ''
-    message_info "Source: \"${source}\""
-    message_info "Target: \"${backup_target}/${data_dir}\""
+    message_info "${job_tag} Source: \"${source}\""
+    message_info "${job_tag} Target: \"${backup_target}/${data_dir}\""
 
-    message_info "Gathering list of files ..."
+    message_info "${job_tag} Gathering list of files ..."
 
     sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
-        message_failure "Failed getting files list from ${backup_target}/${data_dir}"
-        continue
+        message_failure "${job_tag} Failed getting files list from ${backup_target}/${data_dir}"
+        return
     fi
 
     if (( $(wc -l < ${files_list}) == 0 )); then
-        message_success "The source and target directories are synchronized"
+        message_success "${job_tag} The source and target directories are synchronized"
         stamp_as_transfered ${source}
 
         if ${remove} && ${force}; then
-            message_success "Removing \"${source}\" ..."
+            message_success "${job_tag} Removing \"${source}\" ..."
             /bin/rm -rf ${source}
         fi
 
-        continue
+        return
     fi
 
-    message_info "Splitting workload among ${nproc} processes ..."
+    message_info "${job_tag} Splitting workload among ${nproc} processes ..."
     nlines=$( awk -v lines=$(wc -l < ${files_list}) -v nprocs=${nprocs} 'BEGIN {print int(lines/nprocs) + 1}' )
     split --lines=${nlines} < ${files_list}
     cp ${files_list} ${info_dir}/${files_list}
@@ -282,7 +290,7 @@ for source in "${sources[@]}"; do
 
     for ((i = 0; i < ${#chunks[*]}; i++)); do
         (
-            message_info "Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
+            message_info "${job_tag} Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
             stat_file=stat.${i}
             chunk_info="${info_dir}/chunk#$((i + 1))"
             echo "sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target}/${data_dir} 2>/dev/null ) > ${stat_file}" > "${chunk_info}.cmd"
@@ -295,11 +303,11 @@ for source in "${sources[@]}"; do
                 Speedup=$(grep speedup ${stat_file}  | cut -d' ' -f8)
                     Bps=$(grep '^sent ' ${stat_file} | cut -d' ' -f9 | tr -d ,)
                    Mbps=$(awk -v Bps=${Bps} 'BEGIN { printf "%.3f\n", Bps / 125000 }')
-                message_success "Chunk #$((i+1)) (of ${#chunks[*]}) succeeded (${Mbps} Mbps, speedup ${Speedup})"
+                message_success "${job_tag} Chunk #$((i+1)) (of ${#chunks[*]}) succeeded (${Mbps} Mbps, speedup ${Speedup})"
             else
                 # rsync returns 20 when killed
                 if [ "${status}" != 20 ]; then
-                    message_failure "Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
+                    message_failure "${job_tag} Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
                 fi
                 echo ${i} >> ${tmp}/.failures
             fi
@@ -313,9 +321,22 @@ for source in "${sources[@]}"; do
         stamp_as_transfered ${source}
 
         if ${remove} && ${force}; then
-            message_success "Removing \"${source}\" ..."
+            message_success "${job_tag} Removing \"${source}\" ..."
             /bin/rm -rf ${source}
         fi
+    fi
+}
+
+running_jobs=0
+job_id=0
+for source in "${sources[@]}"; do
+    backup_one_source "${source}" &
+    (( running_jobs++ ))
+    (( job_id++ ))
+
+    if ((running_jobs >= jobs)); then
+        wait -n
+        ((running_jobs--))
     fi
 done
 
