@@ -214,7 +214,7 @@ fi
 tmp=$(mktemp -d)
 chmod 755 ${tmp}
 cd ${tmp}
-info_dir=${tmp}/.info-$(date +%Y-%m-%d)
+info_dir=${tmp}/.info-$(date +%Y-%m-%d@%H:%M:%S)
 mkdir -p ${info_dir}
 
 files_list=files
