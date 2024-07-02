@@ -33,7 +33,7 @@ EOF
 }
 
 function status() {
-    last-asroot -u '. /etc/profile.d/last.sh ; module_include lib/message; local -A active; active[1]=$(systemctl is-active last-pipeline1); active[2]=$(systemctl is-active last-pipeline2); if [ ${active[1]} = active ] && [ ${active[2]} = active ]; then message_success "Both last-pipeline services are active"; else message_failure "Something is NOT right: last-pipeline1: ${active[1]}, last-pipeline2: ${active[2]}"; fi'
+    last-asroot -u '. /etc/profile.d/last.sh ; module_include lib/message; local -A active enabled; set -x; active[1]=$(systemctl is-active last-pipeline1); active[2]=$(systemctl is-active last-pipeline2); enabled[1]=$(systemctl is-enabled last-pipeline1); enabled[2]=$(systemctl is-enabled last-pipeline2); if [ ${active[1]} = active ] && [ ${active[2]} = active ] && [ ${enabled[1]} = enabled ] && [ ${enabled[2]} = enabled ]; then message_success "Both last-pipeline services are enabled and active"; else message_warning "Both services are expected to be active/enabled, they currently are: last-pipeline1: ${active[1]}/${enabled[1]}, last-pipeline2: ${active[2]}/${enabled[2]}"; fi'
 }
 
 function turn() {
