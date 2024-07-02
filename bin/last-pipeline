@@ -1,54 +1,110 @@
 #!/bin/bash
 
 #
-# This script executes one LAST pipeline process
-#
+# This script produces manages the two LAST pipeline services
+# 
 
-export LANG=en_US
-export LANGUAGE="en_US:en"
-PROG=$(basename ${0})
+PROG="$(basename "${0}")"
 
-function usage() {
-    echo ""
-    echo "Usage: ${PROG} start|stop id"
-    echo "       ${PROG} status"
-    echo ""
+. /etc/profile.d/last.sh
+
+module_include lib/message
+
+function help() {
+    cat <<- EOF
+
+    Usage:
+        ${PROG} [-h|--help] 
+
+      Get status:
+        ${PROG} [-s|--status] 
+        Shows the status of the last-pipeline services on the selected hosts (default: last-hosts --units)
+
+      Turn on/off (either for the curren boot session or permanently)
+        ${PROG} [-p|--permanent] on|off
+
+    Manages the two last-pipeline services.
+
+    -h|--help:      Shows this help and exits
+    -s|--status:    Shows the status of the services
+    -p|--permanent: When turning the services on/off it does this permanently (across system reboots)
+
+EOF
 }
 
-if [ $# -lt 1 ]; then
-    usage
+function status() {
+    last-asroot -u '. /etc/profile.d/last.sh ; module_include lib/message; local -A active; active[1]=$(systemctl is-active last-pipeline1); active[2]=$(systemctl is-active last-pipeline2); if [ ${active[1]} = active ] && [ ${active[2]} = active ]; then message_success "Both last-pipeline services are active"; else message_failure "Something so NOT right: last-pipeline1: ${active[1]}, last-pipeline2: ${active[2]}"; fi'
+}
+
+function turn() {
+    local action activity
+
+    case ${turn} in
+        on)
+            if ${permanent}; then
+                action=enable
+                activity=Enabled
+            else
+                action=start
+                activity=Started
+            fi
+        ;;
+
+        off)
+            if ${permanent}; then
+                action=disable
+                activity=Disabled
+            else
+                action=stop
+                activity=Stopped
+            fi
+        ;;
+    esac
+
+    last-asroot -u ". /etc/profile.d/last.sh ; module_include lib/message; systemctl ${action} last-pipeline{1,2} && message_success ${activity} the LAST pipeline || message_failure Failed to ${action} the LAST pipeline"
+}
+
+   status=false
+permanent=false
+     turn=
+
+while [ ${#} -gt 0 ]; do
+    case "${1}" in
+        -h|--help)
+            help
+            exit 0
+            ;;
+
+        -s|--status)
+            status=true
+            shift 1
+            ;;
+
+        -p|--permanent)
+            permanent=true
+            shift 1
+            ;;
+
+        on|off)
+            turn=$1
+            shift 1
+            ;;
+
+        *)
+            help
+            exit 1
+    esac
+done
+
+if ${status}; then
+    status
+    exit $?
+fi
+
+if [ ! "${turn}" ]; then
+    message_failure "Missing on/off"
     exit 1
 fi
 
-action=${1}
-    id=${2}
+turn
 
-case "${action}" in
-    start)
-        if [ ! "${id}" ]; then
-            usage
-            exit 1
-        fi
-        exec last-matlab -nodisplay -batch "addpath(\"/home/ocs/matlab/AstroPack/matlab/startup\"); startBatchLASTPipeline('Id', ${id});" &
-        ;;
-
-    stop)
-        if [ ! "${id}" ]; then
-            usage
-            exit 1
-        fi
-        pkill -f "DataDir=${id}" >/dev/null 2>&1
-        exit 0
-        ;;
-
-    status)
-        expected_ids=( 1 2 )
-        for id in ${expected_ids[*]}; do
-            systemctl status last-pipeline${id}
-        done
-        ;;
-
-    *)
-        usage
-        ;;
-esac

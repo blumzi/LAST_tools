@@ -32,9 +32,9 @@ ifeq (${VMWARE},true)
 	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-hosts 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-hosts
 	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-fetch-from-github	${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
 	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/last.sh 				${PACKAGE_DIR}/etc/profile.d/last.sh
-	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/etc/systemd/system/last-pipeline1.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline1.service
-	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/etc/systemd/system/last-pipeline2.service 	${PACKAGE_DIR}/etc/systemd/system/last-pipeline2.service
-	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/etc/systemd/system/last-safety-daemon.service 	${PACKAGE_DIR}/etc/systemd/system/last-safety-daemon.service
+	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/etc/systemd/system/last-pipeline1.service 	${PACKAGE_DIR}/lib/systemd/system/last-pipeline1.service
+	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/etc/systemd/system/last-pipeline2.service 	${PACKAGE_DIR}/lib/systemd/system/last-pipeline2.service
+	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/etc/systemd/system/last-safety-daemon.service 	${PACKAGE_DIR}/lib/systemd/system/last-safety-daemon.service
 else
 	ln -sf ${LAST_TOP}/bin/last-tool 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-tool
 	ln -sf ${LAST_TOP}/bin/last-matlab 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab
@@ -57,11 +57,11 @@ else
 	ln -sf ${LAST_TOP}/bin/last-pipeline       	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pipeline
 	ln -sf ${LAST_TOP}/bin/last-serials     	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-serials
 	ln -sf ${LAST_TOP}/bin/last-compress-raw-images         ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-compress-raw-images
-	mkdir -p  ${PACKAGE_DIR}/etc/systemd/system
-	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline1.service 	    ${PACKAGE_DIR}/etc/systemd/system/last-pipeline1.service
-	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-pipeline2.service 	    ${PACKAGE_DIR}/etc/systemd/system/last-pipeline2.service
-	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-unit-server.service 	    ${PACKAGE_DIR}/etc/systemd/system/last-unit-server.service
-	ln -sf ${LAST_TOP}/files/root/etc/systemd/system/last-safety-daemon.service 	${PACKAGE_DIR}/etc/systemd/system/last-safety-daemon.service
+	mkdir -p  ${PACKAGE_DIR}/lib/systemd/system
+	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-pipeline1.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-pipeline1.service
+	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-pipeline2.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-pipeline2.service
+	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-unit-server.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-unit-server.service
+	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-safety-daemon.service 	${PACKAGE_DIR}/lib/systemd/system/last-safety-daemon.service
 endif
 	@(  \
         repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
