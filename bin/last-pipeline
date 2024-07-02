@@ -33,7 +33,7 @@ EOF
 }
 
 function status() {
-    last-asroot -u '. /etc/profile.d/last.sh ; module_include lib/message; local -A active; active[1]=$(systemctl is-active last-pipeline1); active[2]=$(systemctl is-active last-pipeline2); if [ ${active[1]} = active ] && [ ${active[2]} = active ]; then message_success "Both last-pipeline services are active"; else message_failure "Something so NOT right: last-pipeline1: ${active[1]}, last-pipeline2: ${active[2]}"; fi'
+    last-asroot -u '. /etc/profile.d/last.sh ; module_include lib/message; local -A active; active[1]=$(systemctl is-active last-pipeline1); active[2]=$(systemctl is-active last-pipeline2); if [ ${active[1]} = active ] && [ ${active[2]} = active ]; then message_success "Both last-pipeline services are active"; else message_failure "Something is NOT right: last-pipeline1: ${active[1]}, last-pipeline2: ${active[2]}"; fi'
 }
 
 function turn() {
