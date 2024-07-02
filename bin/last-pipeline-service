@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#
+# This script executes one LAST pipeline process
+#
+
+export LANG=en_US
+export LANGUAGE="en_US:en"
+PROG=$(basename ${0})
+
+function usage() {
+    echo ""
+    echo "Usage: ${PROG} start|stop id"
+    echo "       ${PROG} status"
+    echo ""
+}
+
+if [ $# -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+action=${1}
+    id=${2}
+
+case "${action}" in
+    start)
+        if [ ! "${id}" ]; then
+            usage
+            exit 1
+        fi
+        exec last-matlab -nodisplay -batch "addpath(\"/home/ocs/matlab/AstroPack/matlab/startup\"); startBatchLASTPipeline('Id', ${id});" &
+        ;;
+
+    stop)
+        if [ ! "${id}" ]; then
+            usage
+            exit 1
+        fi
+        pkill -f "DataDir=${id}" >/dev/null 2>&1
+        exit 0
+        ;;
+
+    status)
+        expected_ids=( 1 2 )
+        for id in ${expected_ids[*]}; do
+            systemctl status last-pipeline${id}
+        done
+        ;;
+
+    *)
+        usage
+        ;;
+esac

@@ -4,8 +4,8 @@ Description=LAST pipeline service 2 (of 2)
 [Service]
 User=ocs
 WorkingDirectory=/home/ocs/matlab
-ExecStart=/usr/local/share/last-tool/bin/last-pipeline start 2
-ExecStop=/usr/local/share/last-tool/bin/last-pipeline stop 2
+ExecStart=/usr/local/share/last-tool/bin/last-pipeline-service start 2
+ExecStop=/usr/local/share/last-tool/bin/last-pipeline-service stop 2
 Restart=always
 Environment="SYSTEMD=1"
 WatchdogSec=2700
