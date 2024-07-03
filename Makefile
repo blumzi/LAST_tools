@@ -55,6 +55,7 @@ else
 	ln -sf ${LAST_TOP}/bin/last-cat2db	    				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-cat2db
 	ln -sf ${LAST_TOP}/bin/last-pipeline-digest	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pipeline-digest
 	ln -sf ${LAST_TOP}/bin/last-pipeline       	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pipeline
+	ln -sf ${LAST_TOP}/bin/last-pipeline-status	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pipeline-status
 	ln -sf ${LAST_TOP}/bin/last-serials     	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-serials
 	ln -sf ${LAST_TOP}/bin/last-compress-raw-images         ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-compress-raw-images
 	mkdir -p  ${PACKAGE_DIR}/lib/systemd/system

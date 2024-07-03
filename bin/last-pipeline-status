@@ -1,0 +1,34 @@
+#!/bin/bash
+
+. /etc/profile.d/last.sh
+
+module_include lib/ansi
+module_include lib/message
+
+declare -A active enabled
+ active[1]=$(systemctl is-active last-pipeline1)
+ active[2]=$(systemctl is-active last-pipeline2)
+enabled[1]=$(systemctl is-enabled last-pipeline1)
+enabled[2]=$(systemctl is-enabled last-pipeline2)
+
+case ${active[1]}-${enabled[1]}-${active[2]}-${enabled[2]} in
+    active-enabled-active-enabled)
+        message_success "LAST pipeline is $(ansi_bright_green ALWAYS-ON)"
+        ;;
+
+    inactive-disabled-inactive-disabled)
+        message_success "LAST pipeline is $(ansi_bright_green ALWAYS-OFF)"
+        ;;
+
+    active-*-active-*)
+        message_success "LAST pipeline is $(ansi_bright_green ON)"
+        ;;
+
+    inactive-*-inactive-*)
+        message_success "LAST pipeline is $(ansi_bright_green OFF)"
+        ;;
+
+    *-*-*-*)
+        message_warning "LAST pipeline is in an ambiguous state: last-pipeline1: $(ansi_bright_yellow ${active[1]}/${enabled[1]}), last-pipline2: $(ansi_bright_yellow ${active[2]}/${enabled[2]})"
+        ;;
+esac

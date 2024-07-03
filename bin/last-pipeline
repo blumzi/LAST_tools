@@ -10,101 +10,109 @@ PROG="$(basename "${0}")"
 
 module_include lib/message
 
-function help() {
+function usage() {
     cat <<- EOF
 
-    Usage:
+    Show usage:
         ${PROG} [-h|--help] 
 
-      Get status:
-        ${PROG} [-s|--status] 
-        Shows the status of the last-pipeline services on the selected hosts (default: last-hosts --units)
+    Get status:
+        ${PROG} [[-H host] ... ] [status]
 
-      Turn on/off (either for the curren boot session or permanently)
-        ${PROG} [-p|--permanent] on|off
+    Turn on/off for the current system boot session
+        ${PROG} [[-H host] ... ] on|off
 
-    Manages the two last-pipeline services.
-
-    -h|--help:      Shows this help and exits
-    -s|--status:    Shows the status of the services
-    -p|--permanent: When turning the services on/off it does this permanently (across system reboots)
+    Always run/do-not-run the pipeline (across system boots)
+        ${PROG} [[-H host] ... ] always-on|always-off 
 
 EOF
 }
 
-function status() {
-    last-asroot -u '. /etc/profile.d/last.sh ; module_include lib/message; local -A active enabled; set -x; active[1]=$(systemctl is-active last-pipeline1); active[2]=$(systemctl is-active last-pipeline2); enabled[1]=$(systemctl is-enabled last-pipeline1); enabled[2]=$(systemctl is-enabled last-pipeline2); if [ ${active[1]} = active ] && [ ${active[2]} = active ] && [ ${enabled[1]} = enabled ] && [ ${enabled[2]} = enabled ]; then message_success "Both last-pipeline services are enabled and active"; else message_warning "Both services are expected to be active/enabled, they currently are: last-pipeline1: ${active[1]}/${enabled[1]}, last-pipeline2: ${active[2]}/${enabled[2]}"; fi'
-}
 
-function turn() {
-    local action activity
+OPTS=$( getopt -o 'H:hun' --long "dry-run,help,host:,units,units-only" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
 
-    case ${turn} in
-        on)
-            if ${permanent}; then
-                action=enable
-                activity=Enabled
-            else
-                action=start
-                activity=Started
-            fi
-        ;;
 
-        off)
-            if ${permanent}; then
-                action=disable
-                activity=Disabled
-            else
-                action=stop
-                activity=Stopped
-            fi
-        ;;
-    esac
+units_only=false
+     hosts=()
+   dry_run=false
 
-    last-asroot -u ". /etc/profile.d/last.sh ; module_include lib/message; systemctl ${action} last-pipeline{1,2} && message_success ${activity} the LAST pipeline || message_failure Failed to ${action} the LAST pipeline"
-}
-
-   status=false
-permanent=false
-     turn=
-
-while [ ${#} -gt 0 ]; do
+while true; do
     case "${1}" in
-        -h|--help)
-            help
-            exit 0
-            ;;
+    -n|--dry-run)
+        dry_run=true
+        shift 1
+        ;;
 
-        -s|--status)
-            status=true
-            shift 1
-            ;;
+    -u|--units|--units-only)
+        units_only=true
+        shift 1
+        ;;
 
-        -p|--permanent)
-            permanent=true
-            shift 1
-            ;;
+    -h|--help)
+        usage
+        exit 0
+        ;;
 
-        on|off)
-            turn=$1
-            shift 1
-            ;;
+    -H|--host)
+        hosts+=( ${2} )
+        shift 2
+        ;;
 
-        *)
-            help
-            exit 1
+
+    --)
+        shift 1
+        break
+        ;;
     esac
 done
 
-if ${status}; then
-    status
-    exit $?
+action="${1}"
+
+if [ ! "${action}" ]; then
+    action=status
 fi
 
-if [ ! "${turn}" ]; then
-    message_failure "Missing on/off"
-    exit 1
+
+case "${action}" in
+    status|on|off|always-on|always-off)
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+        
+cmd=""
+case ${action} in
+    status)
+        cmd="last-pipeline-status"
+        ;;
+    on)
+        cmd=$'\'systemctl --quiet start last-pipeline{1,2}\''
+        ;;
+    off)
+        cmd=$'\'systemctl --quiet stop last-pipeline{1,2}\''
+        ;;
+    always-on)
+        cmd=$'\'systemctl --quiet enable last-pipeline{1,2}; for id in [1..2]; do if ! systemctl --quiet is-active last-pipeline${id}; then systemctl -quiet start last-pipeline${id}; fi; done\''
+        ;;
+    always-off)
+        cmd=$'\'systemctl --quiet disable last-pipeline{1,2}; for id in [1..2]; do if systemctl --quiet is-active last-pipeline${id}; then systemctl -quiet stop last-pipeline${id}; fi; done\''
+        ;;
+esac
+
+if [ "${hosts[*]}" ]; then
+    hosts_arg=""
+    for host in ${hosts[*]}; do
+        hosts_arg+=" -H ${host}"
+    done
+else
+    hosts_arg="-u"
 fi
 
-turn
-
+if ${dry_run}; then
+    echo last-asroot ${hosts_arg} --cmd "${cmd}"
+else
+    last-asroot ${hosts_arg} --cmd "${cmd}"
+fi
