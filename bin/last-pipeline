@@ -112,7 +112,7 @@ else
 fi
 
 if ${dry_run}; then
-    echo last-asroot ${hosts_arg} --cmd "${cmd}"
+    echo last-asroot ${hosts_arg} --cmd $'${cmd}'
 else
-    last-asroot ${hosts_arg} --cmd "${cmd}"
+    last-asroot ${hosts_arg} --cmd $'${cmd}'
 fi
