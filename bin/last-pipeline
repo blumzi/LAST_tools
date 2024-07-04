@@ -95,10 +95,10 @@ case ${action} in
         cmd=$'\'systemctl --quiet stop last-pipeline{1,2}\''
         ;;
     always-on)
-        cmd=$'\'systemctl --quiet enable last-pipeline{1,2}; for id in [1..2]; do if ! systemctl --quiet is-active last-pipeline${id}; then systemctl -quiet start last-pipeline${id}; fi; done\''
+        cmd=$'\'systemctl --quiet enable last-pipeline{1,2}; for id in 1 2; do if ! systemctl --quiet is-active last-pipeline${id}; then systemctl -quiet start last-pipeline${id}; fi; done\''
         ;;
     always-off)
-        cmd=$'\'systemctl --quiet disable last-pipeline{1,2}; for id in [1..2]; do if systemctl --quiet is-active last-pipeline${id}; then systemctl -quiet stop last-pipeline${id}; fi; done\''
+        cmd=$'\'systemctl --quiet disable last-pipeline{1,2}; for id in 1 2; do if systemctl --quiet is-active last-pipeline${id}; then systemctl -quiet stop last-pipeline${id}; fi; done\''
         ;;
 esac
 
@@ -112,7 +112,7 @@ else
 fi
 
 if ${dry_run}; then
-    echo last-asroot ${hosts_arg} --cmd $'${cmd}'
+    echo last-asroot ${hosts_arg} --cmd "${cmd}"
 else
-    last-asroot ${hosts_arg} --cmd $'${cmd}'
+    last-asroot ${hosts_arg} --cmd "${cmd}"
 fi
