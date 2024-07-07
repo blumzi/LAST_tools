@@ -63,6 +63,9 @@ else
 	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-pipeline2.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-pipeline2.service
 	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-unit-server.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-unit-server.service
 	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-safety-daemon.service 	${PACKAGE_DIR}/lib/systemd/system/last-safety-daemon.service
+	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-ds9-feeder.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-ds9-feeder.service
+	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-enclosurelogger.service 	${PACKAGE_DIR}/lib/systemd/system/last-enclosurelogger.service
+	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-products-watcher.service 	${PACKAGE_DIR}/lib/systemd/system/last-products-watcher.service
 endif
 	@(  \
         repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
