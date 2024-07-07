@@ -21,8 +21,8 @@ function service_enforce() {
         return
     fi
 
-    local system_file="/usr/lib/systemd/system/${service}.service"
-    local our_file="$(module_locate files/root/etc/systemd/system/${service}.service)"
+    local system_file="/lib/systemd/system/${service}.service"
+    local our_file="$(module_locate files/root/lib/systemd/system/${service}.service)"
 
     ln -sf "${our_file}" "${system_file}"
     message_success "Linked \"${our_file}\" to \"${system_file}\"."
