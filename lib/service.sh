@@ -25,6 +25,7 @@ function service_enforce() {
     local our_file="$(module_locate files/root/lib/systemd/system/${service}.service)"
 
     ln -sf "${our_file}" "${system_file}"
+    systemctl daemon-reload
     message_success "Linked \"${our_file}\" to \"${system_file}\"."
     systemctl daemon-reload
     
