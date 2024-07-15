@@ -64,7 +64,7 @@ util_log_invokation ${*}
 
 # defaults
 identity=
-default_nproc=10
+default_nproc=3
 rsync_extra_args="--exclude '*/raw'"
 rsync_info_args="--info=STATS0 --info=FLIST0"
 quiet=false
@@ -102,11 +102,12 @@ function usage() {
      -F|--force       - Force removal of local directory (only works with -r|--remove)
      -C|--check-all   - Same as -c|--check but for all the local directories
      -j|--jobs N      - Run upto N jobs (default: 5) in parallel
+     -S|--status      - Show all the rsync process currently in progress
 
 EOF
 }
 
-OPTS=$( getopt -o 'qs:f:t:hi:p:xcrCFaj:' --long "jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:' --long "status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 check=false
@@ -116,10 +117,16 @@ remove=false
 force=false
 sources=()
 target=
-jobs=5
+status_only=false
+jobs=1
 
 while true; do
     case "${1}" in
+
+    -S|--status)
+        status_only=true
+        shift 1
+        ;;
 
     -j|--jobs)
         jobs=${1}
@@ -202,6 +209,10 @@ while true; do
 	esac
 done
 
+if ${status_only}; then
+    last-asroot -u --cmd 'ps aux | grep "[0-9] rsync -a"| sed -e "s;^.* rsync;rsync;"'
+    exit 0
+fi
 
 if [ ! "${target}" ]; then
     target="${backup_default_target}"
