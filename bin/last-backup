@@ -64,7 +64,7 @@ util_log_invokation ${*}
 
 # defaults
 identity=
-default_nproc=10
+default_nproc=3
 rsync_extra_args="--exclude '*/raw'"
 rsync_info_args="--info=STATS0 --info=FLIST0"
 quiet=false
@@ -118,7 +118,7 @@ force=false
 sources=()
 target=
 status_only=false
-jobs=5
+jobs=1
 
 while true; do
     case "${1}" in
