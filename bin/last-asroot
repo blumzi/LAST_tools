@@ -88,7 +88,7 @@ module_include lib/message
 for host in ${hosts[*]}; do
     message_section "${host}:"
     err=$(mktemp)
-    ssh -o "ConnectTimeout=${timeout}" -X ocs@${host} "SUDO_ASKPASS=/usr/local/share/last-tool/bin/last-askpass sudo -A bash -c '${cmd}'" 2>/${err}
+    ssh -o "ConnectTimeout=${timeout}" -X ocs@${host} SUDO_ASKPASS=/usr/local/share/last-tool/bin/last-askpass sudo -A bash -c "\"${cmd}\"" 2>/${err}
     status=${?}
     if [ ${status} -eq 255 ]; then
         message_failure "ssh failure (status=${status}, err=\"$(tr -d '\r' < ${err})\")"
