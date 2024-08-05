@@ -83,7 +83,3 @@ function startUnit() {
 
     last-matlab -nosplash -nodesktop -r "Unit=obs.unitCS('"${id}"'); for i=1:4, Unit.Slave{i}.RemoteTerminal='none'; Unit.Slave{i}.Logging=true; Unit.Slave{i}.LoggingDir='~/log/SlaveLogs'; end"
 }
-
-# for the slackbot
-export SLACK_BOT_TOKEN="xoxb-3461302403557-7493345690130-EphEjtwfwwFDQ7j6GpXKD83p"
-export SLACK_TRANSIENTS_CHANNEL="C07EHG1TB99"
