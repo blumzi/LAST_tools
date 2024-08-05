@@ -4,6 +4,7 @@ module_include lib/message
 module_include lib/util
 module_include lib/user
 module_include lib/sections
+module_include lib/container
 
 
 export -a user_expected_groups=( sudo dialout )
@@ -110,6 +111,8 @@ function user_enforce() {
         chown ${user_name}.${user_group} "${user_home}/$(basename "${bash_aliases}")"
         ln -sf ${user_home}/.bash_aliases ~root
     fi
+
+    user_enforce_slack
 }
 
 function user_check() {
@@ -183,6 +186,7 @@ function user_check() {
     util_check_shortcut --favorite google-chrome;   (( ret += ${?} ))
     user_check_git_config;                          (( ret += ${?} ))
     user_check_astropack;                           (( ret += ${?} ))
+    user_check_slack;                               (( ret += ${?} ))
 
     return $(( ret ))
 }
@@ -299,6 +303,31 @@ function user_check_astropack() {
 	    fi
     else
         message_failure "astropack-passwords: ${file} is missing"
+    fi
+}
+
+function user_enforce_slack() {
+    local tmp=$(mktemp)
+    local file=/home/ocs/.bash_aliases
+
+    {
+        grep -iv slack ${file}
+        echo ''
+        cat $(container_path)/files/slack/env
+    } > ${tmp}
+    cp ${tmp} ${file}
+    /bin/rm -f ${tmp}
+    message_success "Added slack stuff to ${file}"
+}
+
+function user_check_slack() {
+    local file=/home/ocs/.bash_aliases
+    local nlines=$(grep -ic slack ${file})
+
+    if [ ${nlines} = 3 ]; then
+        message_success "${file} has three slack lines"
+    else
+        message_failure "${file} has ${nlines} slack lines (instead of 3)"
     fi
 }
 
