@@ -29,6 +29,7 @@ case "${action}" in
             usage
             exit 1
         fi
+        eval $(grep SLACK ~ocs/.bash_aliases)
         exec last-matlab -nodisplay -batch "addpath(\"/home/ocs/matlab/AstroPack/matlab/startup\"); startBatchLASTPipeline('Id', ${id});" &
         ;;
 
