@@ -1,0 +1,200 @@
+#!/bin/bash
+
+. /etc/profile.d/last.sh
+
+module_include lib/message
+
+PROG=$(basename ${0})
+
+function usage() {
+    cat <<- EOF
+
+    Uploads a new transient alert to the WAO Slack channel.
+
+    Usage:
+        ${PROG} -h|--help
+        ${PROG} -m|--message-file <path-to-message-file> -i|--image-file <path-to-image-file>
+
+    Flags:
+        -h|--help:          Shows this help message
+        -m|--message-file:  Specifies a file containing the message
+        -i|--image-file:    Specifies a file containing an image with the sky-map
+
+EOF
+}
+
+#
+# Get the SLACK variables from ~ocs/.bash_aliases
+#
+while read line; do
+    eval "${line}"
+done < <(grep SLACK ~ocs/.bash_aliases)
+
+#
+# Get the proxy variables from /etc/environment
+#
+while read line; do
+    eval "${line}"
+done < <(last-asroot -H $(hostname -s) --cmd "grep _proxy /etc/environment | grep _proxy" | grep -v SECT)
+
+OPTS=$( getopt -o 'hm:i:' --long "help,message-file:,image-file:" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+
+while true; do
+    case "${1}" in
+
+    -h|--help)
+        usage
+        exit 0
+        ;;
+
+    -m|--message-file)
+        if [ ! -r "${2}" ]; then
+            message_failure "Message-file \"${2}\" is not readable"
+            exit 1
+        fi
+        message_file=${2}
+        shift 2
+        ;;
+
+    -i|--image-file)
+        if [ ! -r "${2}" ]; then
+            message_failure "Image-file \"${2}\" is not readable"
+            exit 1
+        fi
+        image_file=${2}
+        shift 2
+        ;;
+
+    --)
+        shift 1
+        break
+        ;;
+
+    *)
+        usage
+        exit 1
+        ;;
+    esac
+done
+
+#if [ ! "${message_file}" ] || [ ! "${image_file}" ]; then
+#    message_failure "Missing message-file and/or image-file"
+#    usage
+#    exit 1
+#fi
+
+slack_base_url="https://slack.com/api"
+
+function slack_api() {
+    local args=( "${@}" )
+    local -a curl_args
+
+    for ((i = 0; i < ${#args[@]} - 1; i++)); do
+        curl_args+=( "${args[i]}" )
+    done
+
+    local path=${args[i]}
+    local status output
+    local url
+    if [[ ${path} =~ https://files.slack.com/upload* ]]; then
+        url=${path}
+    else
+        url=${slack_base_url}/${path}
+    fi
+
+    #for arg in "${curl_args[@]}"; do
+    #    echo arg: ==="${arg}"=== >&2
+    #done
+    #echo url: ===${url}=== >&2
+    output=$(curl --no-progress-meter "${curl_args[@]}" "${url}")
+    status=$?
+
+    if [ ${status} != 0 ]; then
+        message_failure "API call to \"${url}\" exited with status ${status}."
+        exit 1
+    fi
+
+    echo "${output}"
+}
+
+#
+# phase 1: test GET
+#
+out=$(slack_api api.test)
+ok=$(echo "${out}" | jq .ok)
+error=$(echo "${out}" | jq .error)
+if [ "${ok}" != true ]; then
+    message_failure "API call to api.test failed (error=${error})"
+    exit 1
+fi
+message_success "API test.api worked"
+
+#
+# phase 2: test GET
+#
+out=$(slack_api -X POST api.test)
+ok=$(echo "${out}" | jq .ok)
+error=$(echo "${out}" | jq .error)
+if [ "${ok}" != true ]; then
+    message_failure "API call to -X POST api.test failed (error=${error})"
+    exit 1
+fi
+message_success "API -X POST test.api worked"
+
+#
+# phase 3: GET files.getUploadURLExternal
+#
+bytes=$(stat --format='%s' ${image_file})
+out=$(slack_api \
+    -F files=@${image_file} \
+    -F filename=$(basename ${image_file}) \
+    -F token=${SLACK_BOT_TOKEN} \
+    -F length=${bytes} \
+    files.getUploadURLExternal)
+ok=$(echo "${out}" | jq .ok)
+error=$(echo "${out}" | jq .error)
+uploadUrl=$( echo "${out}" | jq .upload_url )
+fileId=$( echo "${out}" | jq .file_id )
+if [ "${ok}" != true ]; then
+    message_failure "API call to files.getUploadURLExternal failed (error=${error})"
+    exit 1
+fi
+message_success "API to files.getUploadURLExternal succeeded"
+
+#
+# phase 4: upload to the received URL
+#
+out=$(slack_api \
+    -X POST \
+    -F token=${SLACK_BOT_TOKEN} \
+    -F filename=@${image_file} \
+    ${uploadUrl//\"/})
+message_success "API to uploadUrl succeeded"
+
+#
+# phase 5: POST to files.completeUploadExternal
+#
+message=$(cat ${message_file})
+message=${message//[&]/%26}
+fileId=${fileId//\"/}
+json="[{\"id\":\"${fileId}\",\"title\":\"NewTransient\"}]"
+
+out=$(slack_api \
+     -X POST \
+     -d "token=${SLACK_BOT_TOKEN}"  \
+     -H "'Content-type: application/json; charset=utf-8'" \
+     -d "files=${json}" \
+     -d "initial_comment=${message}"\
+     -d "channel_id=${SLACK_TRANSIENTS_CHANNEL}"\
+     files.completeUploadExternal
+   )
+
+#echo "${out}" | jq
+ok=$(echo "${out}" | jq .ok)
+error=$(echo "${out}" | jq .error)
+if [ "${ok}" != true ]; then
+    message_failure "API call to files.completeUploadExternal failed (error=${error})"
+    exit 1
+fi
+message_success "API to files.getUploadURLExternal succeeded"
