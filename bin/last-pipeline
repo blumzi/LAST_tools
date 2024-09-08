@@ -75,7 +75,7 @@ fi
 
 
 case "${action}" in
-    status|on|off|always-on|always-off)
+    status|start|stop|enable|disable)
         ;;
     *)
         usage
@@ -86,19 +86,19 @@ esac
 cmd=""
 case ${action} in
     status)
-        cmd="last-pipeline-status"
+	cmd='source /etc/profile.d/last.sh; module_include lib/message; for service in last-pipeline{1,2}; do active=\$(systemctl is-active \${service}); enabled=\$(systemctl is-enabled \${service}); message_info \${service}: \${active} \${enabled}; done'
         ;;
-    on)
-        cmd=$'\'systemctl --quiet start last-pipeline{1,2}\''
+    start)
+        cmd='systemctl start last-pipeline{1,2}'
         ;;
-    off)
-        cmd=$'\'systemctl --quiet stop last-pipeline{1,2}\''
+    stop)
+        cmd='systemctl stop last-pipeline{1,2}'
         ;;
-    always-on)
-        cmd=$'\'systemctl --quiet enable last-pipeline{1,2}; for id in 1 2; do if ! systemctl --quiet is-active last-pipeline${id}; then systemctl -quiet start last-pipeline${id}; fi; done\''
+    enable)
+        cmd='systemctl enable last-pipeline{1,2}'
         ;;
-    always-off)
-        cmd=$'\'systemctl --quiet disable last-pipeline{1,2}; for id in 1 2; do if systemctl --quiet is-active last-pipeline${id}; then systemctl -quiet stop last-pipeline${id}; fi; done\''
+    disable)
+        cmd='systemctl disable last-pipeline{1,2}'
         ;;
 esac
 
