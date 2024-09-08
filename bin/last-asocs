@@ -91,8 +91,12 @@ for host in ${hosts[*]}; do
     err=$(mktemp)
     ssh -o "ConnectTimeout=${timeout}" -X ocs@${host} "${cmd}" 2>${err}
     status=${?}
-    if [ ${status} -eq 255 ]; then
-        message_failure "ssh failure (status=${status}, err=\"$(tr -d '\r' <  ${err})\")"
+    if [ ${status} -ne 0 ]; then
+        message_failure "ssh failure (status=${status})"
+        message_failure "Error(s):"
+        while read line; do
+            message_failure "  ${line}"
+        done < ${err}
     fi
     /bin/rm ${err}
 done
