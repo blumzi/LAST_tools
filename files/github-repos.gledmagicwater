@@ -41,4 +41,6 @@ matlab/LAST/LAST_tools                     https://github.com/blumzi/LAST_tools 
 matlab/LAST/LAST_WebApi                    https://github.com/blumzi/LAST_WebApi                               branch:webapi_transition Development
 matlab/LAST/LAST_Api                       https://github.com/blumzi/LAST_Api                                  branch:master            Development
 matlab/LAST/LAST_SerialDevice              https://github.com/blumzi/LAST_SerialDevice                         branch:main              Development
+matlab/LAST/MatlabRedis                    https://github.com/GummyJum/MatlabRedis.git                         branch:main              Development
 python/LAST_next_generation                https://github.com/blumzi/LAST_next_generation                      branch:main              Development
+
