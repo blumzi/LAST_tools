@@ -177,6 +177,7 @@ message_success "API to uploadUrl succeeded"
 #
 message=$(cat ${message_file})
 message=${message//[&]/%26}
+message=${message//[+]/%20}
 fileId=${fileId//\"/}
 json="[{\"id\":\"${fileId}\",\"title\":\"NewTransient\"}]"
 
