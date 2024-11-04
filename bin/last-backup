@@ -1,5 +1,12 @@
 #!/bin/bash
 
+#
+# Files with this name pattern will
+# - not be backed up
+# - will not be removed after backup
+# - will be removed if more than 36 hours have passed since the transfer succeeded
+#
+special_files='LAST.*_sci_proc_proc_(Image|Mask)'
 
 #
 # Stamps a directory as "transfered"
@@ -64,7 +71,7 @@ util_log_invokation ${*}
 
 # defaults
 identity=
-default_nproc=3
+default_nproc=1
 rsync_extra_args="--exclude '*/raw'"
 rsync_info_args="--info=STATS0 --info=FLIST0"
 quiet=false
@@ -259,6 +266,26 @@ if [ "${#sources[@]}" -eq 0 ]; then
     exit 0
 fi
 
+function remove_if_transfered_and_aged() {
+    local directory="${1}"
+    local tag="${2}"
+    local time_stamp hours_from_creation status_file transfered=false
+    local aging_hours=36
+
+    status_file=${directory}/.status
+
+    if grep -wq transfered ${status_file}; then
+        transfered=true
+    fi
+    time_stamp=$(grep -w "ready-for-transfer" ${status_file} | tail -1 | cut -d' ' -f1)
+    hours_from_creation=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
+
+    if ${transfered} && [ ${hours_from_creation} -ge ${aging_hours} ]; then
+        message_success "${tag} ${hours_from_creation} have passed since transfer (more than ${aging_hours}), removing \"${directory}\" ..."
+        /bin/rm -rf ${directory}
+    fi
+}
+
 function backup_one_source() {
     local data_dir=${1}
     local job_tag="[${job_id}/${#sources[@]}]"
@@ -273,7 +300,7 @@ function backup_one_source() {
 
     message_info "${job_tag} Gathering list of files ..."
 
-    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' > ${files_list}
+    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target}/${data_dir} | grep -v '\.\/' | grep -v 'created directory' | grep -v "${special_files}" > ${files_list}
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
         message_failure "${job_tag} Failed getting files list from ${backup_target}/${data_dir}"
         return
@@ -285,7 +312,7 @@ function backup_one_source() {
 
         if ${remove} && ${force}; then
             message_success "${job_tag} Removing \"${source}\" ..."
-            /bin/rm -rf ${source}
+            remove_if_transfered_and_aged ${source} "${job_tag}"
         fi
 
         return
@@ -333,7 +360,7 @@ function backup_one_source() {
 
         if ${remove} && ${force}; then
             message_success "${job_tag} Removing \"${source}\" ..."
-            /bin/rm -rf ${source}
+            remove_if_transfered_and_aged ${source} "${job_tag}"
         fi
     fi
 }
