@@ -76,6 +76,7 @@ rsync_extra_args="--exclude '*/raw'"
 rsync_info_args="--info=STATS0 --info=FLIST0"
 quiet=false
 
+
 function usage() {
     cat <<- EOF
 
@@ -216,11 +217,6 @@ while true; do
 	esac
 done
 
-if ${status_only}; then
-    last-asroot -u --cmd 'ps aux | grep "[0-9] rsync -a"| sed -e "s;^.* rsync;rsync;"'
-    exit 0
-fi
-
 if [ ! "${target}" ]; then
     target="${backup_default_target}"
 fi
@@ -231,6 +227,43 @@ fi
 
 
 backup_set_target "${target}"
+
+function status() {
+    local lines pids
+
+    pids=( $( pgrep ${PROG} ) )
+    if [ ${#pids[*]} -eq 0 ]; then
+        message_info "No active ${PROG} processes."
+        return
+    fi
+    module_include lib/ansi
+
+    mapfile lines < <(pgrep -alf 'sudo.*rsync')
+
+    for line in "${lines[@]}"; do
+        local -a words=( ${line} ) word visit from to
+
+        for word in ${words[*]}; do
+            if [[ ${word} == /last* ]]; then
+                visit=${word#*archive/}
+                from="${word%${visit}}"
+                visit="${visit%/}"
+            fi
+
+            if [[ ${word} == ${backup_user}@${backup_host}* ]]; then
+                to="${word%${visit}}"
+
+                message_success "Visit $(ansi_bright_green ${visit}) is being backed up from $(ansi_underline ${from%/}) to $(ansi_underline ${to%/})"
+                break
+            fi
+        done
+    done
+}
+
+if ${status_only}; then
+    status
+    exit 0
+fi
 
 if [ ! "${nprocs}" ]; then
     nprocs=${default_nproc}
@@ -254,6 +287,12 @@ if ${check_all}; then
     exit 0
 fi
 
+pids=( $(pgrep ${PROG}) )
+if [ ${#pids[*]} -ne 0 ]; then
+    message_failure "There already is a running ${PROG}, only one allowed!"
+    exit 1
+fi
+
 if [ "${#sources[@]}" -eq 0 ]; then     # no sources were selected with --source
 	if ${backup_all}; then
 	    sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | sort ) )
@@ -265,6 +304,7 @@ if [ "${#sources[@]}" -eq 0 ]; then
     message_info "Nothing to backup, bye!"
     exit 0
 fi
+
 
 function remove_if_transfered_and_aged() {
     local directory="${1}"
