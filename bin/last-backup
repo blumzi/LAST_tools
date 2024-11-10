@@ -289,7 +289,7 @@ fi
 
 pids=( $(pgrep ${PROG}) )
 if [ ${#pids[*]} -ne 0 ]; then
-    message_failure "There already is a running ${PROG}, only one allowed!"
+    message_failure "There already is/are running ${PROG} process(es) (pid(s): ${pids[*]}), only one allowed!"
     exit 1
 fi
 
