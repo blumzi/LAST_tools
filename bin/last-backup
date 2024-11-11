@@ -72,7 +72,10 @@ util_log_invokation ${*}
 # defaults
 identity=
 default_nproc=1
-rsync_extra_args="--exclude '*/raw'"
+basic_exclusion_pattern="--exclude '*/raw'"
+extended_exclusion_pattern="--exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
+#rsync_extra_args="--exclude '*/raw' --exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
+rsync_extra_args="${basic_exclusion_pattern} ${extended_exclusion_pattern}"
 rsync_info_args="--info=STATS0 --info=FLIST0"
 quiet=false
 
@@ -96,6 +99,9 @@ function usage() {
     - Starts the relevant number of rsync processes, one-per-chunk
     - Waits for all the rsync processes to end.
 
+    Exclusion pattern:
+        ${rsync_extra_args}
+
     Flags:
      -h|--help        - Show usage and exit
      -a|--all         - Backup all /$(hostname -s)/data[12]/archive/*/proc/* directories (default)
@@ -111,13 +117,15 @@ function usage() {
      -C|--check-all   - Same as -c|--check but for all the local directories
      -j|--jobs N      - Run upto N jobs (default: 5) in parallel
      -S|--status      - Show all the rsync process currently in progress
+     -T|--total       - Total backup, exclusion pattern only: ${basic_exclusion_pattern}
 
 EOF
 }
 
-OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:' --long "status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:T' --long "status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all,total" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
+total=false
 check=false
 check_all=false
 backup_all=true
@@ -126,6 +134,7 @@ force=false
 sources=()
 target=
 status_only=false
+help_only=false
 jobs=1
 
 while true; do
@@ -191,8 +200,8 @@ while true; do
         ;;
 
     -h|--help)
-        usage
-        exit 0
+        help_only=true
+        shift 1
         ;;
 
     -i|--identity)
@@ -206,8 +215,13 @@ while true; do
         ;;
     
     -x|--extra)
-        rsync_extra_args="${2}"
+        rsync_extra_args+=" ${2}"
         shift 2
+        ;;
+
+    -T|--total)
+        total=true
+        shift 1
         ;;
 
 	--)
@@ -216,6 +230,15 @@ while true; do
 		;;
 	esac
 done
+
+if ${total}; then
+    rsync_extra_args="${basic_exclusion_pattern}"
+fi
+
+if ${help_only}; then
+    usage
+    exit 0
+fi
 
 if [ ! "${target}" ]; then
     target="${backup_default_target}"
