@@ -104,6 +104,6 @@ distrib: package
     module_include lib/message; \
     for host in $$(last-hosts --deployed); do \
 	    message_section $${host}:; \
-        scp -o "ConnectTimeout 2" ${PACKAGE_NAME}.deb $${host}:/tmp; \
+        scp -q -o "ConnectTimeout 2" ${PACKAGE_NAME}.deb $${host}:/tmp; \
         last-asroot --host $${host} --cmd "dpkg --remove ${PACKAGE_SHORT_NAME}; dpkg --install /tmp/${PACKAGE_NAME}.deb"; \
      done
