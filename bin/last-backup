@@ -251,6 +251,28 @@ fi
 
 backup_set_target "${target}"
 
+function visit_is_beeing_backed_up() {
+    local searched_visit="${1}"
+    local lines
+
+    mapfile lines < <(pgrep -alf 'sudo.*rsync')
+    for line in "${lines[@]}"; do
+        local -a words=( ${line} )
+        local word visit from to
+
+        for word in ${words[*]}; do
+            if [[ ${word} == /last* ]]; then
+                visit=${word#*archive/}
+                visit="${visit%/}"
+                if [ "${searched_visit}" = "${visit}" ]; then
+                    return 0
+                fi
+            fi
+        done
+    done
+    return 1
+}
+
 function status() {
     local lines pids
 
@@ -431,13 +453,19 @@ function backup_one_source() {
 running_jobs=0
 job_id=0
 for source in "${sources[@]}"; do
-    backup_one_source "${source}" &
-    (( running_jobs++ ))
-    (( job_id++ ))
+    visit=${source#*/archive/}
 
-    if ((running_jobs >= jobs)); then
-        wait -n
-        ((running_jobs--))
+    if visit_is_beeing_backed_up ${visit}; then
+        message_info "Vist ${visit} is already being backed up, skipping."
+    else
+        backup_one_source "${source}" &
+        (( running_jobs++ ))
+        (( job_id++ ))
+
+        if ((running_jobs >= jobs)); then
+            wait -n
+            ((running_jobs--))
+        fi
     fi
 done
 
