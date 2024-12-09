@@ -23,15 +23,15 @@ function bios_check() {
         return
     fi
 
-    wakeup_type="$(dmidecode -H 1 2>/dev/null | grep 'Wake-up Type:' | sed -e 's;^.*:.;;')"
-    if [ ! "${wakeup_type}" ]; then
-        message_failure "Could not get the wakeup type"
-        return
-    fi
-
-    if [ "${wakeup_type}" = "Power Switch" ]; then
-        message_warning "Wake-up is: $(ansi_bright_red "Power Switch")"
-    fi
+#    wakeup_type="$(dmidecode -H 1 2>/dev/null | grep 'Wake-up Type:' | sed -e 's;^.*:.;;')"
+#    if [ ! "${wakeup_type}" ]; then
+#        message_failure "Could not get the wakeup type"
+#        return
+#    fi
+#
+#    if [ "${wakeup_type}" = "Power Switch" ]; then
+#        message_warning "Wake-up is: $(ansi_bright_red "Power Switch")"
+#    fi
 
     local nDIMMs
     nDIMMs="$(dmidecode -t memory | grep -c '^[[:space:]]*Size: 32 GB')"    # What if it has different DIMMs?
@@ -45,9 +45,6 @@ function bios_check() {
 function bios_policy() {
     cat <<- EOF
 
-    - We would like to be able to make the machine boot Linux after a power failure.
-       At this point-in-time we don't have a method for enforcing that, (still looking)
-    
     - The machines should have 256 GB of installed RAM (8x32 GB)
 
 EOF
