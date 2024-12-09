@@ -14,6 +14,7 @@ function crontab_enforce() {
         fi
         echo "0  8 * * * /usr/local/share/last-tool/bin/last-backup --all --remove --force"
         echo "0 12 * * * /usr/local/share/last-tool/bin/last-compress-raw-images"
+        echo "30 14 * * * /usr/local/share/last-tool/bin/last-prune-individual-images"
     } | crontab -u ${user_name} -
     message_success "crontab: Updated crontab for user \"${user_name}\""
 }

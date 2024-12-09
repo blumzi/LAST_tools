@@ -1,0 +1,85 @@
+#!/bin/bash
+
+source /etc/profile.d/last.sh
+
+module_include lib/message
+module_include lib/ansi
+
+PROG=$(basename ${0})
+
+function usage() {
+    cat <<- EOF
+
+    Deletes LAST individual proc files (*_sci_proc_(Image|Mask|PSF)_*) and focus raw image files older than 36 hours
+
+    Usage:
+        ${PROG} -h|--help
+        ${PROG} -n|--no
+
+    Flags:
+        -h|--help:	Shows this help message
+        -n|--no:	Don't actually remove, just show how many would be removed
+
+EOF
+}
+
+tops=/$(hostname -s)/data[12]
+
+no=false
+
+OPTS=$( getopt -o 'hn' --long "help,no" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+
+while true; do
+    case "${1}" in
+
+    -h|--help)
+        usage
+        exit 0
+        ;;
+
+    -n|--no)
+		no=true
+		shift 1
+        ;;
+
+    --)
+        shift 1
+        break
+        ;;
+
+    *)
+        usage
+        exit 1
+        ;;
+    esac
+done
+
+function handle_individual_images() {
+    local nfiles=$(find ${tops} -type f \( -name  '*_sci_proc_Image_*' -o -name '*_sci_proc_Mask_*' -o -name '*_sci_proc_PSF_*' \) -mmin +2160 2>/dev/null | wc -l)
+
+	if ${no}; then
+		message_info "$(ansi_bright_green ${nfiles}) $(ansi_bold '_sci_proc_(Image|Mask|PSF)_') files need to be deleted"
+	else
+		message_info "Deleting ${nfiles} _sci_proc_(Image|Mask|PSF)_ files ..."
+		find ${tops} -type f \( -name  '*_sci_proc_Image_*' -o -name '*_sci_proc_Mask_*' -o -name '*_sci_proc_PSF_*' \) -mmin +2160 -delete 2>/dev/null
+	fi
+}
+
+function handle_focus_images() {
+    local nfiles=$(find ${tops} -type f -name  '*_focus_raw_Image_*' -mmin +2160 2>/dev/null | wc -l)
+
+	if ${no}; then
+		message_info "$(ansi_bright_green ${nfiles}) $(ansi_bold _focus_raw_Image_) files need to be deleted"
+	else
+		message_info "Deleting ${nfiles} _focus_raw_Image_ files ..."
+		find ${tops} -type f -name  '*_focus_raw_Image_*' -mmin +2160 -delete 2>/dev/null
+	fi
+}
+
+handle_individual_images
+handle_focus_images
+
+if ! ${no}; then
+	message_info "Done"
+fi
