@@ -49,6 +49,10 @@ function ansi_reset() {
     echo -ne "${ANSI_NORMAL}"
 }
 
+function ansi_yellow() {
+    echo -ne "${ANSI_NORMAL_YELLOW}${*}${ANSI_NORMAL}"
+}
+
 function ansi_bright_yellow() {
     echo -ne "${ANSI_BRIGHT_YELLOW}${*}${ANSI_NORMAL}"
 }

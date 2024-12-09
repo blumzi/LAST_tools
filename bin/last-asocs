@@ -98,9 +98,9 @@ for host in ${hosts[*]}; do
     fi
 
     if [ -s ${err} ]; then
-        message_failure "Error(s):"
+        message_error "Error(s):"
         while read line; do
-            message_failure "  ${line}"
+            message_error "  ${line}"
         done < ${err}
     fi
     /bin/rm ${err}
