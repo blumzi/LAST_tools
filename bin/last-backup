@@ -340,7 +340,7 @@ fi
 
 if [ "${#sources[@]}" -eq 0 ]; then     # no sources were selected with --source
 	if ${backup_all}; then
-	    sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | sort ) )
+	    sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | grep -v '_re/' | sort ) )
 	fi
 fi
 
