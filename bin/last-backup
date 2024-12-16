@@ -455,6 +455,10 @@ job_id=0
 for source in "${sources[@]}"; do
     visit=${source#*/archive/}
 
+    if ! grep -qw ready-for-transfer ${source}/.status || grep -wq transfered ${source}/.status; then
+        continue
+    fi
+
     if visit_is_beeing_backed_up ${visit}; then
         message_info "Vist ${visit} is already being backed up, skipping."
     else
