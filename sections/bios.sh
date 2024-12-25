@@ -33,12 +33,18 @@ function bios_check() {
 #        message_warning "Wake-up is: $(ansi_bright_red "Power Switch")"
 #    fi
 
-    local nDIMMs
-    nDIMMs="$(dmidecode -t memory | grep -c '^[[:space:]]*Size: 32 GB')"    # What if it has different DIMMs?
-    if (( nDIMMs == 8 )); then
-        message_success "The machine has 8 DIMMs of 32 GB each (total 256 GB) memory"
+    local DIMMs
+    local total=0
+    DIMMs=( $(dmidecode -t memory | grep '^[[:space:]]*Size: .* GB' | sed -e 's;^.*Size: ;;' -e 's; GB;;') )    # What if it has different DIMMs?
+    for sz in ${DIMMs[*]}; do
+        (( total += sz ))
+    done
+
+
+    if (( total == 256 )); then
+        message_success "The machine has ${total} GB of memory (${#DIMMs[*]} DIMMs, sizes (GB): ${DIMMs[*]})"
     else
-        message_failure "The machine has only ${nDIMMs} DIMMs of 32 GB each (instead of 8)"
+        message_success "The machine has ${total} GB instead of 256 of memory (${#DIMMs[*]} DIMMs, sizes (GB): ${DIMMs[*]})"
     fi
 }
 
