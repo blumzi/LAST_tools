@@ -251,6 +251,28 @@ fi
 
 backup_set_target "${target}"
 
+function visit_is_beeing_backed_up() {
+    local searched_visit="${1}"
+    local lines
+
+    mapfile lines < <(pgrep -alf 'sudo.*rsync')
+    for line in "${lines[@]}"; do
+        local -a words=( ${line} )
+        local word visit from to
+
+        for word in ${words[*]}; do
+            if [[ ${word} == /last* ]]; then
+                visit=${word#*archive/}
+                visit="${visit%/}"
+                if [ "${searched_visit}" = "${visit}" ]; then
+                    return 0
+                fi
+            fi
+        done
+    done
+    return 1
+}
+
 function status() {
     local lines pids
 
@@ -310,7 +332,7 @@ if ${check_all}; then
     exit 0
 fi
 
-pids=( $(pgrep ${PROG}) )
+pids=( $(ps -alf | grep "bash.*${PROG}" | grep -vw grep | grep -vw ${$} | awk '{print $4}') )
 if [ ${#pids[*]} -ne 0 ]; then
     message_failure "There already is/are running ${PROG} process(es) (pid(s): ${pids[*]}), only one allowed!"
     exit 1
@@ -318,7 +340,7 @@ fi
 
 if [ "${#sources[@]}" -eq 0 ]; then     # no sources were selected with --source
 	if ${backup_all}; then
-	    sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | sort ) )
+	    sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | grep -v '_re/' | sort ) )
 	fi
 fi
 
@@ -431,13 +453,23 @@ function backup_one_source() {
 running_jobs=0
 job_id=0
 for source in "${sources[@]}"; do
-    backup_one_source "${source}" &
-    (( running_jobs++ ))
-    (( job_id++ ))
+    visit=${source#*/archive/}
 
-    if ((running_jobs >= jobs)); then
-        wait -n
-        ((running_jobs--))
+    if ! grep -qw ready-for-transfer ${source}/.status || grep -wq transfered ${source}/.status; then
+        continue
+    fi
+
+    if visit_is_beeing_backed_up ${visit}; then
+        message_info "Vist ${visit} is already being backed up, skipping."
+    else
+        backup_one_source "${source}" &
+        (( running_jobs++ ))
+        (( job_id++ ))
+
+        if ((running_jobs >= jobs)); then
+            wait -n
+            ((running_jobs--))
+        fi
     fi
 done
 

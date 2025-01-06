@@ -14,6 +14,7 @@ function crontab_enforce() {
         fi
         echo "0  8 * * * /usr/local/share/last-tool/bin/last-backup --all --remove --force"
         echo "0 12 * * * /usr/local/share/last-tool/bin/last-compress-raw-images"
+        echo "30 14 * * * /usr/local/share/last-tool/bin/last-prune-individual-images"
     } | crontab -u ${user_name} -
     message_success "crontab: Updated crontab for user \"${user_name}\""
 }
@@ -22,8 +23,8 @@ function crontab_check() {
     local expected found pattern ret
     local -a entries with_commas
 
-    pattern='last-(backup|compress-raw-images|pipeline-digest)'
-    entries=( last-backup last-compress-raw-images )
+    pattern='last-(backup|compress-raw-images|pipeline-digest|prune-individual-images)'
+    entries=( last-backup last-compress-raw-images last-prune-individual-images )
     if macmap_this_is_last0; then
         entries+=( last-pipeline-digest )
     fi

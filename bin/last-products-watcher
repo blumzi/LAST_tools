@@ -90,6 +90,10 @@ while read -r path; do
         continue
     fi
 
+    if [[ "${path}" == *_re/* ]]; then  # skip Yarin's files
+        continue
+    fi
+
     status_file=${path}
     dir=$(dirname ${status_file})
 

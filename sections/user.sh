@@ -113,6 +113,7 @@ function user_enforce() {
     fi
 
     user_enforce_slack
+    user_make_bash_aliases_in_bashrc
 }
 
 function user_check() {
@@ -187,6 +188,7 @@ function user_check() {
     user_check_git_config;                          (( ret += ${?} ))
     user_check_astropack;                           (( ret += ${?} ))
     user_check_slack;                               (( ret += ${?} ))
+    user_check_bash_aliases_in_bashrc;              (( ret += ${?} ))
 
     return $(( ret ))
 }
@@ -328,6 +330,27 @@ function user_check_slack() {
         message_success "${file} has three slack lines"
     else
         message_failure "${file} has ${nlines} slack lines (instead of 3)"
+    fi
+}
+
+function user_check_bash_aliases_in_bashrc() {
+    local line="[ -r ~/.bash_aliases ] && . ~/.bash_aliases"
+
+    if grep -q "${line}" ~ocs/.bashrc; then
+        message_success "~ocs/.bashrc is configured to source ~ocs/.bash_aliases"
+        return 0
+    else
+        message_failure "~ocs/.bashrc is not configured to source ~ocs/.bash_aliases"
+        return 1
+    fi
+}
+
+function user_make_bash_aliases_in_bashrc() {
+    local line="[ -r ~/.bash_aliases ] && . ~/.bash_aliases"
+
+    if ! grep -q "${line}" ~ocs/.bashrc; then
+        echo "${line}" >> ~ocs/.bashrc
+        message_success "Added sourcing of .bash_aliases to ~ocs/.bashrc"
     fi
 }
 

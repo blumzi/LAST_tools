@@ -114,10 +114,10 @@ function network_check() {
     fi
 
     # Machines on weizmann.ac.il should be reachable via the HTTP proxy
-    if wget ${WGET_OPTIONS} --output-document=- --tries=2 http://euler1.weizmann.ac.il/catsHTM 2>/dev/null | grep -qs 'large catalog format'; then
-        message_success "WIS-network:  Succeeded reaching the weizmann.ac.il network (got the http://euler1.weizmann.ac.il/catsHTM page)"
+    if curl -x ${http_proxy} -I google.com >/dev/null 2>&1; then
+	    message_success "WIS-network:  Succeeded using the Weizmann HTTP proxy (${http_proxy}) to reach google.com"
     else
-        message_warning "WIS-network:  Failed reaching the weizmann.ac.il network (could not wget the http://euler1.weizmann.ac.il/catsHTM page)"
+	    message_failure "WIS-network:  Failed using the Weizmann HTTP proxy (${http_proxy}) to reach google.com"
         (( errors++ ))
     fi
 

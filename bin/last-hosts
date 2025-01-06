@@ -27,10 +27,10 @@ EOF
 units_only=false
 deployed=true
 
-   deployed_units=( last0{1,2,3,4,5,6,8}{e,w} last10{e,w} )
+   deployed_units=( last0{1,2,3,4,5,6,7,8}{e,w} last10{e,w} )
 deployed_machines=( last0 ${deployed_units[*]} )
         lab_units=( last11{e,w} last12w )
-     stored_units=( last{07,09}{e,w} last12e )
+     stored_units=( last09{e,w} last12e )
      all_machines=( ${deployed_machines[*]} ${lab_units[*]} ${stored_units[*]} )
 
 while [ ${#} -gt 0 ]; do

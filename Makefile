@@ -58,6 +58,7 @@ else
 	ln -sf ${LAST_TOP}/bin/last-pipeline-status	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pipeline-status
 	ln -sf ${LAST_TOP}/bin/last-serials     	    	    ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-serials
 	ln -sf ${LAST_TOP}/bin/last-compress-raw-images         ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-compress-raw-images
+	ln -sf ${LAST_TOP}/bin/last-prune-individual-images     ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-prune-individual-images
 	ln -sf ${LAST_TOP}/bin/last-transient-slack-alert       ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-transient-slack-alert
 	mkdir -p  ${PACKAGE_DIR}/lib/systemd/system
 	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-pipeline1.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-pipeline1.service
@@ -104,6 +105,6 @@ distrib: package
     module_include lib/message; \
     for host in $$(last-hosts --deployed); do \
 	    message_section $${host}:; \
-        scp -o "ConnectTimeout 2" ${PACKAGE_NAME}.deb $${host}:/tmp; \
+        scp -q -o "ConnectTimeout 2" ${PACKAGE_NAME}.deb $${host}:/tmp; \
         last-asroot --host $${host} --cmd "dpkg --remove ${PACKAGE_SHORT_NAME}; dpkg --install /tmp/${PACKAGE_NAME}.deb"; \
      done

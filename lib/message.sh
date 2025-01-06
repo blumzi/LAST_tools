@@ -100,3 +100,15 @@ function message_debug {
         message_log "[DBUG] ${*}"
     fi
 }
+
+# [ERR ] message
+function message_error {
+    if ! ${LAST_TOOL_QUIET}; then
+        echo -e "[$( ansi_yellow "ERR " )] ${*}"
+    fi
+
+    if ! ${LAST_TOOL_DONTLOG}; then
+        message_log "[WARN] ${*}"
+    fi
+}
+

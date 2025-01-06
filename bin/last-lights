@@ -38,6 +38,7 @@ EOF
 declare -A known_light_sockets=(
     ["02e"]=6 ["pswitch02e"]=6 ["10.23.2.3"]=6
     ["02w"]=1 ["pswitch02w"]=1 ["10.23.2.4"]=1
+    ["05w"]=2 ["pswitch05w"]=1 ["10.23.2.10"]=1
     ["08w"]=2 ["pswitch08w"]=2 ["10.23.2.16"]=2
     
 )
