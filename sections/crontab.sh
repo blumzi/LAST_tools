@@ -24,7 +24,7 @@ function crontab_check() {
     local -a entries with_commas
 
     pattern='last-(backup|compress-raw-images|pipeline-digest|prune-individual-images)'
-    entries=( last-backup last-compress-raw-images )
+    entries=( last-backup last-compress-raw-images last-prune-individual-images )
     if macmap_this_is_last0; then
         entries+=( last-pipeline-digest )
     fi
