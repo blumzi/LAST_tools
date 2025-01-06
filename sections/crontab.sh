@@ -23,7 +23,7 @@ function crontab_check() {
     local expected found pattern ret
     local -a entries with_commas
 
-    pattern='last-(backup|compress-raw-images|pipeline-digest)'
+    pattern='last-(backup|compress-raw-images|pipeline-digest|prune-individual-images)'
     entries=( last-backup last-compress-raw-images )
     if macmap_this_is_last0; then
         entries+=( last-pipeline-digest )
