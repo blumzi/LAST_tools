@@ -7,7 +7,8 @@ PROG=$(basename "${0}")
 LAST_TOOL_PID=${$}  # for message_fatal
 
 function kill_ds9s() {
-	kill %1 %2
+	kill %1
+	kill %2
 }
 
 trap kill_ds9s SIGINT SIGTERM
@@ -105,26 +106,36 @@ done
 
 xpa_script="tile mode column; frame new; tile yes; frame 1"
 
-children=()
 # this host
-verbose "Opening ds9 viewer for the \"${this_side}\" side (${this_host})"
-children+=( ${!} )
-ds9 -title ${this_host} -geometry ${this_geometry} &
-while [ $(xpaaccess -cn ${this_host}) -lt 1 ]; do
-	sleep 1
-done
-echo "${xpa_script}" | xpaset ${this_host}
+(
+    while true; do
+        verbose "Opening ds9 viewer for the \"${this_side}\" side (${this_host})"
+        ds9 -title ${this_host} -geometry ${this_geometry} &
+        while [ $(xpaaccess -cn ${this_host}) -lt 1 ]; do
+            sleep 1
+        done
+        echo "${xpa_script}" | xpaset ${this_host}
+
+        wait
+    done
+) &
 
 # peer_host
-if  >/dev/null 2>&1 ssh -n -o "ConnectTimeout 2" ${peer_host} id; then
-    verbose "Opening ds9 viewer for the \"${peer_side}\" side (${peer_host})"
-    ssh -X ${peer_host} -n -o "ConnectTimeout 5" \
-        "ds9 -title ${peer_host} -geometry ${peer_geometry}" &
-    children+=( ${!} )
-    ssh    ${peer_host} -n -o "ConnectTimeout 5" \
-        "while [ \$(xpaaccess -cn ${peer_host}) -lt 1 ]; do sleep 1; done; echo '${xpa_script}' | xpaset ${peer_host}"
-else
-    message_warning "No connection to peer host (${peer_host})"
-fi
+(
+    while true; do
+        if  >/dev/null 2>&1 ssh -n -o "ConnectTimeout 2" ${peer_host} id; then
+            verbose "Opening ds9 viewer for the \"${peer_side}\" side (${peer_host})"
+            ssh -X ${peer_host} -n -o "ConnectTimeout 5" \
+                "ds9 -title ${peer_host} -geometry ${peer_geometry}" &
+            ssh    ${peer_host} -n -o "ConnectTimeout 5" \
+                "while [ \$(xpaaccess -cn ${peer_host}) -lt 1 ]; do sleep 1; done; echo '${xpa_script}' | xpaset ${peer_host}"
+        else
+            message_warning "No connection to peer host (${peer_host})"
+            sleep 5
+        fi
+
+        wait
+    done
+) &
 
 wait
