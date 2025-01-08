@@ -24,8 +24,10 @@
 04:91:62:c0:89:F7	10.23.2.14	pswitch07w SWITCH14 pswitch14
 04:91:62:c0:7F:F3	10.23.2.15	pswitch08e SWITCH15 pswitch15
 04:91:62:c0:8C:7F	10.23.2.16	pswitch08w SWITCH16 pswitch16
-04:91:62:c0:7F:F3	10.23.2.17	pswitch09e SWITCH17 pswitch17
-04:91:62:c0:8C:7F	10.23.2.18	pswitch09w SWITCH18 pswitch18
+#04:91:62:c0:7F:F3	10.23.2.17	pswitch09e SWITCH17 pswitch17
+#04:91:62:c0:8C:7F	10.23.2.18	pswitch09w SWITCH18 pswitch18
+FC:0F:E7:08:13:26	10.23.2.17	pswitch09e SWITCH17 pswitch17
+FC:0F:E7:08:62:87	10.23.2.18	pswitch09w SWITCH18 pswitch18
 04:91:62:c0:7F:F3	10.23.2.19	pswitch10e SWITCH18 pswitch18
 04:91:62:c0:8C:7F	10.23.2.20	pswitch10w SWITCH19 pswitch19
 04:91:62:c0:7F:F3	10.23.2.21	pswitch11e SWITCH18 pswitch20
@@ -50,6 +52,8 @@ D8:5E:D3:05:0A:FC	10.23.1.13	last07e	last13
 D8:5E:D3:05:04:C9	10.23.1.14	last07w	last14
 D8:5E:D3:04:DF:72	10.23.1.15	last08e	last15
 18:C0:4D:82:1E:0B	10.23.1.16	last08w	last16
+D8:5E:D3:04:14:D3	10.23.3.17  	last09e last17
+D0:5E:D3:04:14:D3	10.23.3.18  last09w last18
 D8:5E:D3:03:D9:C9	10.23.1.19	last10e	last19
 D8:5E:D3:04:DC:0A	10.23.1.20	last10w	last20
 18:C0:4D:80:19:63	10.23.3.21	last11e	last21
