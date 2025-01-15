@@ -3,16 +3,66 @@
 module_include message
 module_include deploy
 module_include container
+module_include user
 
 trap cleanup SIGINT SIGTERM
 
 sections_register_section "catalogs" "Handles the LAST catalogs" "filesystems network"
 
 export catalogs_local_top
-catalogs_local_top="/$(hostname)/data/catsHTM"
+
+if macmap_this_is_last0; then
+    catalogs_local_top="$(echo ~${user_name})/matlab"
+else
+    catalogs_local_top="/$(hostname)/data/catsHTM"
+fi
+
 export catalogs_container_top
-export -a catalogs=( GLADE/v1 QSO/Flesch2021 MergedCat/V2 GAIA/DR3extraGal GAIA/DR3var GAIA/DR3 )
-export _catalogs_source=""
+
+eval user_catalogs_destination="~${user_name}/matlab"
+
+if macmap_this_is_last0; then
+    #
+    # Catalogs for last0
+    #
+    user_catalogs_source="/last0/data2/LAST-CONTAINER/catalogs"
+
+    export -A catalog_sources=(
+        [data]="${user_catalogs_source}"
+    )
+
+    export -A catalog_destinations=(
+        [data]="${user_catalogs_destination}"
+    )
+else
+    global_catalogs_destination="/$(hostname)/data/catsHTM"
+    global_catalogs_source="$(container_lookup catalogs)/catalogs"
+    user_catalogs_source="/last0/LAST-CONTAINER/catalogs"
+
+    #
+    # Catalogs for all other LAST machines
+    #
+    export -A catalog_sources=(
+        [GLADE/v1]="${global_catalogs_source}"
+        [QSO/Flesch2021]="${global_catalogs_source}"
+        [MergedCat/V2]="${global_catalogs_source}"
+        [GAIA/DR3extraGal]="${global_catalogs_source}"
+        [GAIA/DR3var]="${global_catalogs_source}"
+        [GAIA/DR3]="${global_catalogs_source}"
+        [data]="${user_catalogs_source}"
+    )
+
+    export -A catalog_destinations=(
+        [GLADE/v1]="${global_catalogs_destination}"
+        [QSO/Flesch2021]="${global_catalogs_destination}"
+        [MergedCat/V2]="${global_catalogs_destination}"
+        [GAIA/DR3extraGal]="${global_catalogs_destination}"
+        [GAIA/DR3var]="${global_catalogs_destination}"
+        [GAIA/DR3]="${global_catalogs_destination}"
+        [data]="${user_catalogs_destination}"
+    )
+fi
+export -a relevant_catalogs=( $(echo "${!catalog_sources[@]}" | tr ' ' '\n' | sort | tr '\n' ' ' ) )
 
 function cleanup() {
 	/bin/rm -rf /tmp/rsync-*${$}*
@@ -22,8 +72,6 @@ function catalogs_init() {
     # shellcheck disable=SC1090
     source "$(module_locate sections/network.sh)"
     network_set_defaults
-
-    catalogs_container_top="$(container_lookup catalogs)/catalogs"
 }
 
 #
@@ -33,14 +81,20 @@ function _catalogs_rsync_command() {
     local catalog="${1}"
     shift
     local -a args=( "${@}" )
-    local src
+    local src dst local_top
 
-    src="${catalogs_container_top}/${catalog}/"
+    if [[ " ${relevant_catalogs[*]} " != *" ${catalog} "* ]]; then
+        message_fatal "Catalog $(ansi_underline ${catalog}) not relevant to this machine, relevant catalogs: ${relevant_catalogs[*]}"
+    fi
+
+    src=${catalog_sources[${catalog}]}/${catalog}
+    dst=${catalog_destinations[${catalog}]}/${catalog}
+
     if [ -d "${src}" ]; then
-        echo "rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}"
+        echo "rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${dst}"
     elif [[ "${network_netpart}" == 10.23.3.* ]] && ping -w 1 -c 1 euler1 >/dev/null 2>&1 ; then
         src="blumzi@euler1:/var/www/html/data/catsHTM/${catalog}/"
-        echo "su ocs -c \"rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${catalogs_local_top}/${catalog}\""
+        echo "su ocs -c \"rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${dst}"
     else
         message_fatal "No source for catalog ${catalog}"
     fi
@@ -81,9 +135,9 @@ function catalogs_sync_catalog() {
     wait -fn
     status=${?}
     if (( status == 0 )); then
-        message_success "Synchronized $(< /tmp/_catalogs_rsync_command.src) with ${catalogs_container_top}/${catalog}"
+        message_success "Synchronized $(< /tmp/_catalogs_rsync_command.src) with ${catalog_destinations[${catalog}]}/${catalog}"
     else
-        message_failure "Failed to synchronize $(< /tmp/_catalogs_rsync_command.src) with ${catalogs_container_top}/${catalog} (status: ${status})"
+        message_failure "Failed to synchronize $(< /tmp/_catalogs_rsync_command.src) with ${catalog_destinations[${catalog}]}/${catalog} (status: ${status})"
     fi
     /bin/rm -rf "${dir}" "${files_list}"
 }
@@ -97,11 +151,6 @@ function catalogs_sync_catalog() {
 function catalogs_enforce() {
     local status
     
-    if macmap_this_is_last0; then
-        message_success "No catalogs on last0"
-        return
-    fi
-
 	if [ ! "${catalogs_container_top}" ]; then
         message_failure "No LAST container, cannot synchronize catalogs (maybe specify one with --catalog=... ?!?)"
         return
@@ -109,7 +158,8 @@ function catalogs_enforce() {
 
     mkdir -p "${catalogs_local_top}"
 
-    for catalog in "${catalogs[@]}"; do
+    message_info "The following catalogs will be enforced: ${relevant_catalogs[*]}"
+    for catalog in "${relevant_catalogs[@]}"; do
 		catalogs_sync_catalog "${catalog}" &
     done
 	wait
@@ -120,17 +170,13 @@ function catalogs_check() {
     tmp_nfiles=$(mktemp)
     local src
 
-    if macmap_this_is_last0; then
-        message_success "No catalogs on last0"
-        return
-    fi
-
     if [ ! -d "${catalogs_local_top}" ]; then
         message_failure "Missing \"${catalogs_local_top}\""
         return 1
     fi
 
-    for catalog in "${catalogs[@]}"; do
+    message_info "The following catalogs will be checked: ${relevant_catalogs[*]}"
+    for catalog in "${relevant_catalogs[@]}"; do
         local -i nfiles
         local cmd
 
@@ -141,18 +187,19 @@ function catalogs_check() {
         src="$(< /tmp/_catalogs_rsync_command.src)"
         
         if (( nfiles > 0 )); then
-            message_warning "Catalog ${src%/}: ${nfiles} files differ (with ${catalogs_local_top}/${catalog})"
+            message_warning "Catalog ${src%/}: ${nfiles} files differ (with ${catalog_destinations[${catalog}]}/${catalog})"
         else
-            message_success "Catalog ${src%/} is up-to-date (with ${catalogs_local_top}/${catalog})"
+            message_success "Catalog ${src%/} is up-to-date (with ${catalog_destinations[${catalog}]}/${catalog})"
         fi
     done
-    /bin/rm "${tmp_nfiles}" /tmp/_catalogs_rsync_command.src
+    /bin/rm -f "${tmp_nfiles}" /tmp/_catalogs_rsync_command.src
 }
 
 function catalogs_policy() {
     cat <<- EOF
 
-    The LAST project uses the GAIA/DRE3 and the MergedCAT catalogs.  Both need to reside in /data/catsHTM.
+    The LAST project uses the following catalogs:
+        $(echo ${!catalog_sources[@]} | fmt)
 
     If a LAST-CONTAINER container is available (USB disk, mounted filesystem, etc.):
      - $(ansi_underline "${PROG} check catalogs") - checks that the installed catalogs are in sync with the ones in the container
