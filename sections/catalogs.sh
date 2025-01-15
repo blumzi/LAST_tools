@@ -49,7 +49,7 @@ else
         [GAIA/DR3extraGal]="${global_catalogs_source}"
         [GAIA/DR3var]="${global_catalogs_source}"
         [GAIA/DR3]="${global_catalogs_source}"
-        [PCG]="${global_catalogs_source}"
+        [PGC]="${global_catalogs_source}"
         [data]="${user_catalogs_source}"
     )
 
@@ -60,7 +60,7 @@ else
         [GAIA/DR3extraGal]="${global_catalogs_destination}"
         [GAIA/DR3var]="${global_catalogs_destination}"
         [GAIA/DR3]="${global_catalogs_destination}"
-        [PCG]="${global_catalogs_destination}"
+        [PGC]="${global_catalogs_destination}"
         [data]="${user_catalogs_destination}"
     )
 fi
