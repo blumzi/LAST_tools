@@ -66,6 +66,16 @@ else
 fi
 export -a relevant_catalogs=( $(echo "${!catalog_sources[@]}" | tr ' ' '\n' | sort | tr '\n' ' ' ) )
 
+longest_name=0
+for c in "${!catalog_destinations[@]}"; do
+    s=${catalog_destinations[${c}]}/${c}
+    len=${#s}
+    if (( len > longest_name )); then
+        longest_name=${len}
+    fi
+done
+
+
 function cleanup() {
 	/bin/rm -rf /tmp/rsync-*${$}*
 }
@@ -80,23 +90,35 @@ function catalogs_init() {
 # _catalogs_rsync_command GAIA/DRE3 --dry-run
 #
 function _catalogs_rsync_command() {
+    local added_slash=
+
+    if [ "${1}" = "--check" ]; then
+        added_slash=/
+        shift 1
+    fi
+
     local catalog="${1}"
     shift
     local -a args=( "${@}" )
     local src dst local_top
 
-    if [[ " ${relevant_catalogs[*]} " != *" ${catalog} "* ]]; then
-        message_fatal "Catalog $(ansi_underline ${catalog}) not relevant to this machine, relevant catalogs: ${relevant_catalogs[*]}"
+    local relevant=false c
+    for c in "${relevant_catalogs[@]}"; do
+        if [ "${c}" = ${catalog} ]; then
+            relevant=true
+            break
+        fi
+    done
+
+    if ! ${relevant}; then
+        message_fatal "Catalog $(ansi_bold ${catalog}) not relevant to this machine, relevant catalogs: ${relevant_catalogs[*]}"
     fi
 
-    src=${catalog_sources[${catalog}]}/${catalog}
+    src=${catalog_sources[${catalog}]}/${catalog}${added_slash}
     dst=${catalog_destinations[${catalog}]}/${catalog}
 
     if [ -d "${src}" ]; then
-        echo "rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${dst}"
-    elif [[ "${network_netpart}" == 10.23.3.* ]] && ping -w 1 -c 1 euler1 >/dev/null 2>&1 ; then
-        src="blumzi@euler1:/var/www/html/data/catsHTM/${catalog}/"
-        echo "su ocs -c \"rsync ${args[*]} --exclude zzOld --exclude zz1 --exclude oldVer --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${dst}"
+        echo "rsync ${args[*]} --info=STATS0 --info=FLIST0 --itemize-changes ${src} ${dst}"
     else
         message_fatal "No source for catalog ${catalog}"
     fi
@@ -110,11 +132,10 @@ function catalogs_sync_catalog() {
 
     no_slashes_catalog=$( echo "${catalog}" | tr / _)
     files_list=/tmp/rsync-"${no_slashes_catalog}".${$}
-    eval "$(_catalogs_rsync_command "${catalog}"/ -av --dry-run) | \
-	    grep -v '\.\/' | \
-	    grep -v '^directory$' | \
-	    sed -e 's;^\.GAIA;GAIA;' | \
-	    cut -d ' ' -f2 > ${files_list}"
+    eval "$(_catalogs_rsync_command "${catalog}" -av --dry-run) | \
+        grep -vw 'directory' | \
+	    cut -d ' ' -f2 | \
+        sed -e 's;[^/]*/;;' > ${files_list}"
     nfiles=$(wc -l < "${files_list}")
 
     if (( nfiles == 0 )); then
@@ -130,37 +151,45 @@ function catalogs_sync_catalog() {
     pushd "${dir}" >&/dev/null || true
     split --lines=${files_per_chunk} < "${files_list}"
     local chunk_no=0
+    local -A chunk_nos exit_status
     for chunk in x??; do
-	    message_info "Synchronizing chunk #$((chunk_no++)) of \"${catalog}\" ($(wc -l < "${chunk}") files) ..."
-        eval "$(_catalogs_rsync_command ${catalog} -avq --files-from="${chunk}" ) 2>/dev/null" &
+	    message_info "Synchronizing chunk #${chunk_no} of \"${catalog}\" ($(wc -l < "${chunk}") files) ..."
+        eval "$(_catalogs_rsync_command ${catalog} -avq --files-from="${chunk}" ) " &
+        pid=$!
+        chunk_nos[${pid}]=${chunk_no}
+        (( chunk_no++ ))
     done
-    wait -fn
-    status=${?}
-    if (( status == 0 )); then
-        message_success "Synchronized $(< /tmp/_catalogs_rsync_command.src) with ${catalog_destinations[${catalog}]}/${catalog}"
+    local nchunks=${#chunk_nos[@]}
+
+    local failures=0
+    for pid in ${!chunk_nos[@]}; do
+        wait ${pid}
+        exit_status[${pid}]=$?
+        if (( exit_status[${pid}] == 0 )); then
+            message_success "Synchronized chunk #${chunk_nos[${pid}]} of catalog ${catalog} with ${catalog_destinations[${catalog}]}/${catalog}"
+        else
+            message_failure "Failed to synchronize chunk #${chunk_nos[${pid}]} of catalog ${catalog} with ${catalog_destinations[${catalog}]}/${catalog} (status: ${exit_status[${pid}]})"
+            (( failures++ ))
+        fi
+    done
+
+    if [ ${failures} -eq 0 ]; then
+        message_success "All ${nchunks} chunk(s) of catalog ${catalog} have been successfully synchronized"
     else
-        message_failure "Failed to synchronize $(< /tmp/_catalogs_rsync_command.src) with ${catalog_destinations[${catalog}]}/${catalog} (status: ${status})"
+        message_failure "${failures} chunk(s) (out of ${nchunks}) of catalog ${catalog} have failed"
     fi
+
     /bin/rm -rf "${dir}" "${files_list}"
 }
 
-#
-# The staging area for catalogs:
-#   euler1:/var/www/html/data (mounted on euler:/data/euler)
-#
-# euler1:/var/www/html/data  670T  209T  462T  32% /data/euler
-#
 function catalogs_enforce() {
     local status
     
-	if [ ! "${catalogs_container_top}" ]; then
-        message_failure "No LAST container, cannot synchronize catalogs (maybe specify one with --catalog=... ?!?)"
-        return
-    fi
-
     mkdir -p "${catalogs_local_top}"
 
-    message_info "The following catalogs will be enforced: ${relevant_catalogs[*]}"
+    message_info "The following catalogs will be synchronized:"
+    message_info "  $(ansi_bold ${relevant_catalogs[*]})"
+    message_info ""
     for catalog in "${relevant_catalogs[@]}"; do
 		catalogs_sync_catalog "${catalog}" &
     done
@@ -170,28 +199,36 @@ function catalogs_enforce() {
 function catalogs_check() {
     local tmp_nfiles
     tmp_nfiles=$(mktemp)
-    local src
+    local src justified
 
     if [ ! -d "${catalogs_local_top}" ]; then
         message_failure "Missing \"${catalogs_local_top}\""
         return 1
     fi
 
-    message_info "The following catalogs will be checked: ${relevant_catalogs[*]}"
+    message_info "The following catalogs will be checked:"
+    message_info "  $(ansi_bold ${relevant_catalogs[*]})"
+    message_info ""
     for catalog in "${relevant_catalogs[@]}"; do
         local -i nfiles
         local cmd
 
-        cmd="$(_catalogs_rsync_command "${catalog}"  -a --dry-run) | grep -v '\.\/' | grep -v '^directory$' | wc -l"
+        cmd="$(_catalogs_rsync_command --check "${catalog}"  -a --dry-run) | \
+            grep -v '\.\/' | \
+            grep -v '^directory$' | \
+            cut -d ' ' -f2 | \
+            sed -e 's;^[^/]*/;;' | \
+            wc -l"
         eval "${cmd} > ${tmp_nfiles}"
 
         nfiles="$(< "${tmp_nfiles}")"
         src="$(< /tmp/_catalogs_rsync_command.src)"
         
+        justified="$(printf "%-*s" ${longest_name} "${catalog_destinations[${catalog}]}/${catalog}")"
         if (( nfiles > 0 )); then
-            message_warning "Catalog ${src%/}: ${nfiles} files differ (with ${catalog_destinations[${catalog}]}/${catalog})"
+            message_warning "Catalog ${justified} is $(ansi_bright_red NOT) up-to-date with ${src%/}, ${nfiles} files differ"
         else
-            message_success "Catalog ${src%/} is up-to-date (with ${catalog_destinations[${catalog}]}/${catalog})"
+            message_success "Catalog ${justified} is up-to-date with ${src%/}"
         fi
     done
     /bin/rm -f "${tmp_nfiles}" /tmp/_catalogs_rsync_command.src
