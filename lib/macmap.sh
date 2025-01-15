@@ -27,7 +27,25 @@ function macmap_file() {
 function macmap_get_local_mac() {
     local -a words
 
-    read -r -a words <<< "$(ip -o link show | grep link/ether | grep ': en')"
+    #
+    # This is a bit tricky:
+    # - onboard interfaces are named enoXXX
+    # - interfaces in PCI slots are named enp<PCI-bus#>s<PCI-slot>
+    #
+    # On most LAST machines there was a single PCI interface.  Since all the machines
+    #  were of the same make and time, all had an enp67s0 (PCI bus#67 slot#0) interface
+    #
+    # At some point we received machines that have more than one interface
+    # We forced one of the interfaces to be named enp67s0 (by creating a teling systemd to rename it)
+    #   /etc/systemd/network/10-eth.rules:
+    #   [Match]
+    #   	MACAddress=xx:xx:xx:xx:xx:xx
+    #	[Link]
+    #		Name=enp67s0
+    #
+    # This is NOT sustainable for new or replacenet machines
+    #
+    read -r -a words <<< "$(ip -o link show | grep link/ether | grep ': enp67s0')"
     for (( i = 0; i < ${#words[*]}; i++ )); do
         if [ "${words[i]}" = "link/ether" ]; then
             echo "${words[i+1]}"
