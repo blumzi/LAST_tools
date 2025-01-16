@@ -87,7 +87,7 @@ function catalogs_init() {
 }
 
 #
-# _catalogs_rsync_command GAIA/DRE3 --dry-run
+# Creates an rsync command to get the list of out-of-date files
 #
 function _catalogs_rsync_command() {
     local added_slash=
@@ -125,17 +125,24 @@ function _catalogs_rsync_command() {
     echo "${src}" > /tmp/_catalogs_rsync_command.src
 }
 
+#
+# Synchronizes a catalog
+#
 function catalogs_sync_catalog() {
 	local catalog="${1}"
 	local -i nfiles files_per_chunk=1000
     local files_list no_slashes_catalog
 
+    # make a file containing the list of out-of-date files
+
     no_slashes_catalog=$( echo "${catalog}" | tr / _)
     files_list=/tmp/rsync-"${no_slashes_catalog}".${$}
-    eval "$(_catalogs_rsync_command "${catalog}" -av --dry-run) | \
+    eval "$(_catalogs_rsync_command --check "${catalog}" -av --dry-run) | \
         grep -vw 'directory' | \
 	    cut -d ' ' -f2 | \
-        sed -e 's;[^/]*/;;' > ${files_list}"
+        sed -e 's;[^/]*/;;' -e '/^$/d' > ${files_list}"
+
+    # how many files are out-of-date?
     nfiles=$(wc -l < "${files_list}")
 
     if (( nfiles == 0 )); then
@@ -143,6 +150,14 @@ function catalogs_sync_catalog() {
         return
     fi
 
+    #
+    # There are out-of-date files.
+    # 1. Split the workload into chunks (default: 1000 files per chunk)
+    # 2. Synchronize the chunks in parallel
+    # 3. Wait for chunks to either succeed or fail
+    #
+
+    # 1. Split the workload into chunks (default: 1000 files per chunk)
 	mkdir -p "${catalogs_local_top}/${catalog}"
     local dir status
 
@@ -150,6 +165,8 @@ function catalogs_sync_catalog() {
     mkdir -p "${dir}"
     pushd "${dir}" >&/dev/null || true
     split --lines=${files_per_chunk} < "${files_list}"
+
+    # 2. Synchronize the chunks in parallel
     local chunk_no=0
     local -A chunk_nos exit_status
     for chunk in x??; do
@@ -161,6 +178,7 @@ function catalogs_sync_catalog() {
     done
     local nchunks=${#chunk_nos[@]}
 
+    # 3. Wait for chunks to either succeed or fail
     local failures=0
     for pid in ${!chunk_nos[@]}; do
         wait ${pid}
