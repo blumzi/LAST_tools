@@ -3,7 +3,7 @@
 sections_register_section "time" "Manages the LAST project time syncronization" "network"
 
 export time_config_file="/etc/systemd/timesyncd.conf"
-export -a time_servers=( sitechntp ntp.weizmann.ac.il )
+export -a time_servers=( ntp.weizmann.ac.il )
 export time_servers_list
 time_servers_list="$(IFS=,; echo "${time_servers[*]}")"
 
