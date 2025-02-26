@@ -32,13 +32,14 @@ function stamp_as_transfered() {
     fi
     chown ${user_name}.${user_group} ${stat_file}
     message_success "Stamped \"${source}\" as \"transfered\"."
+
     file_type=$( sudo -u ${user_name} ssh -q -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} "stat -c %F ${backup_topdir}/${data_dir} 2>/dev/null" )
     if [ "${file_type}" = directory ]; then
         message_info "Copying .info and .status to ${backup_topdir}/${data_dir} ..."
         sudo -u ${user_name} scp -r -q -o "StrictHostKeyChecking accept-new" ${info_dir} ${backup_user}@${backup_host}:${backup_topdir}/${data_dir}
         sudo -u ${user_name} scp -q -o "StrictHostKeyChecking accept-new" ${stat_file} ${backup_user}@${backup_host}:${backup_topdir}/${data_dir}
     elif [ "${file_type}" = "regular file" ]; then
-        message_failure "Not copying .status and .info to ${backup_topdir}/${data_dir}, IT IS A FILE"
+        message_failure "Not copying .status and .info to ${backup_topdir}/${data_dir}, IT IS A REGULAR FILE"
     elif [ ! "${file_type}" ]; then
         message_failure "Not copying .status and .info to ${backup_topdir}/${data_dir}, IT DOES NOT EXIST"
     fi
