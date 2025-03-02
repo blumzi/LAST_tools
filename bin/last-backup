@@ -436,7 +436,7 @@ function backup_one_source() {
     cp ${files_list} ${info_dir}/${files_list}
     chunks=( x?? )
 
-    sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_target_dir_full_path}
+    sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_target_dir_full_path#*:}
 
     for ((i = 0; i < ${#chunks[*]}; i++)); do
         (
