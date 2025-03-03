@@ -22,6 +22,10 @@ function stamp_as_transfered() {
     local file_type
     local ssh_flags=(-q -o "StrictHostKeyChecking accept-new")
 
+    local time_stamp=$(grep -w "ready-for-transfer" ${stat_file} | tail -1 | cut -d' ' -f1)
+    local seconds_from_ready=$(( $(date +%s) - $(date --date "${time_stamp}" +%s) ))
+    stamp_line+=" # ${seconds_from_ready} seconds from ready-for-transfer"
+
     if [ ! -e ${stat_file} ]; then
         echo "${stamp_line}" > ${stat_file}
         message_success "Stamped \"${source}\" as \"transfered\"."
@@ -378,7 +382,7 @@ function remove_if_transfered_and_aged() {
     hours_from_creation=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
 
     if ${transfered} && [ ${hours_from_creation} -ge ${aging_hours} ]; then
-        message_success "${tag} ${hours_from_creation} have passed since transfer (more than ${aging_hours}), removing \"${directory}\" ..."
+        message_success "${tag} ${hours_from_creation} hours have passed since transfer (more than ${aging_hours}), removing \"${directory}\" ..."
         /bin/rm -rf ${directory}
     fi
 }
@@ -438,16 +442,17 @@ function backup_one_source() {
 
     sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_target_dir_full_path#*:}
 
+    local chunk_info_prefix
     for ((i = 0; i < ${#chunks[*]}; i++)); do
         (
             message_info "${job_tag} Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
-            stat_file=stat.${i}
-            chunk_info="${info_dir}/chunk#$((i + 1))"
-            echo "sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}" > "${chunk_info}.cmd"
-            cp ${chunks[${i}]} "${chunk_info}.files"
+            chunk_info_prefix="${info_dir}/chunk#$((i + 1))"
+            stat_file=${chunk_info_prefix}.status
+            echo "sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}" > "${chunk_info_prefix}.cmd"
+            cp ${chunks[${i}]} "${chunk_info_prefix}.files"
             (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}
             status=${?}
-            echo ${status} > ${chunk_info}.status
+            echo "exit status: ${status}" >> ${stat_file}
 
             if [ "${status}" ] && [ ${status} -eq 0 ]; then
                 Speedup=$(grep speedup ${stat_file}  | cut -d' ' -f8)
