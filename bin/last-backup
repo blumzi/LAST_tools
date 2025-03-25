@@ -6,7 +6,7 @@
 # - will not be removed after backup
 # - will be removed if more than 36 hours have passed since the transfer succeeded
 #
-special_files='LAST.*_sci_proc_proc_(Image|Mask)'
+ignored_files='/LAST.*_sci_proc_(Image|Mask|PSF)'	# A 'grep -Ev' pattern
 
 #
 # Stamps a directory as "transfered"
@@ -410,7 +410,7 @@ function backup_one_source() {
     # TODO: the source and destination MUST be of the same type, either FILE or DIRECTORY.
     #  If the destination exists but is not of the same type, MAYBE remove it first ?!?
     #
-    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target_dir_full_path} 2>rsync_errors | grep -v '\.\/' | grep -v 'created directory' | grep -v "${special_files}" > ${files_list}
+    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target_dir_full_path} 2>rsync_errors | grep -v '\.\/' | grep -v 'created directory' | grep -Ev "${ignored_files}" > ${files_list}
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
         if [ -s rsync_errors ]; then
             while read line; do
