@@ -158,5 +158,5 @@ function util_str_join() {
 function util_log_invokation() {
     local args="${*}"
 
-    message_log "[INFO] Invoked as \"${PROG} ${args}\""
+    message_log "[INFO] Invoked as \"${PROG} ${args}\" (by [${PPID}] - $(tr '\0' ' ' < /proc/${PPID}/cmdline))"
 }
