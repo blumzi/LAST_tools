@@ -6,7 +6,7 @@
 # - will not be removed after backup
 # - will be removed if more than 36 hours have passed since the transfer succeeded
 #
-ignored_files='/LAST.*_sci_proc_(Image|Mask|PSF)'	# A 'grep -Ev' pattern
+ignored_files='/LAST.*_sci_proc_(Image|Mask|PSF)'   # A 'grep -Ev' pattern
 
 #
 # Stamps a directory as "transfered"
@@ -16,6 +16,7 @@ ignored_files='/LAST.*_sci_proc_(Image|Mask|PSF)'	# A 'grep -Ev' pattern
 function stamp_as_transfered() {
     local src_dir="${1}"
     local dst_dir="${2}"
+    local job_tag="${3}"
 
     local stat_file=${src_dir}/.status
     local stamp_line="$(date --iso-8601=seconds --utc) transfered"
@@ -28,8 +29,8 @@ function stamp_as_transfered() {
 
     if [ ! -e ${stat_file} ]; then
         echo "${stamp_line}" > ${stat_file}
-        message_success "Stamped \"${source}\" as \"transfered\"."
-	else
+        message_success "${job_tag} Stamped \"${source}\" as \"transfered\"."
+    else
         (
             grep -vw transfered ${stat_file}
             echo "${stamp_line}"
@@ -37,17 +38,17 @@ function stamp_as_transfered() {
         mv ${stat_file}.new ${stat_file}
     fi
     chown ${user_name}.${user_group} ${stat_file}
-    message_success "Stamped \"${source}\" as \"transfered\"."
+    message_success "${job_tag} Stamped \"${source}\" as \"transfered\"."
 
-    file_type=$( sudo -u ${user_name} ssh "${ssh_flags[@]}" ${backup_user}@${backup_host} "stat -c %F ${dst_dir} 2>/dev/null" )
+    file_type=$( sudo -u ${user_name} ssh "${ssh_flags[@]}" ${backup_user}@${backup_host} "stat -c %F ${dst_dir#*:} 2>/dev/null" )
     if [ "${file_type}" = directory ]; then
-        message_info "Copying .info and .status to ${dst_dir} ..."
+        message_info "${job_tag} Copying .info and .status to ${dst_dir} ..."
         sudo -u ${user_name} scp -r "${ssh_flags[@]}" ${info_dir} ${dst_dir}
         sudo -u ${user_name} scp "${ssh_flags[@]}" ${stat_file} ${dst_dir}
     elif [ "${file_type}" = "regular file" ]; then
-        message_failure "Not copying .status and .info to ${dst_dir}, IT IS A REGULAR FILE"
+        message_failure "${job_tag} Not copying .status and .info to ${dst_dir}, ${dst_dir} IS A REGULAR FILE"
     elif [ ! "${file_type}" ]; then
-        message_failure "Not copying .status and .info to ${dst_dir}, IT DOES NOT EXIST"
+        message_failure "${job_tag} Not copying .status and .info to ${dst_dir}, ${dst_dir} DOES NOT EXIST"
     fi
 }
 
@@ -134,12 +135,78 @@ function usage() {
      -j|--jobs N      - Run upto N jobs (default: 5) in parallel
      -S|--status      - Show all the rsync process currently in progress
      -T|--total       - Total backup, exclusion pattern only: ${basic_exclusion_pattern}
+     -k|--kill        - Kills all existing ${PROG} processes
 
 EOF
 }
 
-OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:T' --long "status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all,total" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:Tkl' --long "list,kill,status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all,total" -n "${PROG}" -- "$@" 2> /tmp/.getopt-err )
+if [ $? -ne 0 ]; then
+    message_failure "$(< /tmp/.getopt-err)"
+    /bin/rm -f /tmp/.getopt-err
+    exit 1
+fi
 eval set -- "${OPTS}"
+
+function status() {
+    local lines pids pid
+
+    pids=( $( pgrep ${PROG} ) )
+    if [ ${#pids[*]} -eq 0 ]; then
+        message_info "No active ${PROG} processes."
+        return
+    fi
+    module_include lib/ansi
+
+    mapfile lines < <(pgrep -alf 'sudo.*rsync')
+    if [ ${#lines[@]} -eq 0 ]; then
+        message_info "No last-backup processes"
+        return
+    fi
+
+    for line in "${lines[@]}"; do
+        #echo "line: ${line}" 
+        local -a words=( ${line} )
+        local word visit from dest
+
+        pid=${words[0]}
+        local parent_process=$( pstree -aclsp ${pid} | awk -v pid=${pid} '
+            {
+                if (match($0, /.*last-backup.*/)) {
+                    print parent_process
+                    exit
+                }
+                sub(/.*`-/, "")
+                split($1, arr, ",")
+                parent_pid = arr[2]
+                parent_cmd = arr[1] 
+                for (i = 2; i <= NF; i++)
+                    parent_cmd = parent_cmd " " $i
+                parent_process = "[" parent_pid "] " parent_cmd
+            }
+        ')
+
+        for word in ${words[*]}; do
+            if [[ ${word} == /last* ]]; then
+                visit=${word#*archive/}
+                from="${word%${visit}}"
+                visit="${visit%/}"
+            fi
+
+
+            if [[ ${word} == ${backup_user}@${backup_host}* ]]; then
+                dest="${word%${visit}}"
+
+                message_success "Visit       $(ansi_underline ${visit})"
+                message_info    "Source      ${from%/}/$(ansi_underline ${visit})"
+                message_info    "Destination ${dest%/}/$(ansi_underline ${visit})"
+                message_info    "Initiator   ${parent_process}"
+                echo ""
+                break
+            fi
+        done
+    done
+}
 
 total=false
 check=false
@@ -151,10 +218,22 @@ sources=()
 target=
 status_only=false
 help_only=false
+kill_only=false
+list_sources=false
 jobs=1
 
 while true; do
     case "${1}" in
+
+    -l|--list)
+        list_sources=true
+        shift 1
+        ;;
+
+    -k|--kill)
+        kill_only=true
+        shift 1
+        ;;
 
     -S|--status)
         status_only=true
@@ -240,11 +319,18 @@ while true; do
         shift 1
         ;;
 
-	--)
-		shift 1
-		break
-		;;
-	esac
+    --)
+        shift 1
+        break
+        ;;
+
+    -*)
+        message_error "Invalid flag '${1}'"
+        usage
+        exit 1
+        ;;
+
+    esac
 done
 
 if ${total}; then
@@ -289,37 +375,22 @@ function visit_is_beeing_backed_up() {
     return 1
 }
 
-function status() {
-    local lines pids
+function kill_all_backups() {
+    local sudo_pids=( $(pgrep -f 'sudo.*rsync') )
+    local sudo_pid pid descendants
 
-    pids=( $( pgrep ${PROG} ) )
-    if [ ${#pids[*]} -eq 0 ]; then
-        message_info "No active ${PROG} processes."
-        return
-    fi
-    module_include lib/ansi
-
-    mapfile lines < <(pgrep -alf 'sudo.*rsync')
-
-    for line in "${lines[@]}"; do
-        local -a words=( ${line} ) word visit from to
-
-        for word in ${words[*]}; do
-            if [[ ${word} == /last* ]]; then
-                visit=${word#*archive/}
-                from="${word%${visit}}"
-                visit="${visit%/}"
-            fi
-
-            if [[ ${word} == ${backup_user}@${backup_host}* ]]; then
-                to="${word%${visit}}"
-
-                message_success "Visit $(ansi_bright_green ${visit}) is being backed up from $(ansi_underline ${from%/}) to $(ansi_underline ${to%/})"
-                break
-            fi
+    for sudo_pid in ${sudo_pids[*]}; do
+        descendants=( $(pstree -a -s -p ${sudo_pid} | awk '/last-backup/ { found = 1 }; found { sub(/^[^,]*,/, "", $1); print $1}'|tac ) )
+        for pid in ${descendants[*]}; do
+            kill ${pid}
         done
     done
 }
+
+if ${kill_only}; then
+    kill_all_backups
+    exit 0
+fi
 
 if ${status_only}; then
     status
@@ -348,16 +419,24 @@ if ${check_all}; then
     exit 0
 fi
 
-pids=( $(ps -alf | grep "bash.*${PROG}" | grep -vw grep | grep -vw ${$} | awk '{print $4}') )
-if [ ${#pids[*]} -ne 0 ]; then
-    message_failure "There already is/are running ${PROG} process(es) (pid(s): ${pids[*]}), only one allowed!"
-    exit 1
-fi
+#pids=( $(ps -alf | grep "bash.*${PROG}" | grep -vw grep | grep -vw ${$} | awk '{print $4}') )
+#if [ ${#pids[*]} -ne 0 ]; then
+#    message_failure "There already is/are running ${PROG} process(es) (pid(s): ${pids[*]}), only one allowed!"
+#    exit 1
+#fi
 
 if [ "${#sources[@]}" -eq 0 ]; then     # no sources were selected with --source
-	if ${backup_all}; then
-	    sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | grep -v '_re/' | sort ) )
-	fi
+    if ${backup_all}; then
+        message_info "Detecting sources ..."
+        all_sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | grep -v '_re/' | sort ) )
+        for source in ${all_sources[*]}; do
+            stat_file=${source}/.status
+            if [ -r ${stat_file} ] && grep -qw ready-for-transfer ${stat_file} && ! grep -qw transfered ${stat_file}; then
+                sources+=( ${source} )
+            fi
+        done
+        message_info "Detected ${#sources[*]} ready but not transfered sources"
+    fi
 fi
 
 # Neither manually specified nor automatically found sources
@@ -366,6 +445,12 @@ if [ "${#sources[@]}" -eq 0 ]; then
     exit 0
 fi
 
+if ${list_sources}; then
+    for source in ${sources[*]}; do
+        message_info "${source}"
+    done
+    exit 0
+fi
 
 function remove_if_transfered_and_aged() {
     local directory="${1}"
@@ -374,6 +459,10 @@ function remove_if_transfered_and_aged() {
     local aging_hours=36
 
     status_file=${directory}/.status
+    if [ ! -r ${status_file} ]; then
+        message_warning "Missing ${status_file}"
+        return
+    fi
 
     if grep -wq transfered ${status_file}; then
         transfered=true
@@ -387,14 +476,24 @@ function remove_if_transfered_and_aged() {
     fi
 }
 
+function is_being_backed_up() {
+    pgrep -f "^rsync .*${1}.*"
+}
+
 function backup_one_source() {
     local data_dir=${1}
     local job_tag="[${job_id}/${#sources[@]}]"
-    local backup_target_dir_full_path
+    local backup_target_dir_full_path visit
 
 
     if [[ "${data_dir}"  == */archive/* ]]; then
         data_dir="${data_dir#*/archive/}"
+        local backup_process=$(is_being_backed_up "${data_dir}")
+
+        if [ "${backup_process}" ]; then
+            message_info "${data_dir} is already being backed up by pid ${backup_process}"
+            return
+        fi
         backup_target_dir_full_path=${backup_target}/${data_dir}
     else
         backup_target_dir_full_path=${backup_target}
@@ -424,7 +523,7 @@ function backup_one_source() {
 
     if (( $(wc -l < ${files_list}) == 0 )); then
         message_success "${job_tag} The source and target directories are synchronized"
-        stamp_as_transfered "${source}" "${backup_target_dir_full_path}"
+        stamp_as_transfered "${source}" "${backup_target_dir_full_path}" "${job_tag}" "${job_tag}"
 
         if ${remove} && ${force}; then
             message_success "${job_tag} Removing \"${source}\" ..."
@@ -473,7 +572,7 @@ function backup_one_source() {
 
     if [ ! -e ${tmp}/.failures ]; then
         # the backup succeeded
-        stamp_as_transfered "${source}" "${backup_target_dir_full_path}"
+        stamp_as_transfered "${source}" "${backup_target_dir_full_path}" "${job_tag}"
 
         if ${remove} && ${force}; then
             message_success "${job_tag} Removing \"${source}\" ..."
