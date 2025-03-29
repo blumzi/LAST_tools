@@ -140,14 +140,17 @@ function usage() {
 EOF
 }
 
-OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:Tkl' --long "list,kill,status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all,total" -n "${PROG}" -- "$@" 2> /tmp/.getopt-err )
+getopt_err=$(mktemp)
+OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:Tkl' --long "list,kill,status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all,total" -n "${PROG}" -- "$@" 2> ${getopt_err} )
 if [ $? -ne 0 ]; then
-    if [ -r /tmp/.getopt-err ]; then
-        message_failure "$(< /tmp/.getopt-err)"
-        /bin/rm -f /tmp/.getopt-err
+    if [ -r ${getopt_err} ]; then
+        message_failure "$(< ${getopt_err})"
     fi
+    /bin/rm -f ${getopt_err}
     exit 1
 fi
+/bin/rm -f ${getopt_err}
+
 eval set -- "${OPTS}"
 
 function status() {
@@ -199,9 +202,10 @@ function status() {
             if [[ ${word} == ${backup_user}@${backup_host}* ]]; then
                 dest="${word%${visit}}"
 
-                message_success "Visit       $(ansi_underline ${visit})"
-                message_info    "Source      ${from%/}/$(ansi_underline ${visit})"
-                message_info    "Destination ${dest%/}/$(ansi_underline ${visit})"
+                message_success "Visit       $(ansi_bold ${visit})"
+                message_info    "Source      ${from%/}/$(ansi_bold ${visit})"
+                message_info    "Destination ${dest%/}/$(ansi_bold ${visit})"
+                message_info    "Elapsed     $(ps -p ${pid} -o etime=) # [[DD-]hh:]mm:ss"
                 message_info    "Initiator   ${parent_process}"
                 echo ""
                 break
