@@ -142,8 +142,10 @@ EOF
 
 OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:Tkl' --long "list,kill,status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all,total" -n "${PROG}" -- "$@" 2> /tmp/.getopt-err )
 if [ $? -ne 0 ]; then
-    message_failure "$(< /tmp/.getopt-err)"
-    /bin/rm -f /tmp/.getopt-err
+    if [ -r /tmp/.getopt-err ]; then
+        message_failure "$(< /tmp/.getopt-err)"
+        /bin/rm -f /tmp/.getopt-err
+    fi
     exit 1
 fi
 eval set -- "${OPTS}"
