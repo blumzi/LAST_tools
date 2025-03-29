@@ -205,8 +205,9 @@ function status() {
                 message_success "Visit       $(ansi_bold ${visit})"
                 message_info    "Source      ${from%/}/$(ansi_bold ${visit})"
                 message_info    "Destination ${dest%/}/$(ansi_bold ${visit})"
-                message_info    "Elapsed     $(ps -p ${pid} -o etime=) # [[DD-]hh:]mm:ss"
                 message_info    "Initiator   ${parent_process}"
+                message_info    "Started     $(ps -p ${pid} -o start= | tr -d ' ')"
+                message_info    "Elapsed     $(ps -p ${pid} -o etime= | tr -d ' ') # [[DD-]hh:]mm:ss"
                 echo ""
                 break
             fi
@@ -388,7 +389,7 @@ function kill_all_backups() {
     for sudo_pid in ${sudo_pids[*]}; do
         descendants=( $(pstree -a -s -p ${sudo_pid} | awk '/last-backup/ { found = 1 }; found { sub(/^[^,]*,/, "", $1); print $1}'|tac ) )
         for pid in ${descendants[*]}; do
-            kill ${pid}
+            kill ${pid} >/dev/null 2>&1
         done
     done
 }
