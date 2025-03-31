@@ -10,11 +10,7 @@ PACKAGE_VERSION:=$(shell \
 
 PACKAGE_NAME=${PACKAGE_SHORT_NAME}-${PACKAGE_VERSION}
 PACKAGE_DIR=packaging/${PACKAGE_NAME}
-
-VMWARE = 
-ifeq ($(shell mapfile -t type < <(df --output=fstype .); echo $${type[1]}),fuse.vmhgfs-fuse)
-	VMWARE = true
-endif
+SYSTEMD_DIR=etc/systemd/system
 
 package: LAST_TOP  = /usr/local/share/last-tool
 package: LOCAL_TOP = /usr/local
@@ -22,20 +18,6 @@ package: mrclean check-for-github-tokens
 	mkdir -m 755 -p ${PACKAGE_DIR}/${LAST_TOP} ${PACKAGE_DIR}/${LOCAL_TOP}/bin ${PACKAGE_DIR}/etc/profile.d
 	tar cf - --exclude=LAST-CONTAINER ./bin ./lib ./files ./sections | (cd ${PACKAGE_DIR}/${LAST_TOP} ; tar xf -)
 	chmod 755 ${PACKAGE_DIR}/${LAST_TOP}/*	
-ifeq (${VMWARE},true)
-	mkdir -p ${PACKAGE_DIR}/${LOCAL_TOP}/bin ${PACKAGE_DIR}/etc/profile.d
-	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-tool 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-tool
-	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-pswitch 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pswitch
-	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-lights 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-lights
-	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-matlab 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab
-	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-matlab 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab-R2022a
-	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-hosts 				${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-hosts
-	install -m 755 ${PACKAGE_DIR}/${LAST_TOP}/bin/last-fetch-from-github	${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
-	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/last.sh 				${PACKAGE_DIR}/etc/profile.d/last.sh
-	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/lib/systemd/system/last-pipeline1.service 	${PACKAGE_DIR}/lib/systemd/system/last-pipeline1.service
-	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/lib/systemd/system/last-pipeline2.service 	${PACKAGE_DIR}/lib/systemd/system/last-pipeline2.service
-	install -m 644 ${PACKAGE_DIR}/${LAST_TOP}/files/root/lib/systemd/system/last-safety-daemon.service 	${PACKAGE_DIR}/lib/systemd/system/last-safety-daemon.service
-else
 	ln -sf ${LAST_TOP}/bin/last-tool 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-tool
 	ln -sf ${LAST_TOP}/bin/last-matlab 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab
 	ln -sf ${LAST_TOP}/bin/last-matlab 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-matlab-R2022a
@@ -60,15 +42,13 @@ else
 	ln -sf ${LAST_TOP}/bin/last-compress-raw-images         ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-compress-raw-images
 	ln -sf ${LAST_TOP}/bin/last-prune-individual-images     ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-prune-individual-images
 	ln -sf ${LAST_TOP}/bin/last-transient-slack-alert       ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-transient-slack-alert
-	mkdir -p  ${PACKAGE_DIR}/lib/systemd/system
-	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-pipeline1.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-pipeline1.service
-	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-pipeline2.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-pipeline2.service
-	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-unit-server.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-unit-server.service
-	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-safety-daemon.service 	${PACKAGE_DIR}/lib/systemd/system/last-safety-daemon.service
-	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-ds9-feeder.service 	    ${PACKAGE_DIR}/lib/systemd/system/last-ds9-feeder.service
-	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-enclosurelogger.service 	${PACKAGE_DIR}/lib/systemd/system/last-enclosurelogger.service
-	ln -sf ${LAST_TOP}/files/root/lib/systemd/system/last-products-watcher.service 	${PACKAGE_DIR}/lib/systemd/system/last-products-watcher.service
-endif
+	mkdir -p  ${PACKAGE_DIR}/${SYSTEMD_DIR}
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-pipeline1.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-pipeline1.service
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-pipeline2.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-pipeline2.service
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-safety-daemon.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-safety-daemon.service
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-ds9-feeder.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-ds9-feeder.service
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-enclosurelogger.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-enclosurelogger.service
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-products-watcher.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-products-watcher.service
 	@(  \
         repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
         commit=$$(git rev-parse --short HEAD); \
@@ -83,11 +63,7 @@ endif
 	sed -e "/^Version:/s;:.*;: ${PACKAGE_VERSION};" < debian/control | tr -d '\r' > ${PACKAGE_DIR}/DEBIAN/control
 	install -m 644 debian/changelog ${PACKAGE_DIR}/DEBIAN/changelog
 	install -m 755 debian/rules ${PACKAGE_DIR}/DEBIAN/rules	
-ifeq (${VMWARE},true)
-	cd packaging; dpkg-deb  --nocheck --build ${PACKAGE_NAME}
-else
 	cd packaging; dpkg-deb --build ${PACKAGE_NAME}
-endif
 	mv packaging/*.deb .
 	${MAKE} clean
 
