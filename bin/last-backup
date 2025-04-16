@@ -29,7 +29,7 @@ function stamp_as_transfered() {
 
     if [ ! -e ${stat_file} ]; then
         echo "${stamp_line}" > ${stat_file}
-        message_success "${job_tag} Stamped \"${source}\" as \"transfered\"."
+        message_success "${job_tag} Stamped \"${src_dir}\" as \"transfered\"."
     else
         (
             grep -vw transfered ${stat_file}
@@ -38,7 +38,7 @@ function stamp_as_transfered() {
         mv ${stat_file}.new ${stat_file}
     fi
     chown ${user_name}.${user_group} ${stat_file}
-    message_success "${job_tag} Stamped \"${source}\" as \"transfered\"."
+    message_success "${job_tag} Stamped \"${src_dir}\" as \"transfered\"."
 
     file_type=$( sudo -u ${user_name} ssh "${ssh_flags[@]}" ${backup_user}@${backup_host} "stat -c %F ${dst_dir#*:} 2>/dev/null" )
     if [ "${file_type}" = directory ]; then
@@ -221,7 +221,7 @@ check_all=false
 backup_all=true
 remove=false
 force=false
-sources=()
+candidates_for_backup=()
 target=
 status_only=false
 help_only=false
@@ -288,7 +288,7 @@ while true; do
             message_fatal "Bad source \"${2}\", no such directory"
             exit 1
         fi
-        sources+=( ${source} )
+        candidates_for_backup+=( ${source} )
         shift 2
         ;;
 
@@ -426,38 +426,56 @@ if ${check_all}; then
     exit 0
 fi
 
-#pids=( $(ps -alf | grep "bash.*${PROG}" | grep -vw grep | grep -vw ${$} | awk '{print $4}') )
-#if [ ${#pids[*]} -ne 0 ]; then
-#    message_failure "There already is/are running ${PROG} process(es) (pid(s): ${pids[*]}), only one allowed!"
-#    exit 1
-#fi
+#
+# Check if a data_dir is already backed_up
+#
+# Output:
+#    error - an error occured
+#      yes - all contents are backed up
+#       no - not all contents are backed up
 
-if [ "${#sources[@]}" -eq 0 ]; then     # no sources were selected with --source
-    if ${backup_all}; then
-        message_info "Detecting sources ..."
-        all_sources=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | grep -v '_re/' | sort ) )
-        for source in ${all_sources[*]}; do
-            stat_file=${source}/.status
-            if [ -r ${stat_file} ] && grep -qw ready-for-transfer ${stat_file} && ! grep -qw transfered ${stat_file}; then
-                sources+=( ${source} )
-            fi
-        done
-        message_info "Detected ${#sources[*]} ready but not transfered sources"
+# Side effects:
+#    creates ${files_list}
+#
+function already_backed_up() {
+    local data_dir="${1}"
+    local backup_target_dir_full_path
+    local rc visit
+
+    if [[ "${data_dir}"  == */archive/* ]]; then
+        visit="${data_dir#*/archive/}"
+        backup_target_dir_full_path=${backup_target}/${visit}
+    else
+        backup_target_dir_full_path=${backup_target}
     fi
-fi
 
-# Neither manually specified nor automatically found sources
-if [ "${#sources[@]}" -eq 0 ]; then
-    message_info "Nothing to backup, bye!"
-    exit 0
-fi
+    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${data_dir}/ ${backup_target_dir_full_path} 2>rsync_errors |  \
+        grep -Ev '^\.\/$' |  \
+        grep -v 'created directory' |  \
+        grep -Ev "${ignored_files}" | \
+        grep -Ev "^./$" | \
+        grep -Ev "^.status$" \
+            > ${files_list}
 
-if ${list_sources}; then
-    for source in ${sources[*]}; do
-        message_info "${source}"
-    done
-    exit 0
-fi
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+        if [ -s rsync_errors ]; then
+            while read line; do
+                message_error "${job_tag} rsync error:  ${line}" >&2
+            done < rsync_errors
+        fi
+        /bin/rm -rf rsync_errors
+        echo error
+    fi
+
+    if [ $(wc -l < ${files_list}) -eq 0 ]; then
+        rc=yes
+    else
+        rc=no
+    fi
+
+    /bin/rm -rf rsync_errors
+    echo ${rc}
+}
 
 function remove_if_transfered_and_aged() {
     local directory="${1}"
@@ -483,31 +501,83 @@ function remove_if_transfered_and_aged() {
     fi
 }
 
+#pids=( $(ps -alf | grep "bash.*${PROG}" | grep -vw grep | grep -vw ${$} | awk '{print $4}') )
+#if [ ${#pids[*]} -ne 0 ]; then
+#    message_failure "There already is/are running ${PROG} process(es) (pid(s): ${pids[*]}), only one allowed!"
+#    exit 1
+#fi
+
+candidates_for_removal=()
+
+if [ "${#candidates_for_backup[@]}" -eq 0 ]; then     # no candidates_for_backup were selected with --source
+    if ${backup_all}; then
+        message_info "Detecting sources ..."
+        proc_directories=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | grep -v '_re/' | sort ) )
+        for source in ${proc_directories[*]}; do
+            stat_file=${source}/.status
+
+            if [ -r ${stat_file} ] && grep -qw ready-for-transfer ${stat_file}; then
+                if grep -qw transfered ${stat_file}; then
+                    candidates_for_removal+=( ${source} )
+                else
+                    candidates_for_backup+=( ${source} )
+                fi
+            fi
+        done
+        message_info "Detected ${#candidates_for_backup[*]} ready but not transfered sources"
+    fi
+fi
+
+if ${remove} && [ ${#candidates_for_removal[*]} -ne 0 ]; then
+    message_info "Considering ${#candidates_for_removal[*]} candidates for removal ..."
+
+    for candidate in ${candidates_for_removal[*]}; do
+        if [ $(already_backed_up ${candidate}) = yes ]; then
+            remove_if_transfered_and_aged ${candidate}
+        fi
+    done
+fi
+
+# Neither manually specified nor automatically found candidates_for_backup
+if [ "${#candidates_for_backup[@]}" -eq 0 ]; then
+    message_info "Nothing to backup, bye!"
+    exit 0
+fi
+
+if ${list_sources}; then
+    for source in ${candidates_for_backup[*]}; do
+        message_info "${source}"
+    done
+    exit 0
+fi
+
 function is_being_backed_up() {
     pgrep -f "^rsync .*${1}.*"
 }
 
+
 function backup_one_source() {
     local data_dir=${1}
-    local job_tag="[${job_id}/${#sources[@]}]"
+    local job_tag="[${job_id}/${#candidates_for_backup[@]}]"
     local backup_target_dir_full_path visit
+    local backedup
 
 
     if [[ "${data_dir}"  == */archive/* ]]; then
-        data_dir="${data_dir#*/archive/}"
+        visit="${data_dir#*/archive/}"
         local backup_process=$(is_being_backed_up "${data_dir}")
 
         if [ "${backup_process}" ]; then
             message_info "${data_dir} is already being backed up by pid ${backup_process}"
             return
         fi
-        backup_target_dir_full_path=${backup_target}/${data_dir}
+        backup_target_dir_full_path=${backup_target}/${visit}
     else
         backup_target_dir_full_path=${backup_target}
     fi
 
     echo ''
-    message_info "${job_tag} Source: \"${source}\""
+    message_info "${job_tag} Source: \"${data_dir}\""
     message_info "${job_tag} Target: \"${backup_target_dir_full_path}\""
 
     message_info "${job_tag} Gathering list of files ..."
@@ -516,26 +586,15 @@ function backup_one_source() {
     # TODO: the source and destination MUST be of the same type, either FILE or DIRECTORY.
     #  If the destination exists but is not of the same type, MAYBE remove it first ?!?
     #
-    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${source}/ ${backup_target_dir_full_path} 2>rsync_errors | grep -v '\.\/' | grep -v 'created directory' | grep -Ev "${ignored_files}" > ${files_list}
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-        if [ -s rsync_errors ]; then
-            while read line; do
-                message_error "${job_tag} rsync error:  ${line}"
-            done < rsync_errors
-        fi
-        /bin/rm rsync_errors
+    backedup=$(already_backed_up "${data_dir}")
+    if [ ${backedup} = error ]; then
         message_failure "${job_tag} Failed getting files list from ${backup_target_dir_full_path}"
         return
     fi
 
-    if (( $(wc -l < ${files_list}) == 0 )); then
+    if [ ${backedup} = yes ]; then
         message_success "${job_tag} The source and target directories are synchronized"
-        stamp_as_transfered "${source}" "${backup_target_dir_full_path}" "${job_tag}" "${job_tag}"
-
-        if ${remove} && ${force}; then
-            message_success "${job_tag} Removing \"${source}\" ..."
-            remove_if_transfered_and_aged ${source} "${job_tag}"
-        fi
+        stamp_as_transfered "${data_dir}" "${backup_target_dir_full_path}" "${job_tag}" "${job_tag}"
 
         return
     fi
@@ -554,9 +613,9 @@ function backup_one_source() {
             message_info "${job_tag} Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
             chunk_info_prefix="${info_dir}/chunk#$((i + 1))"
             stat_file=${chunk_info_prefix}.status
-            echo "sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}" > "${chunk_info_prefix}.cmd"
+            echo "sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${data_dir}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}" > "${chunk_info_prefix}.cmd"
             cp ${chunks[${i}]} "${chunk_info_prefix}.files"
-            (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${source}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}
+            (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${data_dir}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}
             status=${?}
             echo "exit status: ${status}" >> ${stat_file}
 
@@ -579,10 +638,10 @@ function backup_one_source() {
 
     if [ ! -e ${tmp}/.failures ]; then
         # the backup succeeded
-        stamp_as_transfered "${source}" "${backup_target_dir_full_path}" "${job_tag}"
+        stamp_as_transfered "${data_dir}" "${backup_target_dir_full_path}" "${job_tag}"
 
         if ${remove} && ${force}; then
-            message_success "${job_tag} Removing \"${source}\" ..."
+            message_success "${job_tag} Removing \"${data_dir}\" ..."
             remove_if_transfered_and_aged ${source} "${job_tag}"
         fi
     fi
@@ -590,17 +649,17 @@ function backup_one_source() {
 
 running_jobs=0
 job_id=0
-for source in "${sources[@]}"; do
-    visit=${source#*/archive/}
+for candidate_for_backup in "${candidates_for_backup[@]}"; do
+    visit=${candidate_for_backup#*/archive/}
 
-    if ! grep -qw ready-for-transfer ${source}/.status || grep -wq transfered ${source}/.status; then
+    if ! grep -qw ready-for-transfer ${candidate_for_backup}/.status || grep -wq transfered ${candidate_for_backup}/.status; then
         continue
     fi
 
     if visit_is_beeing_backed_up ${visit}; then
         message_info "Vist ${visit} is already being backed up, skipping."
     else
-        backup_one_source "${source}" &
+        backup_one_source "${candidate_for_backup}" &
         (( running_jobs++ ))
         (( job_id++ ))
 
