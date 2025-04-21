@@ -24,8 +24,7 @@ function stamp_as_transfered() {
     local ssh_flags=(-q -o "StrictHostKeyChecking accept-new")
 
     local time_stamp=$(grep -w "ready-for-transfer" ${stat_file} | tail -1 | cut -d' ' -f1)
-    local seconds_from_ready=$(( $(date +%s) - $(date --date "${time_stamp}" +%s) ))
-    stamp_line+=" # ${seconds_from_ready} seconds from ready-for-transfer"
+    stamp_line+=" # ${hours_from_ready[${src_dir}]} hours from ready for transfer"
 
     if [ ! -e ${stat_file} ]; then
         echo "${stamp_line}" > ${stat_file}
@@ -43,8 +42,9 @@ function stamp_as_transfered() {
     file_type=$( sudo -u ${user_name} ssh "${ssh_flags[@]}" ${backup_user}@${backup_host} "stat -c %F ${dst_dir#*:} 2>/dev/null" )
     if [ "${file_type}" = directory ]; then
         message_info "${job_tag} Copying .info and .status to ${dst_dir} ..."
-        sudo -u ${user_name} scp -r "${ssh_flags[@]}" ${info_dir} ${dst_dir}
-        sudo -u ${user_name} scp "${ssh_flags[@]}" ${stat_file} ${dst_dir}
+        sudo -u ocs rsync -a ${info_dir}/ ${stat_file} ${backup_target_dir_full_path} 2>/dev/null
+        #sudo -u ${user_name} scp -r "${ssh_flags[@]}" ${info_dir} ${dst_dir}
+        #sudo -u ${user_name} scp "${ssh_flags[@]}" ${stat_file} ${dst_dir}
     elif [ "${file_type}" = "regular file" ]; then
         message_failure "${job_tag} Not copying .status and .info to ${dst_dir}, ${dst_dir} IS A REGULAR FILE"
     elif [ ! "${file_type}" ]; then
@@ -53,7 +53,7 @@ function stamp_as_transfered() {
 }
 
 function cleanup() {
-    local failures=( $(if [ -s ${tmp}/.failures ]; then cat ${tmp}/.failures 2>/dev/null; fi) )
+    local failures=( $(if [ -s ${global_tmp}/.failures ]; then cat ${global_tmp}/.failures 2>/dev/null; fi) )
     local running_processes=( $(jobs -pr) )
 
     if [ ${#running_processes[*]} -eq 0 ]; then
@@ -68,7 +68,7 @@ function cleanup() {
         message_info "Killing running process(es): ${running_processes[*]}"
         2>/dev/null kill -9 ${running_processes[*]} 
     fi
-    /bin/rm -rf ${tmp}
+    /bin/rm -rf ${global_tmp}
     exit 0
 }
 
@@ -89,12 +89,11 @@ util_log_invokation ${*}
 # defaults
 identity=
 default_nproc=1
+default_njobs=1
 basic_exclusion_pattern="--exclude '*/raw'"
 extended_exclusion_pattern="--exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
-#rsync_extra_args="--exclude '*/raw' --exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
 rsync_extra_args="${basic_exclusion_pattern} ${extended_exclusion_pattern}"
-rsync_info_args="--info=STATS0 --info=FLIST0"
-quiet=false
+old_age_hours=36
 
 
 function usage() {
@@ -104,7 +103,7 @@ function usage() {
 
     Either one or more <source-directories> may be specified with --source.
     If no <source-directories> were specified, all the directories named */proc/* under /$(hostname -s)/data[12] will
-     be backed up.
+     be considered
 
     Every <source-directory> will be recursivelly synchronized with the <target-directory>.
     Both source and target may reside on the current machine.
@@ -121,27 +120,35 @@ function usage() {
 
     Flags:
      -h|--help        - Show usage and exit
-     -a|--all         - Backup all /$(hostname -s)/data[12]/archive/*/proc/* directories (default)
-     -q|--quiet       - Be quiet
-     -s|--source      - Specifies the source-directory
-     -f|--from        - Specifies the source-directory
+
+     Source/destination:
+     -s|--source      - Specifies a source-directory (may be repeated)
+     -f|--from        - Same as -s|--source
      -t|--to|--target - Specifies the target-directory (default: ${backup_default_target})
-     -p|--processes   - Specifies the number of processes to use (default: ${default_nproc})
+     -F|--full        - Full backup, exclude only */raw (ignores the exclusion pattern)
+
+    Resources:
+     -j|--jobs N      - Run upto N jobs (default: ${default_njobs}) in parallel
+     -p|--processes   - Specifies the number of processes to use per job (default: ${default_nproc})
      -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
-     -c|--check       - Check if the source directory was backed up
-     -r|--remove      - Remove source directory if it was backed up (only works with -c|--check or -C|--check-all)
-     -F|--force       - Force removal of local directory (only works with -r|--remove)
-     -C|--check-all   - Same as -c|--check but for all the local directories
-     -j|--jobs N      - Run upto N jobs (default: 5) in parallel
-     -S|--status      - Show all the rsync process currently in progress
-     -T|--total       - Total backup, exclusion pattern only: ${basic_exclusion_pattern}
+
+     -r|--remove      - Remove source directory if it has been:
+                        - successfully transfered
+                        - ready-for-transfer for more than ${old_age_hours} hours
+
+    Status:
+     -S|--status      - Show current status
+     -R|--running     - Show running backup processes
+     -v|--verbose     - Bee more talkative (can be repeated to increase verbosity)
+
+    Cruelty:
      -k|--kill        - Kills all existing ${PROG} processes
 
 EOF
 }
 
 getopt_err=$(mktemp)
-OPTS=$( getopt -o 'Sqs:f:t:hi:p:xcrCFaj:Tkl' --long "list,kill,status,jobs,all,quiet:,help,extra:,processes:,identity:,force,source:,from:,to:,target:,check,remove,check-all,total" -n "${PROG}" -- "$@" 2> ${getopt_err} )
+OPTS=$( getopt -o 'Ss:f:t:hi:p:xrj:FkvcR' --long "running,check,kill,status,jobs,help,extra:,processes:,identity:,source:,from:,to:,target:,remove,full,verbose" -n "${PROG}" -- "$@" 2> ${getopt_err} )
 if [ $? -ne 0 ]; then
     if [ -r ${getopt_err} ]; then
         message_failure "$(< ${getopt_err})"
@@ -153,7 +160,10 @@ fi
 
 eval set -- "${OPTS}"
 
-function status() {
+#
+# Shows the current backup processes, trying to figure out what spawned them
+#
+function show_running_processes() {
     local lines pids pid
 
     pids=( $( pgrep ${PROG} ) )
@@ -169,6 +179,8 @@ function status() {
         return
     fi
 
+    message_empty
+    message_info "Current backup processes:"
     for line in "${lines[@]}"; do
         #echo "line: ${line}" 
         local -a words=( ${line} )
@@ -202,83 +214,62 @@ function status() {
             if [[ ${word} == ${backup_user}@${backup_host}* ]]; then
                 dest="${word%${visit}}"
 
-                message_success "Visit       $(ansi_bold ${visit})"
-                message_info    "Source      ${from%/}/$(ansi_bold ${visit})"
-                message_info    "Destination ${dest%/}/$(ansi_bold ${visit})"
-                message_info    "Initiator   ${parent_process}"
-                message_info    "Started     $(ps -p ${pid} -o start= | tr -d ' ')"
-                message_info    "Elapsed     $(ps -p ${pid} -o etime= | tr -d ' ') # [[DD-]hh:]mm:ss"
-                echo ""
+                message_success "  Visit:       $(ansi_bold ${visit})"
+                message_info    "  Source:      ${from%/}/$(ansi_bold ${visit})"
+                message_info    "  Destination: ${dest%/}/$(ansi_bold ${visit})"
+                message_info    "  Initiator:   ${parent_process}"
+                message_info    "  Started:     $(ps -p ${pid} -o start= | tr -d ' ')"
+                message_info    "  Elapsed:     $(ps -p ${pid} -o etime= | tr -d ' ')      # [[DD-]hh:]mm:ss"
+                message_empty
+
                 break
             fi
         done
     done
 }
 
-total=false
-check=false
-check_all=false
-backup_all=true
-remove=false
-force=false
-candidates_for_backup=()
+full_flag=false
+remove_flag=false
+candidates=()
 target=
-status_only=false
-help_only=false
-kill_only=false
-list_sources=false
-jobs=1
+status_flag=false
+help_flag=false
+kill_flag=false
+verbosity_level=0
+check_flag=false
+max_jobs=${default_njobs}
+running_flag=false
 
 while true; do
     case "${1}" in
 
-    -l|--list)
-        list_sources=true
+    -R|--running)
+        running_flag=true
         shift 1
         ;;
 
     -k|--kill)
-        kill_only=true
+        kill_flag=true
         shift 1
         ;;
 
     -S|--status)
-        status_only=true
+        status_flag=true
         shift 1
         ;;
 
     -j|--jobs)
-        jobs=${1}
+        max_jobs=${1}
         shift 2
         ;;
 
-    -a|--all)
-        backup_all=true
-        shift 1
-        ;;
-
-    -C|--check-all)
-        check_all=true
-        shift 1
-        ;;
-
-    -c|--check)
-        check=true
-        shift 1
-        ;;
-
     -r|--remove)
-        remove=true
+        remove_flag=true
         shift 1
         ;;
 
-    -F|--force)
-        force=true
-        shift 1
-        ;;
-
-    -q|--quiet)
-        quiet=true
+    -v|--verbose)
+        (( verbosity_level++ ))
         shift 1
         ;;
 
@@ -288,7 +279,7 @@ while true; do
             message_fatal "Bad source \"${2}\", no such directory"
             exit 1
         fi
-        candidates_for_backup+=( ${source} )
+        candidates+=( ${source} )
         shift 2
         ;;
 
@@ -302,7 +293,7 @@ while true; do
         ;;
 
     -h|--help)
-        help_only=true
+        help_flag=true
         shift 1
         ;;
 
@@ -321,8 +312,8 @@ while true; do
         shift 2
         ;;
 
-    -T|--total)
-        total=true
+    -F|--full)
+        full_flag=true
         shift 1
         ;;
 
@@ -340,11 +331,11 @@ while true; do
     esac
 done
 
-if ${total}; then
+if ${full_flag}; then
     rsync_extra_args="${basic_exclusion_pattern}"
 fi
 
-if ${help_only}; then
+if ${help_flag}; then
     usage
     exit 0
 fi
@@ -353,14 +344,10 @@ if [ ! "${target}" ]; then
     target="${backup_default_target}"
 fi
 
-if ${quiet}; then
-    export LAST_TOOL_QUIET=true
-fi
-
 
 backup_set_target "${target}"
 
-function visit_is_beeing_backed_up() {
+function is_being_backed_up() {
     local searched_visit="${1}"
     local lines
 
@@ -394,13 +381,8 @@ function kill_all_backups() {
     done
 }
 
-if ${kill_only}; then
+if ${kill_flag}; then
     kill_all_backups
-    exit 0
-fi
-
-if ${status_only}; then
-    status
     exit 0
 fi
 
@@ -408,80 +390,90 @@ if [ ! "${nprocs}" ]; then
     nprocs=${default_nproc}
 fi
 
-tmp=$(mktemp -d)
-chmod 755 ${tmp}
-cd ${tmp}
-info_dir=${tmp}/.info-$(date +%Y-%m-%d_%H-%M-%S)
+global_tmp=$(mktemp -d)
+chmod 755 ${global_tmp}
+cd ${global_tmp}
+info_dir=${global_tmp}/.info-$(date +%Y-%m-%d_%H-%M-%S)
 mkdir -p ${info_dir}
 
-files_list=files
+#
+# Makes an rsync dry-run and gets the list of differing files
+#  between the local and remote directories
+#
+# Output: list of differing files (one per line)
+# Return:
+#  - 0: success (files list on stdout)
+#  - 1: failure (stdout not relevant)
+#
+function get_unsynced_files() {
+    local local_dir="${1}"
+    local remote_dir rc=0
+    local err=$(mktemp)
 
-if ${check}; then
-    backup_check_one "${source}"
-    exit 0
-fi
+    remote_dir=${backup_target}
+    if is_LAST_visit ${local_dir}; then
+        remote_dir+=/${local_dir#*/archive/}
+    fi
 
-if ${check_all}; then
-    backup_check_all
-    exit 0
-fi
+
+    #
+    # Make a verbose dry-run to get the differing files list
+    # Discards:
+    #  - the last 3 (status) lines
+    #  - the 'sending incremental ...' line
+    #  - the './' line
+    #  - any of the ignored files
+    #
+    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av --dry-run ${rsync_extra_args} ${local_dir}/ ${remote_dir} 2>${err} |  \
+        head -n -3 | \
+        grep -Ev '^\./$' |  \
+        grep -v '^sending incremental file list$' |  \
+        grep -Ev "${ignored_files}"
+
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+        if [ -s ${err} ]; then
+            while read line; do
+                message_error "${job_tag} ${local_dir}: rsync error:  ${line}" >&2
+            done < ${err}
+        fi
+        rc=1
+    fi
+
+    /bin/rm -f ${err}
+    return ${rc}
+}
+
 
 #
 # Check if a data_dir is already backed_up
 #
-# Output:
-#    error - an error occured
-#      yes - all contents are backed up
-#       no - not all contents are backed up
-
-# Side effects:
-#    creates ${files_list}
+# Returns:
+#  0 - no unsynced files
+#  1 - there are unsynced files (on stdout)
 #
-function already_backed_up() {
+function same_as_on_backup() {
     local data_dir="${1}"
-    local backup_target_dir_full_path
-    local rc visit
+    local rc ndiff
+    local local_tmp=$(mktemp)
 
-    if [[ "${data_dir}"  == */archive/* ]]; then
-        visit="${data_dir#*/archive/}"
-        backup_target_dir_full_path=${backup_target}/${visit}
-    else
-        backup_target_dir_full_path=${backup_target}
-    fi
-
-    sudo -u ocs rsync -e 'ssh -o "StrictHostKeyChecking accept-new"' -av ${rsync_info_args} --dry-run ${rsync_extra_args} ${data_dir}/ ${backup_target_dir_full_path} 2>rsync_errors |  \
-        grep -Ev '^\.\/$' |  \
-        grep -v 'created directory' |  \
-        grep -Ev "${ignored_files}" | \
-        grep -Ev "^./$" | \
-        grep -Ev "^.status$" \
-            > ${files_list}
-
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-        if [ -s rsync_errors ]; then
-            while read line; do
-                message_error "${job_tag} rsync error:  ${line}" >&2
-            done < rsync_errors
+    if get_unsynced_files ${data_dir} > ${local_tmp}; then
+        ndiff=$(wc -l < ${local_tmp})
+        if [ ${ndiff} -eq 0 ]; then
+            rc=0
+        else
+            rc=1
         fi
-        /bin/rm -rf rsync_errors
-        echo error
-    fi
 
-    if [ $(wc -l < ${files_list}) -eq 0 ]; then
-        rc=yes
-    else
-        rc=no
+        cat ${local_tmp}
     fi
+    /bin/rm -f ${local_tmp}
 
-    /bin/rm -rf rsync_errors
-    echo ${rc}
+    return ${rc}
 }
 
-function remove_if_transfered_and_aged() {
+function aged_enough() {
     local directory="${1}"
-    local tag="${2}"
-    local time_stamp hours_from_creation status_file transfered=false
-    local aging_hours=36
+    local time_stamp hours_from_ready
 
     status_file=${directory}/.status
     if [ ! -r ${status_file} ]; then
@@ -489,81 +481,45 @@ function remove_if_transfered_and_aged() {
         return
     fi
 
-    if grep -wq transfered ${status_file}; then
-        transfered=true
-    fi
     time_stamp=$(grep -w "ready-for-transfer" ${status_file} | tail -1 | cut -d' ' -f1)
-    hours_from_creation=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
+    hours_from_ready=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
 
-    if ${transfered} && [ ${hours_from_creation} -ge ${aging_hours} ]; then
-        message_success "${tag} ${hours_from_creation} hours have passed since transfer (more than ${aging_hours}), removing \"${directory}\" ..."
-        /bin/rm -rf ${directory}
+    if [ ${hours_from_ready} -ge ${old_age_hours} ]; then
+        return 0
+    else
+        return 1
     fi
 }
 
-#pids=( $(ps -alf | grep "bash.*${PROG}" | grep -vw grep | grep -vw ${$} | awk '{print $4}') )
-#if [ ${#pids[*]} -ne 0 ]; then
-#    message_failure "There already is/are running ${PROG} process(es) (pid(s): ${pids[*]}), only one allowed!"
-#    exit 1
-#fi
-
-candidates_for_removal=()
-
-if [ "${#candidates_for_backup[@]}" -eq 0 ]; then     # no candidates_for_backup were selected with --source
-    if ${backup_all}; then
-        message_info "Detecting sources ..."
-        proc_directories=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | grep -v '_re/' | sort ) )
-        for source in ${proc_directories[*]}; do
-            stat_file=${source}/.status
-
-            if [ -r ${stat_file} ] && grep -qw ready-for-transfer ${stat_file}; then
-                if grep -qw transfered ${stat_file}; then
-                    candidates_for_removal+=( ${source} )
-                else
-                    candidates_for_backup+=( ${source} )
-                fi
-            fi
-        done
-        message_info "Detected ${#candidates_for_backup[*]} ready but not transfered sources"
-    fi
-fi
-
-if ${remove} && [ ${#candidates_for_removal[*]} -ne 0 ]; then
-    message_info "Considering ${#candidates_for_removal[*]} candidates for removal ..."
-
-    for candidate in ${candidates_for_removal[*]}; do
-        if [ $(already_backed_up ${candidate}) = yes ]; then
-            remove_if_transfered_and_aged ${candidate}
-        fi
-    done
-fi
-
-# Neither manually specified nor automatically found candidates_for_backup
-if [ "${#candidates_for_backup[@]}" -eq 0 ]; then
-    message_info "Nothing to backup, bye!"
-    exit 0
-fi
-
-if ${list_sources}; then
-    for source in ${candidates_for_backup[*]}; do
-        message_info "${source}"
-    done
-    exit 0
-fi
 
 function is_being_backed_up() {
     pgrep -f "^rsync .*${1}.*"
 }
 
+#
+# Checks if a full path is a LAST visit
+#
+function is_LAST_visit() {
+    local path="${1}"
 
-function backup_one_source() {
+    if [[ ${path} == /last*/archive/* ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+#
+# The actual backup engine, handles one backup candidate
+#
+function backup_one_candidate() {
     local data_dir=${1}
-    local job_tag="[${job_id}/${#candidates_for_backup[@]}]"
+    local job_tag="${2}"
     local backup_target_dir_full_path visit
-    local backedup
+    local local_tmp=$(mktemp)
 
 
-    if [[ "${data_dir}"  == */archive/* ]]; then
+    if is_LAST_visit "${data_dir}"; then
         visit="${data_dir#*/archive/}"
         local backup_process=$(is_being_backed_up "${data_dir}")
 
@@ -576,34 +532,19 @@ function backup_one_source() {
         backup_target_dir_full_path=${backup_target}
     fi
 
-    echo ''
+    message_empty
     message_info "${job_tag} Source: \"${data_dir}\""
     message_info "${job_tag} Target: \"${backup_target_dir_full_path}\""
 
     message_info "${job_tag} Gathering list of files ..."
+    get_unsynced_files ${data_dir} > ${local_tmp}
 
-    #
-    # TODO: the source and destination MUST be of the same type, either FILE or DIRECTORY.
-    #  If the destination exists but is not of the same type, MAYBE remove it first ?!?
-    #
-    backedup=$(already_backed_up "${data_dir}")
-    if [ ${backedup} = error ]; then
-        message_failure "${job_tag} Failed getting files list from ${backup_target_dir_full_path}"
-        return
-    fi
-
-    if [ ${backedup} = yes ]; then
-        message_success "${job_tag} The source and target directories are synchronized"
-        stamp_as_transfered "${data_dir}" "${backup_target_dir_full_path}" "${job_tag}" "${job_tag}"
-
-        return
-    fi
-
-    message_info "${job_tag} Splitting workload among ${nproc} processes ..."
-    nlines=$( awk -v lines=$(wc -l < ${files_list}) -v nprocs=${nprocs} 'BEGIN {print int(lines/nprocs) + 1}' )
-    split --lines=${nlines} < ${files_list}
-    cp ${files_list} ${info_dir}/${files_list}
-    chunks=( x?? )
+    message_info "${job_tag} Splitting workload ($(wc -l < ${local_tmp}) files) among ${nproc} process(es) ..."
+    local nlines=$( awk -v lines=$(wc -l < ${local_tmp}) -v nprocs=${nprocs} 'BEGIN {print int(lines/nprocs) + 1}' )
+    split --lines=${nlines} < ${local_tmp}
+    cp ${local_tmp} ${info_dir}/files_list
+    local chunks=( x?? )
+    /bin/rm -f ${local_tmp}
 
     sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_target_dir_full_path#*:}
 
@@ -611,12 +552,13 @@ function backup_one_source() {
     for ((i = 0; i < ${#chunks[*]}; i++)); do
         (
             message_info "${job_tag} Synchronizing chunk #$((i+1)) (of ${#chunks[*]}) ..."
-            chunk_info_prefix="${info_dir}/chunk#$((i + 1))"
-            stat_file=${chunk_info_prefix}.status
+            local chunk_info_prefix="${info_dir}/chunk#$((i + 1))"
+            local stat_file=${chunk_info_prefix}.status
+
             echo "sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${data_dir}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}" > "${chunk_info_prefix}.cmd"
             cp ${chunks[${i}]} "${chunk_info_prefix}.files"
             (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${data_dir}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}
-            status=${?}
+            local status=${?}
             echo "exit status: ${status}" >> ${stat_file}
 
             if [ "${status}" ] && [ ${status} -eq 0 ]; then
@@ -629,45 +571,188 @@ function backup_one_source() {
                 if [ "${status}" != 20 ]; then
                     message_failure "${job_tag} Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
                 fi
-                echo ${i} >> ${tmp}/.failures
+                echo ${i} >> ${global_tmp}/.failures
             fi
         ) &
     done
 
     wait
 
-    if [ ! -e ${tmp}/.failures ]; then
+    if [ ! -e ${global_tmp}/.failures ]; then
         # the backup succeeded
         stamp_as_transfered "${data_dir}" "${backup_target_dir_full_path}" "${job_tag}"
-
-        if ${remove} && ${force}; then
-            message_success "${job_tag} Removing \"${data_dir}\" ..."
-            remove_if_transfered_and_aged ${source} "${job_tag}"
-        fi
     fi
 }
 
-running_jobs=0
-job_id=0
-for candidate_for_backup in "${candidates_for_backup[@]}"; do
-    visit=${candidate_for_backup#*/archive/}
+#
+# Main
+#
+if [ "${#candidates[@]}" -eq 0 ]; then     # no candidates were selected with --source
+    if (( verbosity_level > 0 )); then message_info "Detecting candidates ..."; fi
 
-    if ! grep -qw ready-for-transfer ${candidate_for_backup}/.status || grep -wq transfered ${candidate_for_backup}/.status; then
+    candidates=( $( find /$(hostname -s)/data[12]/archive -type d -path '*/proc/*' | grep -v '_re/' | sort ) )
+fi
+
+candidates_for_backup=()
+candidates_for_removal=()
+missing_ready_stamp=()
+missing_status_file=()
+still_young=()
+candidates_for_retry=()
+declare -A hours_from_ready=()
+
+#
+# The preamble.
+# Gather information about the candidates (either specified by the user or found on the filesystems)
+#
+for candidate in ${candidates[*]}; do
+    stat_file=${candidate}/.status
+    time_stamp=
+    hours=
+
+    if [ ! -r ${stat_file} ]; then
+        missing_status_file+=( ${candidate} )
         continue
     fi
 
-    if visit_is_beeing_backed_up ${visit}; then
-        message_info "Vist ${visit} is already being backed up, skipping."
+    time_stamp=$(grep -w "ready-for-transfer" ${stat_file} | tail -1 | cut -d' ' -f1)
+    if [ ! "${time_stamp}" ]; then
+        missing_ready_stamp+=( ${candidate} )
+        continue
+    fi
+
+    if grep -qw transfered ${stat_file}; then
+
+        hours=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
+
+        hours_from_ready[${candidate}]=${hours}
+        if (( hours >= old_age_hours )); then
+            candidates_for_removal+=( ${candidate} )
+        else
+            still_young+=( ${candidate} )
+        fi
+
     else
-        backup_one_source "${candidate_for_backup}" &
-        (( running_jobs++ ))
+        candidates_for_backup+=( ${candidate} )
+    fi
+
+done
+
+#
+# The status part
+#
+if ${status_flag}; then
+    message_info "Found ${#candidates[*]} candidates"
+
+    message_empty
+    message_info "Found $(printf "%4d" ${#missing_status_file[*]}) candidates with no .status file"
+    if (( verbosity_level > 0 )); then
+        for candidate in ${missing_status_file[*]}; do
+            message_info "  ${candidate}"
+        done
+    fi
+
+    if (( verbosity_level > 0 )); then message_empty; fi
+    message_info "Found $(printf "%4d" ${#missing_ready_stamp[*]}) candidates with no ready-for-transfer stamp"
+    if (( verbosity_level > 0 )); then
+        for candidate in ${missing_ready_stamp[*]}; do
+            message_info "  ${candidate}"
+        done
+    fi
+
+    if (( verbosity_level > 0 )); then message_empty; fi
+    message_info "Found $(printf "%4d" ${#candidates_for_backup[*]}) candidates for backup"
+    if (( verbosity_level > 0 )); then
+        for candidate in ${candidates_for_backup[*]}; do
+            message_info "  ${candidate}"
+        done
+    fi
+
+    if (( verbosity_level > 0 )); then message_empty; fi
+    message_info "Found $(printf "%4d" ${#candidates_for_removal[*]}) candidates old enough for removal (ready-for-transfer for more than ${old_age_hours} hours)"
+    if (( verbosity_level > 0 )); then
+        for candidate in ${candidates_for_removal[*]}; do
+            message_info "  ${candidate}: $(printf "%4d" ${hours_from_ready[${candidate}]}) hours"
+        done
+    fi
+
+    if (( verbosity_level > 0 )); then message_empty; fi
+    message_info "Found $(printf "%4d" ${#still_young[*]}) candidates too young for removal (ready-for-transfer for less than ${old_age_hours} hours)"
+    if (( verbosity_level > 0 )); then
+        for candidate in ${still_young[*]}; do
+            message_info "  ${candidate}: $(printf "%4d" ${hours_from_ready[${candidate}]}) hours"
+        done
+    fi
+
+    if ${running_flag}; then
+        show_running_processes
+    fi
+
+    exit 0
+fi
+
+if ${running_flag} && ! ${status_flag}; then
+    show_running_processes
+    exit 0
+fi
+
+
+#
+# The removal part
+# Remove local directories only if they are the same as the backup
+#
+if ${remove_flag} && [ ${#candidates_for_removal[*]} -ne 0 ]; then
+    message_info "Considering ${#candidates_for_removal[*]} candidates for removal ..."
+
+    for candidate in ${candidates_for_removal[*]}; do
+        diffs=$(mktemp)
+        if same_as_on_backup ${candidate} >${diffs}; then
+            /bin/rm -rf ${candidate}
+            message_success "  ${candidate} - removed"
+        else
+            message_error "  ${candidate} - differs from backup ($(wc -l < ${diffs}) diffs), will retry"
+            candidates_for_retry+=( ${candidate} )  # give it another chance
+        fi
+        /bin/rm ${diffs}
+    done
+fi
+
+#
+# The backup part
+# Backup candidates that are ready-for-transfer but:
+#  - are not marked-as-transfered 
+#  - are marked-as-transfered but not really backed up (either backup error or different from the backup)
+#
+
+total_candidates_for_backup=( ${candidates_for_backup[*]} ${candidates_for_retry[*]} )
+if [ ${#total_candidates_for_backup[*]} -ne 0 ]; then
+    if (( verbosity_level > 0 )); then
+        message_info "Considering ${#total_candidates_for_backup[*]} candidates for backup (or retry)"
+    fi
+
+    running_jobs=0
+    job_id=0
+    for candidate in ${total_candidates_for_backup[*]}; do
         (( job_id++ ))
 
-        if ((running_jobs >= jobs)); then
+        backup_process=$(is_being_backed_up ${candidate})
+        if [ "${backup_process}" ]; then
+            message_success "${candidate}: is currently being backed up by process ${backup_process}, skipped"
+            continue
+        fi
+
+        backup_one_candidate ${candidate} "[${job_id}/${#total_candidates_for_backup[*]}]" &
+        (( running_jobs++ ))
+
+        if ((running_jobs >= max_jobs)); then
             wait -n
             ((running_jobs--))
         fi
+    done
+else
+    if (( verbosity_level > 0 )); then
+        message_ok "No candidates for backup"
     fi
-done
+fi
 
 cleanup
