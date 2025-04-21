@@ -617,6 +617,15 @@ for candidate in ${candidates[*]}; do
     time_stamp=
     hours=
 
+    if ! is_LAST_visit ${candidate}; then
+        candidates_for_backup+=( ${candidate} )
+        continue
+    fi
+
+
+    #
+    # .status files exist only in LAST visits
+    #
     if [ ! -r ${stat_file} ]; then
         missing_status_file+=( ${candidate} )
         continue
