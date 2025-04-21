@@ -90,10 +90,11 @@ util_log_invokation ${*}
 identity=
 default_nproc=1
 default_njobs=1
+default_age_hours=36
 basic_exclusion_pattern="--exclude '*/raw'"
 extended_exclusion_pattern="--exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
 rsync_extra_args="${basic_exclusion_pattern} ${extended_exclusion_pattern}"
-old_age_hours=36
+old_age_hours=${default_age_hours}
 
 
 function usage() {
@@ -131,10 +132,11 @@ function usage() {
      -j|--jobs N      - Run upto N jobs (default: ${default_njobs}) in parallel
      -p|--processes   - Specifies the number of processes to use per job (default: ${default_nproc})
      -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
+     -a|--age         - Specifies an aging period for visits (default: ${default_age_hours})
 
      -r|--remove      - Remove source directory if it has been:
                         - successfully transfered
-                        - ready-for-transfer for more than ${old_age_hours} hours
+                        - ready-for-transfer for more than ${default_age_hours} hours
 
     Status:
      -S|--status      - Show current status
@@ -148,7 +150,7 @@ EOF
 }
 
 getopt_err=$(mktemp)
-OPTS=$( getopt -o 'Ss:f:t:hi:p:xrj:FkvcR' --long "running,check,kill,status,jobs,help,extra:,processes:,identity:,source:,from:,to:,target:,remove,full,verbose" -n "${PROG}" -- "$@" 2> ${getopt_err} )
+OPTS=$( getopt -o 'aSs:f:t:hi:p:xrj:FkvcR' --long "age,running,check,kill,status,jobs,help,extra:,processes:,identity:,source:,from:,to:,target:,remove,full,verbose" -n "${PROG}" -- "$@" 2> ${getopt_err} )
 if [ $? -ne 0 ]; then
     if [ -r ${getopt_err} ]; then
         message_failure "$(< ${getopt_err})"
@@ -242,6 +244,11 @@ running_flag=false
 
 while true; do
     case "${1}" in
+
+    -a|--age)
+        old_age_hours="${1}"
+        shift 1
+        ;;
 
     -R|--running)
         running_flag=true
