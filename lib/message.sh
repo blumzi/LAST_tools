@@ -112,3 +112,9 @@ function message_error {
     fi
 }
 
+# an empty line
+function message_empty() {
+    if ! ${LAST_TOOL_QUIET}; then
+        echo ''
+    fi
+}
