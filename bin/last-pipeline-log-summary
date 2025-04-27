@@ -1,0 +1,125 @@
+#!/bin/bash
+
+summarize_logs() {
+    # Optional parameters:
+    # $1 = mode ('l' for list, 's' for summary), default is 'l'
+    # $2 = specific file or date to analyze (optional)
+    # $3 = node number (default is 01)
+
+    MODE="l"
+    NODE_NUM="01"
+    INPUT_FILE=""
+
+    if [ "$1" == "--help" ]; then
+        echo "Usage: $0 [mode] [log_file_or_date] [node_number]"
+        echo "  mode: 'l' for list (default), 's' for summary only"
+        echo "  log_file_or_date: Log file path or 8-digit date to find matching logs"
+        echo "  node_number: Node number used in directory path (default: 01)"
+        return 0
+    fi
+
+    if [ ! -z "$1" ]; then
+        MODE="$1"
+    fi
+
+    if [ ! -z "$2" ]; then
+        INPUT_FILE="$2"
+    fi
+
+    if [ ! -z "$3" ]; then
+        NODE_NUM="$3"
+    fi
+
+    # Get short hostname (e.g., last04e)
+    HOSTNAME=$(hostname | cut -d. -f1)
+
+    # Extract mount number and side (e or w)
+    if [[ "$HOSTNAME" =~ ^last([0-9]{2})([ew])$ ]]; then
+        MOUNT_NUM=${BASH_REMATCH[1]}
+        SIDE=${BASH_REMATCH[2]}
+    else
+        return 1
+    fi
+
+    # Determine telescope numbers based on side
+    if [ "$SIDE" == "e" ]; then
+        TEL1=01
+        TEL2=02
+    else
+        TEL1=03
+        TEL2=04
+    fi
+
+    # Build log directories
+    BASE="/last${MOUNT_NUM}${SIDE}"
+    LOG_DIR1="$BASE/data1/archive/LAST.${NODE_NUM}.${MOUNT_NUM}.${TEL1}/log"
+    LOG_DIR2="$BASE/data2/archive/LAST.${NODE_NUM}.${MOUNT_NUM}.${TEL2}/log"
+
+    LOG_FILES=()
+
+    # If input is an 8-digit date, try to match log files containing that date
+    if [[ "$INPUT_FILE" =~ ^[0-9]{8}$ ]]; then
+        DATEPATTERN="$INPUT_FILE"
+        for LOG_DIR in "$LOG_DIR1" "$LOG_DIR2"; do
+            if [ -d "$LOG_DIR" ]; then
+                MATCHED=$(ls "$LOG_DIR"/LAST.*_${DATEPATTERN}*.log 2>/dev/null | head -n 1)
+                [ -n "$MATCHED" ] && LOG_FILES+=("$MATCHED")
+            fi
+        done
+    elif [ -n "$INPUT_FILE" ]; then
+        if [ ! -f "$INPUT_FILE" ]; then
+            echo "Error: File '$INPUT_FILE' does not exist."
+            return 1
+        fi
+        LOG_FILES=("$INPUT_FILE")
+    else
+        # Default to the latest log files
+        if [ -d "$LOG_DIR1" ]; then
+            LATEST1=$(ls -t "$LOG_DIR1"/*.log 2>/dev/null | head -n 1)
+            [ -n "$LATEST1" ] && LOG_FILES+=("$LATEST1")
+        fi
+        if [ -d "$LOG_DIR2" ]; then
+            LATEST2=$(ls -t "$LOG_DIR2"/*.log 2>/dev/null | head -n 1)
+            [ -n "$LATEST2" ] && LOG_FILES+=("$LATEST2")
+        fi
+    fi
+
+    if [ "$MODE" == "s" ]; then
+        declare -A TOTAL_COUNTS
+        declare -A FAILED_COUNTS
+
+        while read -r LINE; do
+            if [[ "$LINE" =~ summary\ line\ -\ (Sucess|Failed).*\/(LAST\.[0-9]{2}\.[0-9]{2}\.[0-9]{2})_ ]]; then
+                STATUS=${BASH_REMATCH[1]}
+                TELE=${BASH_REMATCH[2]}
+                ((TOTAL_COUNTS[$TELE]++))
+                if [ "$STATUS" == "Failed" ]; then
+                    ((FAILED_COUNTS[$TELE]++))
+                fi
+            fi
+        done < <(grep -E "summary line - Failed|summary line - Sucess" "${LOG_FILES[@]}" 2>/dev/null)
+
+        for TELE in "${!TOTAL_COUNTS[@]}"; do
+            FAILED=${FAILED_COUNTS[$TELE]:-0}
+            echo "$TELE, ${TOTAL_COUNTS[$TELE]}, $FAILED"
+        done
+        return 0
+    fi
+
+    # List mode: Parse relevant log lines and extract summary information
+    for FILE in "${LOG_FILES[@]}"; do
+        grep -E "summary line - Failed|summary line - Sucess" "$FILE" | while read -r LINE; do
+            if [[ "$LINE" =~ summary\ line\ -\ (Sucess|Failed).*\/(LAST\.[0-9]{2}\.[0-9]{2}\.[0-9]{2})_([0-9]{8}\.[0-9]{6}\.[0-9]{3})_[^_]+_([^_]+) ]]; then
+                STATUS=${BASH_REMATCH[1]}
+                TELE=${BASH_REMATCH[2]}
+                DATE=${BASH_REMATCH[3]}
+                FIELD=${BASH_REMATCH[4]}
+                [ "$STATUS" == "Sucess" ] && CODE=1 || CODE=0
+                echo "$CODE,$TELE,$DATE,$FIELD"
+            fi
+        done
+    done
+}
+
+summarize_logs "$@"
+
