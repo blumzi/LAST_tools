@@ -41,10 +41,12 @@ function stamp_as_transfered() {
 
     file_type=$( sudo -u ${user_name} ssh "${ssh_flags[@]}" ${backup_user}@${backup_host} "stat -c %F ${dst_dir#*:} 2>/dev/null" )
     if [ "${file_type}" = directory ]; then
-        message_info "${job_tag} Copying .info and .status to ${dst_dir} ..."
-        sudo -u ocs rsync -a ${info_dir}/ ${stat_file} ${backup_target_dir_full_path} 2>/dev/null
-        #sudo -u ${user_name} scp -r "${ssh_flags[@]}" ${info_dir} ${dst_dir}
-        #sudo -u ${user_name} scp "${ssh_flags[@]}" ${stat_file} ${dst_dir}
+        message_info "${job_tag} Copying .status to ${dst_dir} ..."
+        sudo -u ocs rsync -a ${stat_file} ${backup_target_dir_full_path} 2>/dev/null
+        if [ -d .info ]; then
+            message_info "${job_tag} Copying .info to ${dst_dir} ..."
+            sudo -u ocs rsync -a .info/ ${backup_target_dir_full_path} 2>/dev/null
+        fi
     elif [ "${file_type}" = "regular file" ]; then
         message_failure "${job_tag} Not copying .status and .info to ${dst_dir}, ${dst_dir} IS A REGULAR FILE"
     elif [ ! "${file_type}" ]; then
@@ -53,26 +55,16 @@ function stamp_as_transfered() {
 }
 
 function cleanup() {
-    local failures=( $(if [ -s ${global_tmp}/.failures ]; then cat ${global_tmp}/.failures 2>/dev/null; fi) )
     local running_processes=( $(jobs -pr) )
 
-    if [ ${#running_processes[*]} -eq 0 ]; then
-        if (( ${#failures[*]} == 0 )); then
-            # message_success "All chunks have been synchronized"
-            :
-        else
-            failures=( $(list_sort "${failures[@]}" ) )
-            message_fatal "Chunks ${failures[*]} have failed to synchronize!"
-        fi
-    else
+    if [ ${#running_processes[*]} -gt 0 ]; then
         message_info "Killing running process(es): ${running_processes[*]}"
         2>/dev/null kill -9 ${running_processes[*]} 
     fi
-    /bin/rm -rf ${global_tmp}
     exit 0
 }
 
-trap cleanup SIGHUP SIGINT
+trap cleanup SIGHUP SIGINT SIGTERM
 
 
 PROG=$(basename ${0})
@@ -88,13 +80,14 @@ util_log_invokation ${*}
 
 # defaults
 identity=
-default_nproc=1
+default_nprocs=3
 default_njobs=1
-default_age_hours=36
 basic_exclusion_pattern="--exclude '*/raw'"
 extended_exclusion_pattern="--exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
 rsync_extra_args="${basic_exclusion_pattern} ${extended_exclusion_pattern}"
-old_age_hours=${default_age_hours}
+
+default_old_age_hours=36
+old_age_hours=${default_old_age_hours}
 
 
 function usage() {
@@ -130,13 +123,13 @@ function usage() {
 
     Resources:
      -j|--jobs N      - Run upto N jobs (default: ${default_njobs}) in parallel
-     -p|--processes   - Specifies the number of processes to use per job (default: ${default_nproc})
+     -p|--processes   - Specifies the number of processes to use per job (default: ${default_nprocs})
      -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
-     -a|--age         - Specifies an aging period for visits (default: ${default_age_hours})
 
+     -a|--age         - Specify old age (in hours) (default: ${default_old_age_hours})
      -r|--remove      - Remove source directory if it has been:
                         - successfully transfered
-                        - ready-for-transfer for more than ${default_age_hours} hours
+                        - ready-for-transfer for more than ${old_age_hours} hours
 
     Status:
      -S|--status      - Show current status
@@ -150,7 +143,7 @@ EOF
 }
 
 getopt_err=$(mktemp)
-OPTS=$( getopt -o 'aSs:f:t:hi:p:xrj:FkvcR' --long "age,running,check,kill,status,jobs,help,extra:,processes:,identity:,source:,from:,to:,target:,remove,full,verbose" -n "${PROG}" -- "$@" 2> ${getopt_err} )
+OPTS=$( getopt -o 'Ss:f:t:hi:p:xrj:FkvcRa' --long "age:,running,check,kill,status,jobs,help,extra:,processes:,identity:,source:,from:,to:,target:,remove,full,verbose" -n "${PROG}" -- "$@" 2> ${getopt_err} )
 if [ $? -ne 0 ]; then
     if [ -r ${getopt_err} ]; then
         message_failure "$(< ${getopt_err})"
@@ -246,8 +239,8 @@ while true; do
     case "${1}" in
 
     -a|--age)
-        old_age_hours="${1}"
-        shift 1
+        old_age_hours=${2}
+        shift 2
         ;;
 
     -R|--running)
@@ -394,14 +387,8 @@ if ${kill_flag}; then
 fi
 
 if [ ! "${nprocs}" ]; then
-    nprocs=${default_nproc}
+    nprocs=${default_nprocs}
 fi
-
-global_tmp=$(mktemp -d)
-chmod 755 ${global_tmp}
-cd ${global_tmp}
-info_dir=${global_tmp}/.info-$(date +%Y-%m-%d_%H-%M-%S)
-mkdir -p ${info_dir}
 
 #
 # Makes an rsync dry-run and gets the list of differing files
@@ -458,44 +445,73 @@ function get_unsynced_files() {
 #  0 - no unsynced files
 #  1 - there are unsynced files (on stdout)
 #
-function same_as_on_backup() {
+function was_successfully_tranfered() {
     local data_dir="${1}"
-    local rc ndiff
-    local local_tmp=$(mktemp)
+    local rc ndiffs
+    local diffs=$(mktemp)
 
-    if get_unsynced_files ${data_dir} > ${local_tmp}; then
-        ndiff=$(wc -l < ${local_tmp})
-        if [ ${ndiff} -eq 0 ]; then
-            rc=0
-        else
-            rc=1
-        fi
+    if get_unsynced_files ${data_dir} > ${diffs}; then
+        ndiffs=$(wc -l < ${diffs})
+        local remote_status=$(mktemp)
 
-        cat ${local_tmp}
+        case ${ndiffs} in
+            0)
+                rc=0
+                ;;
+            1)
+                if [ "$(< ${diffs})" = ".status" ] && grep -qw transfered ${data_dir}/.status; then
+                    rc=0
+                else
+                    rc=1
+                fi
+
+#                if [ "$(< ${diffs})" = ".status" ]; then
+#                    local remote_dir=${backup_target}
+#
+#                    if is_LAST_visit ${data_dir}; then
+#                        remote_dir+=/${local_dir#*/archive/}
+#                    fi
+#
+#                    #
+#                    # if the remote .status file starts with the contents of the local .status file, they are considered the same
+#                    #
+#                    local nbytes=$(wc -c < ${data_dir}/.status)
+#
+#                    ssh ${backup_user}@${backup_host} cat ${remote_dir#*:}/.status > ${remote_status}
+#                    (
+#                        echo === local .status =================================
+#                        cat ${data_dir}/.status
+#                        echo === remote .status =================================
+#                        cat ${remote_status}
+#                        echo ======================================================================
+#                    ) >&2 
+#                    if cmp --silent <(head -c ${nbytes} ${remote_status}) ${data_dir}/.status; then
+#                        echo === same .status === >&2
+#                        rc=0
+#                    else
+#                        echo === not same .status ============================= >&2 
+#                        rc=1
+#                    fi
+#                else
+#                    (
+#                        echo === one diff, not .status ============================================
+#                        cat ${diffs}
+#                        echo ======================================================================
+#                    ) >&2 
+#                    rc=1
+#                fi
+                ;;
+            *)
+                rc=1
+                ;;
+        esac
+        /bin/rm -f ${remote_status}
+
+        cat ${diffs}
     fi
-    /bin/rm -f ${local_tmp}
+    /bin/rm -f ${diffs}
 
     return ${rc}
-}
-
-function aged_enough() {
-    local directory="${1}"
-    local time_stamp hours_from_ready
-
-    status_file=${directory}/.status
-    if [ ! -r ${status_file} ]; then
-        message_warning "Missing ${status_file}"
-        return
-    fi
-
-    time_stamp=$(grep -w "ready-for-transfer" ${status_file} | tail -1 | cut -d' ' -f1)
-    hours_from_ready=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
-
-    if [ ${hours_from_ready} -ge ${old_age_hours} ]; then
-        return 0
-    else
-        return 1
-    fi
 }
 
 
@@ -523,7 +539,7 @@ function backup_one_candidate() {
     local data_dir=${1}
     local job_tag="${2}"
     local backup_target_dir_full_path visit
-    local local_tmp=$(mktemp)
+    local diffs=$(mktemp)
 
 
     if is_LAST_visit "${data_dir}"; then
@@ -543,17 +559,41 @@ function backup_one_candidate() {
     message_info "${job_tag} Source: \"${data_dir}\""
     message_info "${job_tag} Target: \"${backup_target_dir_full_path}\""
 
-    message_info "${job_tag} Gathering list of files ..."
-    get_unsynced_files ${data_dir} > ${local_tmp}
-
-    message_info "${job_tag} Splitting workload ($(wc -l < ${local_tmp}) files) among ${nproc} process(es) ..."
-    local nlines=$( awk -v lines=$(wc -l < ${local_tmp}) -v nprocs=${nprocs} 'BEGIN {print int(lines/nprocs) + 1}' )
-    split --lines=${nlines} < ${local_tmp}
-    cp ${local_tmp} ${info_dir}/files_list
-    local chunks=( x?? )
-    /bin/rm -f ${local_tmp}
-
     sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_target_dir_full_path#*:}
+
+    if was_successfully_tranfered ${data_dir} > ${diffs}; then
+        message_success "${job_tag} Was already transfered, skipping it"
+        /bin/rm -f ${diffs}
+        return
+    fi
+
+
+    local ndiffs=$(wc -l < ${diffs})
+
+    #
+    # If there are more than min_files_per_worker files per worker, split the workload
+    #
+    local min_files_per_worker=10
+    local nworkers=${nprocs}
+    local files_per_worker=$(( ( ndiffs / nworkers ) + 1 ))
+    if (( files_per_worker <= min_files_per_worker )); then
+        nworkers=1
+        files_per_worker=${ndiffs}
+    fi
+
+    local working_dir=$(mktemp -d)
+    local info_dir=${working_dir}/.info
+    mkdir -p ${info_dir}
+
+    pushd ${working_dir} >/dev/null 2>&1
+
+    message_info "${job_tag} Splitting workload (${ndiffs} files) among ${nworkers} process(es) ..."
+
+    split --lines=${files_per_worker} < ${diffs}
+    cp ${diffs} ${info_dir}/files_list
+    local chunks=( x?? )
+    local failed_chunks=${info_dir}/failed_chunks
+    /bin/rm -f ${diffs}
 
     local chunk_info_prefix
     for ((i = 0; i < ${#chunks[*]}; i++)); do
@@ -564,7 +604,7 @@ function backup_one_candidate() {
 
             echo "sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${data_dir}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}" > "${chunk_info_prefix}.cmd"
             cp ${chunks[${i}]} "${chunk_info_prefix}.files"
-            (sudo -u ocs rsync -aRz --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${data_dir}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}
+            (sudo -u ocs rsync -aRz -e 'ssh -T -c aes128-gcm@openssh.com -o Compression=no' --inplace --stats --times ${rsync_extra_args} --files-from=${chunks[${i}]} ${data_dir}/ ${backup_target_dir_full_path} 2>/dev/null ) > ${stat_file}
             local status=${?}
             echo "exit status: ${status}" >> ${stat_file}
 
@@ -578,17 +618,23 @@ function backup_one_candidate() {
                 if [ "${status}" != 20 ]; then
                     message_failure "${job_tag} Chunk #$((i+1)) (of ${#chunks[*]}) failed with status: ${status}"
                 fi
-                echo ${i} >> ${global_tmp}/.failures
+                echo ${i} >> ${failed_chunks}
             fi
         ) &
     done
 
     wait
 
-    if [ ! -e ${global_tmp}/.failures ]; then
+    if [ -e ${failed_chunks} ]; then
+        message_failure "${job_tag} $(wc -l < ${failed_chunks}) chunks (out of ${#chunks[*]}) failed"
+        /bin/rm -f ${failed_chunks}
+    else
         # the backup succeeded
         stamp_as_transfered "${data_dir}" "${backup_target_dir_full_path}" "${job_tag}"
     fi
+
+    popd >/dev/null 2>&1
+    /bin/rm -rf ${working_dir}
 }
 
 #
@@ -617,15 +663,6 @@ for candidate in ${candidates[*]}; do
     time_stamp=
     hours=
 
-    if ! is_LAST_visit ${candidate}; then
-        candidates_for_backup+=( ${candidate} )
-        continue
-    fi
-
-
-    #
-    # .status files exist only in LAST visits
-    #
     if [ ! -r ${stat_file} ]; then
         missing_status_file+=( ${candidate} )
         continue
@@ -637,11 +674,11 @@ for candidate in ${candidates[*]}; do
         continue
     fi
 
+    hours_from_ready[${candidate}]=${hours}
+    hours=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
+
     if grep -qw transfered ${stat_file}; then
 
-        hours=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
-
-        hours_from_ready[${candidate}]=${hours}
         if (( hours >= old_age_hours )); then
             candidates_for_removal+=( ${candidate} )
         else
@@ -722,7 +759,7 @@ if ${remove_flag} && [ ${#candidates_for_removal[*]} -ne 0 ]; then
 
     for candidate in ${candidates_for_removal[*]}; do
         diffs=$(mktemp)
-        if same_as_on_backup ${candidate} >${diffs}; then
+        if was_successfully_tranfered ${candidate} >${diffs}; then
             /bin/rm -rf ${candidate}
             message_success "  ${candidate} - removed"
         else
