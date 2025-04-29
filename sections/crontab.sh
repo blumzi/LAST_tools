@@ -10,11 +10,11 @@ function crontab_enforce() {
     
     {
         if macmap_this_is_last0; then
-            echo "0  7 * * * /usr/local/share/last-tool/bin/last-pipeline-digest"
+            echo "0  5 * * * /usr/local/share/last-tool/bin/last-pipeline-digest"
         fi
-        echo "0  8 * * * /usr/local/share/last-tool/bin/last-backup --remove"
-        echo "0 12 * * * /usr/local/share/last-tool/bin/last-compress-raw-images"
-        echo "30 14 * * * /usr/local/share/last-tool/bin/last-prune-individual-images"
+        echo "# 0  6 * * * /usr/local/share/last-tool/bin/last-backup --remove"
+        echo "0 10 * * * /usr/local/share/last-tool/bin/last-compress-raw-images"
+        echo "30 12 * * * /usr/local/share/last-tool/bin/last-prune-individual-images"
     } | crontab -u ${user_name} -
     message_success "crontab: Updated crontab for user \"${user_name}\""
 }
