@@ -7,7 +7,8 @@ module_include lib/message
 #
 # We currently use last@marvin/BIGDATA/last/data/temp as the default target
 #
-export backup_default_target="last@marvin.weizmann.ac.il:/BIGDATA/last/data/temp"
+# export backup_default_target="last@marvin.weizmann.ac.il:/BIGDATA/last/data/temp"
+export backup_default_target="euclid@euclid.weizmann.ac.il:/bigdata/projects/last/data"
 export backup_user=
 export backup_host=
 export backup_topdir=
