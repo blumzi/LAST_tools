@@ -4,18 +4,13 @@ PROG=$(basename ${0})
 source /etc/profile.d/last.sh
 
 module_include lib/const
+module_include lib/backup
 
 PROG=$(basename "${0}")
 hostname="$(hostname -s)"
 tops="/${hostname}/data[12]"
 
-# sync_user="last"
-# sync_host="marvin"
-# sync_top="/BIGDATA/last/data/temp"
-
-sync_user="euclid"
-sync_host="euclid"
-sync_top="/bigdata/projects/last/data"
+backup_set_target ${backup_default_target}
 
 function usage() {
     cat <<- EOF
@@ -31,27 +26,13 @@ function usage() {
         sources:      ${tops}
 
     Backup host:
-        host:         ${sync_host}
-        user:         ${sync_user}
-        destination:  ${sync_top} 
+        host:         ${backup_host}
+        user:         ${backup_user}
+        destination:  ${backup_topdir} 
 
 EOF
 }
 
-function initiate_transfer() {
-    local src="${1}"
-    local dst="${2}"
-    local rc
-
-    LAST_TOOL_QUIET=true last-backup --source=${src} --target=${sync_user}@${sync_host}:${sync_top}
-    rc=${?}
-
-    if [ ${rc} -eq 0 ]; then
-        echo "$(date --iso-8601=seconds) transfered" >> ${status_file}
-    fi
-
-    return ${rc}
-}
 
 if [ "${1}" = '-h' ] || [ "${1}" = "--help" ]; then
     usage
@@ -72,10 +53,7 @@ while read -r path; do
     fi
 
     if grep -qw ready-for-transfer "${status_file}" && ! grep -qw transfered "${status_file}"; then
-        initiate_transfer "${dir}" "${sync_user}@${sync_host}:${sync_top}/${dir}"
-        rc=${?}
+        LAST_TOOL_QUIET=true last-backup --source=${src} --target=${backup_user}@${backup_host}:${backup_topdir}/${src}
     fi
-
-    # last-cat2db "$(realpath ${status_file})"
 
 done < <(find ${tops} -type f -name .status 2>/dev/null | sort -t/ --key=6n --key=8n)
