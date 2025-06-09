@@ -60,6 +60,9 @@ D8:5E:D3:04:DC:0A	10.23.1.20	last10w	last20
 18:C0:4D:80:19:64	10.23.3.21	last11e	last21
 D8:5E:D3:03:DC:1A	10.23.3.22	last11w	last22
 18:C0:4D:82:1D:FF	10.23.3.24	last12w	last24
+#
+74:56:3C:BB:68:50   10.23.3.41  last21e last41
+74:56:3C:BB:68:E4   10.23.3.42  last21w last42
 
 # last0
 B4:2E:99:A8:6B:C6	10.23.1.25	last0
