@@ -8,5 +8,9 @@ ExecStart=/home/ocs/python/WAO_Safety/bin/last-safety-daemon start
 ExecStop=/home/ocs/python/WAO_Safety/bin/last-safety-daemon stop
 Restart=always
 
+[Unit]
+Requires=postgresql
+After=postgresql
+
 [Install]
 WantedBy=multi-user.target
