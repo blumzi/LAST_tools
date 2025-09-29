@@ -43,14 +43,17 @@ function hostname_enforce() {
 
         cat <<- EOF
 
-		# The following lines are desirable for IPv6 capable hosts
-		::1     ip6-localhost ip6-loopback
-		fe00::0 ip6-localnet
-		ff00::0 ip6-mcastprefix
-		ff02::1 ip6-allnodes
-		ff02::2 ip6-allrouters
-		
-		132.77.100.5 ntp.weizmann.ac.il
+# The following lines are desirable for IPv6 capable hosts
+::1             ip6-localhost ip6-loopback
+fe00::0         ip6-localnet
+ff00::0         ip6-mcastprefix
+ff02::1         ip6-allnodes
+ff02::2         ip6-allrouters
+
+# Pre-defined hosts
+132.77.100.5    ntp.weizmann.ac.il
+10.23.1.40      skycam
+10.23.2.222     rpi-ntp
 		
 EOF
 
