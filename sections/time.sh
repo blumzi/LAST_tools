@@ -2,8 +2,10 @@
 
 sections_register_section "time" "Manages the LAST project time syncronization" "network"
 
+module_include lib/list
+
 export time_config_file="/etc/systemd/timesyncd.conf"
-export -a time_servers=( ntp.weizmann.ac.il )
+export -a time_servers=( rpintp ntp.weizmann.ac.il )
 export time_servers_list
 time_servers_list="$(IFS=,; echo "${time_servers[*]}")"
 
@@ -30,15 +32,28 @@ function time_enforce() {
 }
 
 function time_check() {
-    local ret
-    
-    ret=0
+    local ret=0
+    local configured_servers=( $(grep '^NTP=' ${time_config_file} | sed -e 's;NTP=;;') )
+    local sorted_configured_servers sorted_time_servers
+    local err
 
-    if grep "^NTP=${time_servers[*]}" ${time_config_file} >/dev/null; then
-        message_success "NTP server(s) (${time_servers_list}) are properly configured in \"${time_config_file}\"."
-    else
-        message_failure "NTP server(s) (${time_servers_list}) are not well configured in \"${time_config_file}\"."
+    sorted_configured_servers=$( list_sort "${configured_servers[*]}" )
+    sorted_time_servers=$( list_sort "${time_servers[*]}" )
+
+    if [ ${#sorted_configured_servers[*]} -ne ${#sorted_time_servers[*]} ]; then
+        message_failure "Expected ${#{time_servers}} servers, configured ${#configured_servers[*]} servers"
         (( ret++ ))
+    fi
+
+    for (( i = 0; i < ${#sorted_time_servers[*]}; i++)); do
+        if [ "${sorted_time_servers[i]}" != "${sorted_configured_servers[i]}" ]; then
+            message_failure "Expected servers: \"${time_servers[*]}\", configured servers: \"${configured_servers[*]}\""
+        (( ret++ ))
+        fi
+    done
+
+    if (( ret == 0 )); then
+        message_success "Expected servers: \"${time_servers[*]}\", configured servers: \"${configured_servers[*]}\""
     fi
 
     if systemctl status ${time_service} >/dev/null; then
