@@ -53,7 +53,7 @@ ff02::2         ip6-allrouters
 # Pre-defined hosts
 132.77.100.5    ntp.weizmann.ac.il
 10.23.1.40      skycam
-10.23.2.222     rpi-ntp
+10.23.1.222     rpi-ntp
 		
 EOF
 
