@@ -5,7 +5,7 @@ sections_register_section "time" "Manages the LAST project time syncronization" 
 module_include lib/list
 
 export time_config_file="/etc/systemd/timesyncd.conf"
-export -a time_servers=( rpintp ntp.weizmann.ac.il )
+export -a time_servers=( rpi-ntp ntp.weizmann.ac.il )
 export time_servers_list
 time_servers_list="$(IFS=,; echo "${time_servers[*]}")"
 
@@ -85,7 +85,7 @@ function time_policy() {
 
     Time synchronization:
 
-        LAST uses an on-site NTP server (by SiTech Inc.) as primary server and the Weizmann Institute's
+        LAST uses an on-site NTP server "rpi-ntp" as primary server and the Weizmann Institute's
         ntp.weizmann.ac.il as the secondary.
 
         - The config file ${time_config_file} should reflect this in it's NTP= line
