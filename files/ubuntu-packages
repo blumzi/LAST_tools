@@ -49,3 +49,5 @@ colorized-logs
 libcfitsio-bin
 qfits-tools
 curl
+
+astropy-utils
