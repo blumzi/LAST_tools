@@ -21,24 +21,27 @@
 #
 
 # Name                                     URL                                                                 Checkout-Info            Token-name
-matlab/AstroPack                           https://github.com/EranOfek/AstroPack.git                           branch:dev1,tag:v2.1     Development
-matlab/LAST/LAST_iOptronCEM120             https://github.com/EastEriq/LAST_iOptronCEM120.git                  branch:mastrolindo       Development
+matlab/AstroPack                           https://github.com/EranOfek/AstroPack.git                           branch:dev1              Development
+#matlab/LAST/LAST_iOptronCEM120             https://github.com/EastEriq/LAST_iOptronCEM120.git                  branch:mastrolindo       Development
 matlab/LAST/LAST_tinycontrolIPpowerSocket  https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git       branch:master            Development
-matlab/LAST/LAST_ZWOASICamera              https://github.com/EastEriq/LAST_ZWOASICamera.git                   branch:mastrolindo       Development
-matlab/LAST/LAST_CelestronFocusMotor       https://github.com/EastEriq/LAST_CelestronFocusMotor.git            branch:mastrolindo       Development
+#matlab/LAST/LAST_ZWOASICamera              https://github.com/EastEriq/LAST_ZWOASICamera.git                   branch:mastrolindo       Development
+matlab/LAST/LAST_CelestronFocusMotor       https://github.com/EastEriq/LAST_CelestronFocusMotor.git            branch:protectedSerialQuery       Development
+matlab/LAST/LAST_PrimaluceSestoSenso       https://github.com/EastEriq/LAST_PrimaluceSestoSenso.git            branch:main              Cecco
 matlab/LAST/LAST_USBserial                 https://github.com/EastEriq/LAST_USBserial.git                      branch:master            Development
 matlab/LAST/LAST_QHYccd                    https://github.com/EastEriq/LAST_QHYccd.git                         branch:mastrolindo       Development
-matlab/LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    branch:mastrolindo       Development
-matlab/LAST/LAST_OCS                       https://github.com/PolishookDavid/LAST_OCS.git                      branch:mastrolindo       Development
-matlab/LAST/LAST_Messaging                 https://github.com/EastEriq/LAST_Messaging.git                      branch:main              Development
+matlab/LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    branch:eventCallbackQuery       Development
+matlab/LAST/LAST_OCS                       https://github.com/PolishookDavid/LAST_OCS.git                      branch:gledmagicwater    Development
+matlab/LAST/LAST_Messaging                 https://github.com/EastEriq/LAST_Messaging.git                      branch:gledmagicwater    Development
 matlab/LAST/LAST_EnvironmentArduinoSensors https://github.com/EastEriq/LAST_EnvironmentArduinoSensors.git      branch:master            Cecco
-matlab/LAST/LAST_MountArduinoSensors       https://github.com/EastEriq/LAST_MountArduinoSensors.git            branch:master            Cecco
-matlab/LAST/LAST_AtikCamera                https://github.com/EastEriq/LAST_AtikCamera.git                     branch:main              Cecco
+#matlab/LAST/LAST_MountArduinoSensors       https://github.com/EastEriq/LAST_MountArduinoSensors.git            branch:master            Cecco
+#matlab/LAST/LAST_AtikCamera                https://github.com/EastEriq/LAST_AtikCamera.git                     branch:main              Cecco
 matlab/LAST/LAST_config                    https://github.com/EranOfek/LAST_config.git                         branch:mastrolindo       Development
 matlab/LAST/LAST_Handle                    https://github.com/EastEriq/LAST_Handle.git                         branch:mastrolindo       Development
 matlab/LAST/LAST_EnclosureControl          https://github.com/EastEriq/LAST_EnclosureControl                   branch:main              Cecco
 matlab/LAST/LAST_tools                     https://github.com/blumzi/LAST_tools                                branch:main              Development
-matlab/LAST/LAST_WebApi                    https://github.com/blumzi/LAST_WebApi                               branch:webapi_transition Development
-matlab/LAST/LAST_Api                       https://github.com/blumzi/LAST_Api                                  branch:webapi_transition Development
-matlab/LAST/LAST_SerialDevice              https://github.com/blumzi/LAST_SerialDevice                         branch:main              Development
-python/LAST_next_generation                https://github.com/blumzi/LAST_next_generation                      branch:main              Development
+#matlab/LAST/LAST_WebApi                    https://github.com/blumzi/LAST_WebApi                               branch:webapi_transition Development
+#matlab/LAST/LAST_Api                       https://github.com/blumzi/LAST_Api                                  branch:master            Development
+#matlab/LAST/LAST_SerialDevice              https://github.com/blumzi/LAST_SerialDevice                         branch:main              Development
+matlab/LAST/MatlabRedis                    https://github.com/GummyJum/MatlabRedis.git                         branch:main              Development
+#python/LAST_next_generation                https://github.com/blumzi/LAST_next_generation                      branch:main              Development
+

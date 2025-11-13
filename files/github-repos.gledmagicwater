@@ -26,6 +26,7 @@ matlab/AstroPack                           https://github.com/EranOfek/AstroPack
 matlab/LAST/LAST_tinycontrolIPpowerSocket  https://github.com/EastEriq/LAST_tinycontrolIPpowerSocket.git       branch:master            Development
 #matlab/LAST/LAST_ZWOASICamera              https://github.com/EastEriq/LAST_ZWOASICamera.git                   branch:mastrolindo       Development
 matlab/LAST/LAST_CelestronFocusMotor       https://github.com/EastEriq/LAST_CelestronFocusMotor.git            branch:protectedSerialQuery       Development
+matlab/LAST/LAST_PrimaluceSestoSenso       https://github.com/EastEriq/LAST_PrimaluceSestoSenso.git            branch:main              Cecco
 matlab/LAST/LAST_USBserial                 https://github.com/EastEriq/LAST_USBserial.git                      branch:master            Development
 matlab/LAST/LAST_QHYccd                    https://github.com/EastEriq/LAST_QHYccd.git                         branch:mastrolindo       Development
 matlab/LAST/LAST_XerxesMount               https://github.com/EastEriq/LAST_XerxesMount.git                    branch:eventCallbackQuery       Development
