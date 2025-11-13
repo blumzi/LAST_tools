@@ -12,31 +12,44 @@ util_log_invokation ${*}
 
 function usage() {
     echo ""
-    echo "  Usage: ${PROG} [-t|--timeout seconds] [-u|--units|--units-only] [[-H|--host <host>] ...] -c|--cmd|--command command"
+    echo "  Usage: ${PROG} [-t|--timeout seconds] [-u|--units|--units-only] [-e|--east|--east-only] [-w|--west|--west-only] [[-H|--host <host>] ...] -c|--cmd|--command command"
     echo ""
     echo "  Runs the specified command as root"
     echo "   on the specified hosts (default: $(echo ${default_hosts[@]} | tr ' ' ','))"
     echo ""
 }
 
-OPTS=$( getopt -o 'H:hc:t:u' --long "help,host:,cmd:,command:,timeout:,units,units-only" -n "${PROG}" -- "$@" )
+OPTS=$( getopt -o 'H:hc:t:uew' --long "help,host:,cmd:,command:,timeout:,units,units-only,east,east-only,west,west-only" -n "${PROG}" -- "$@" )
 eval set -- "${OPTS}"
 
 default_hosts=( $(last-hosts --deployed) )
 timeout=2
 units_only=false
+east_only=false
+west_only=false
+
 
 hosts=()
 while true; do
     case "${1}" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
-
     -u|--units|--units-only)
         units_only=true
         shift 1
+        ;;
+
+    -e|--east|--east-only)
+        east_only=true
+        shift 1
+        ;;
+
+    -w|--west|--west-only)
+        west_only=true
+        shift 1
+        ;;
+
+    -h|--help)
+        usage
+        exit 0
         ;;
 
     -H|--host)
@@ -74,7 +87,28 @@ if ${units_only}; then
     done
     hosts=( ${units[*]} )
 fi
-        
+
+if ${east_only}; then
+    units=()
+    for h in ${hosts[*]}; do
+        if [ ${h: -1} == e ]; then
+            units+=( ${h} )
+        fi
+    done
+    hosts=( ${units[*]} )
+fi
+
+if ${west_only}; then
+    units=()
+    for h in ${hosts[*]}; do
+        if [ ${h: -1} == w ]; then
+            units+=( ${h} )
+        fi
+    done
+    hosts=( ${units[*]} )
+fi
+
+
 if [ ! "${cmd}" ]; then
     cmd="${@}"
 fi
