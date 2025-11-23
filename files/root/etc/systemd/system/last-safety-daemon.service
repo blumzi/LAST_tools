@@ -6,11 +6,12 @@ User=ocs
 WorkingDirectory=/home/ocs/python/WAO_Safety
 ExecStart=/home/ocs/python/WAO_Safety/bin/last-safety-daemon start
 ExecStop=/home/ocs/python/WAO_Safety/bin/last-safety-daemon stop
+KillSignal=SIGKILL
+RestartKillSignal=SIGKILL
 Restart=always
 
 [Unit]
-Requires=postgresql
-After=postgresql
+After=postgresql.service
 
 [Install]
 WantedBy=multi-user.target
