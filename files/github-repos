@@ -44,4 +44,7 @@ matlab/LAST/LAST_tools                     https://github.com/blumzi/LAST_tools 
 #matlab/LAST/LAST_SerialDevice              https://github.com/blumzi/LAST_SerialDevice                         branch:main              Development
 matlab/LAST/MatlabRedis                    https://github.com/GummyJum/MatlabRedis.git                         branch:main              Development
 #python/LAST_next_generation                https://github.com/blumzi/LAST_next_generation                      branch:main              Development
+matlab/LAST/matlab-posix-mqueue             https://github.com/EastEriq/matlab-posix-mqueue.git                 branch:main              Cecco
+matlab/LAST/matlab-shared-pointer           https://github.com/EastEriq/matlab-shared-pointer.git               branch:main              Cecco
+matlab/LAST/LAST_fast_pipeline              https://github.com/EastEriq/LAST_fast_pipeline.git                  branch:main              Cecco
 
