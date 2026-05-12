@@ -1,0 +1,259 @@
+#!/bin/bash
+#
+# last-moveRAW2external — transfer raw/ data directories from local archive
+#                         to an external host (marvin).
+#
+# Usage: last-moveRAW2external -n NODE -y YEAR -m MM[-MM] [-p PARALLEL] [-r USER@HOST] [-i]
+
+set -uo pipefail
+
+readonly LOCK_DIR="/var/lock"
+readonly LOG_DIR="/tmp"
+readonly REMOTE_DEFAULT="last@marvin"
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") -n NODE -y YEAR -m MM[-MM] [-p PARALLEL] [-r USER@HOST] [-i]
+
+  -n NODE       node number; allowed range depends on hostname suffix:
+                  lastNNe -> NODE must be 1 or 2
+                  lastNNw -> NODE must be 3 or 4
+                (auto-padded to two digits)
+  -y YEAR       4-digit year
+  -m MM[-MM]    single month (e.g. 07) or inclusive range (e.g. 07-09); auto-padded
+  -d DD[-DD]    single day (e.g. 15) or inclusive range (e.g. 10-20); auto-padded;
+                only valid when -m specifies a single month
+  -p PARALLEL   parallel rsync jobs (default 10)
+  -r USER@HOST  remote ssh target (default: ${REMOTE_DEFAULT})
+  -i            interactive: print resolved inputs/paths and ask for confirmation
+                before starting any transfer (requires a controlling terminal)
+  -h            show this help
+EOF
+}
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+# ---------- parse args ----------
+NODE_IN=""
+YEAR=""
+MONTH_RAW=""
+DAY_RAW=""
+PAR=10
+REMOTE="$REMOTE_DEFAULT"
+INTERACTIVE=0
+
+while getopts ":n:y:m:d:p:r:ih" opt; do
+  case "$opt" in
+    n) NODE_IN="$OPTARG" ;;
+    y) YEAR="$OPTARG" ;;
+    m) MONTH_RAW="$OPTARG" ;;
+    d) DAY_RAW="$OPTARG" ;;
+    p) PAR="$OPTARG" ;;
+    r) REMOTE="$OPTARG" ;;
+    i) INTERACTIVE=1 ;;
+    h) usage; exit 0 ;;
+    \?) usage >&2; die "unknown option: -$OPTARG" ;;
+    :)  usage >&2; die "option -$OPTARG requires an argument" ;;
+  esac
+done
+
+[[ -n "$REMOTE" ]] || die "-r REMOTE must not be empty"
+[[ "$REMOTE" =~ ^[^@[:space:]]+@[^@[:space:]]+$ ]] \
+  || die "REMOTE must be USER@HOST, got: $REMOTE"
+
+[[ -n "$NODE_IN"   ]] || { usage >&2; die "-n NODE is required"; }
+[[ -n "$YEAR"      ]] || { usage >&2; die "-y YEAR is required"; }
+[[ -n "$MONTH_RAW" ]] || { usage >&2; die "-m MONTH is required"; }
+
+# ---------- hostname → node-host segment + suffix ----------
+HOST_SHORT="$(hostname -s)"
+[[ "$HOST_SHORT" =~ ^last([0-9]+)([ew])$ ]] \
+  || die "hostname '$HOST_SHORT' does not match expected pattern lastNN[ew]"
+NODE_HOST="${BASH_REMATCH[1]}"
+HOST_SUFFIX="${BASH_REMATCH[2]}"
+
+# ---------- validate & normalize ----------
+[[ "$YEAR"    =~ ^[0-9]{4}$ ]] || die "YEAR must be 4 digits, got: $YEAR"
+[[ "$NODE_IN" =~ ^[0-9]+$  ]]  || die "NODE must be digits, got: $NODE_IN"
+
+case "$HOST_SUFFIX" in
+  e) (( 10#$NODE_IN == 1 || 10#$NODE_IN == 2 )) \
+       || die "NODE must be 1 or 2 for host $HOST_SHORT, got: $NODE_IN" ;;
+  w) (( 10#$NODE_IN == 3 || 10#$NODE_IN == 4 )) \
+       || die "NODE must be 3 or 4 for host $HOST_SHORT, got: $NODE_IN" ;;
+esac
+printf -v NODE "%02d" "$((10#$NODE_IN))"
+LOCKFILE="$LOCK_DIR/last-moveRAW2external_node${NODE}.lock"
+
+[[ "$PAR" =~ ^[0-9]+$ ]] && (( PAR >= 1 )) \
+                              || die "PARALLEL must be a positive integer, got: $PAR"
+
+if   [[ "$MONTH_RAW" =~ ^([0-9]{1,2})$ ]]; then
+  MS="${BASH_REMATCH[1]}"; ME="$MS"
+elif [[ "$MONTH_RAW" =~ ^([0-9]{1,2})-([0-9]{1,2})$ ]]; then
+  MS="${BASH_REMATCH[1]}"; ME="${BASH_REMATCH[2]}"
+else
+  die "MONTH must be MM or MM-MM, got: $MONTH_RAW"
+fi
+(( 10#$MS >= 1 && 10#$MS <= 12 )) || die "month out of range: $MS"
+(( 10#$ME >= 1 && 10#$ME <= 12 )) || die "month out of range: $ME"
+(( 10#$MS <= 10#$ME ))            || die "month range reversed: $MONTH_RAW"
+
+MONTHS=()
+for ((m=10#$MS; m<=10#$ME; m++)); do
+  printf -v mm "%02d" "$m"
+  MONTHS+=("$mm")
+done
+
+DAYS=()
+if [[ -n "$DAY_RAW" ]]; then
+  (( 10#$MS == 10#$ME )) || die "-d requires a single month, got: $MONTH_RAW"
+  if   [[ "$DAY_RAW" =~ ^([0-9]{1,2})$ ]]; then
+    DS="${BASH_REMATCH[1]}"; DE="$DS"
+  elif [[ "$DAY_RAW" =~ ^([0-9]{1,2})-([0-9]{1,2})$ ]]; then
+    DS="${BASH_REMATCH[1]}"; DE="${BASH_REMATCH[2]}"
+  else
+    die "DAY must be DD or DD-DD, got: $DAY_RAW"
+  fi
+  (( 10#$DS >= 1 && 10#$DS <= 31 )) || die "day out of range: $DS"
+  (( 10#$DE >= 1 && 10#$DE <= 31 )) || die "day out of range: $DE"
+  (( 10#$DS <= 10#$DE ))            || die "day range reversed: $DAY_RAW"
+  for ((d=10#$DS; d<=10#$DE; d++)); do
+    printf -v dd "%02d" "$d"
+    DAYS+=("$dd")
+  done
+fi
+
+# ---------- paths ----------
+LAST_TAG="LAST.01.${NODE_HOST}.${NODE}"
+if (( 10#$NODE_IN % 2 == 1 )); then DATA_VOL="data1"; else DATA_VOL="data2"; fi
+SRC_BASE="/${HOST_SHORT}/${DATA_VOL}/archive/${LAST_TAG}/${YEAR}"
+DST_BASE="/home/last/lastdata/${LAST_TAG}/${YEAR}"
+
+[[ -d "$SRC_BASE" ]] || die "source base does not exist: $SRC_BASE"
+
+# ---------- single-instance lock ----------
+exec 8>"$LOCKFILE" || die "cannot open lockfile $LOCKFILE"
+flock -n 8         || die "another instance is running (lockfile: $LOCKFILE)"
+
+# ---------- run-wide log + failure tracking ----------
+RUN_TS="$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="${LOG_DIR}/last-moveRAW2external_${RUN_TS}_$$.log"
+FAIL_FILE="${LOG_DIR}/last-moveRAW2external_${RUN_TS}_$$.fail"
+LOG_LOCK="${LOG_FILE}.lock"
+FAIL_LOCK="${FAIL_FILE}.lock"
+: >"$LOG_FILE"
+: >"$FAIL_FILE"
+
+log() { echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"; }
+
+trap 'log "interrupted (SIGINT/SIGTERM)"; exit 130' INT TERM
+
+log "host=$HOST_SHORT tag=$LAST_TAG year=$YEAR months=${MONTHS[*]}${DAYS[*]:+ days=${DAYS[*]}} parallel=$PAR"
+log "src_base=$SRC_BASE"
+log "dst_base=${REMOTE}:${DST_BASE}"
+log "log=$LOG_FILE  fail_list=$FAIL_FILE"
+
+# ---------- pre-flight: remote reachable + base creatable ----------
+ssh -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" "mkdir -p \"$DST_BASE\"" \
+  || die "pre-flight ssh to $REMOTE failed"
+log "pre-flight ssh OK"
+
+# ---------- export for inner bash ----------
+export REMOTE SRC_BASE DST_BASE LOG_FILE FAIL_FILE LOG_LOCK FAIL_LOCK
+
+# ---------- enumerate transfer candidates ----------
+find_args=( "$SRC_BASE" -type d "(" )
+first=1
+for m in "${MONTHS[@]}"; do
+  if (( ${#DAYS[@]} > 0 )); then
+    for d in "${DAYS[@]}"; do
+      if (( first )); then
+        find_args+=( -path "*/${m}/${d}/raw" )
+        first=0
+      else
+        find_args+=( -o -path "*/${m}/${d}/raw" )
+      fi
+    done
+  else
+    if (( first )); then
+      find_args+=( -path "*/${m}/*/raw" )
+      first=0
+    else
+      find_args+=( -o -path "*/${m}/*/raw" )
+    fi
+  fi
+done
+find_args+=( ")" -print0 )
+
+log "scanning $SRC_BASE for matching raw/ directories..."
+mapfile -d '' SRC_DIRS < <(find "${find_args[@]}")
+TRANSFERS=${#SRC_DIRS[@]}
+log "found $TRANSFERS transfer candidate(s)"
+if (( TRANSFERS == 0 )); then
+  log "nothing to do"
+  exit 0
+fi
+
+# ---------- interactive confirmation ----------
+if (( INTERACTIVE )); then
+  [[ -e /dev/tty ]] || die "-i requires a controlling terminal (/dev/tty unavailable)"
+  log "----- summary (interactive confirmation) -----"
+  log "host          : $HOST_SHORT (suffix=$HOST_SUFFIX)"
+  log "tag           : $LAST_TAG"
+  log "year          : $YEAR"
+  log "months        : ${MONTHS[*]}"
+  (( ${#DAYS[@]} > 0 )) && log "days          : ${DAYS[*]}"
+  log "parallel      : $PAR"
+  log "remote        : $REMOTE"
+  log "src_base      : $SRC_BASE"
+  log "dst_base      : ${REMOTE}:${DST_BASE}"
+  log "lockfile      : $LOCKFILE"
+  log "log_file      : $LOG_FILE"
+  log "fail_list     : $FAIL_FILE"
+  log "transfers     : $TRANSFERS raw/ dir(s)"
+  log "----- end summary -----"
+  printf "Proceed with the transfer? [y/N]: " >/dev/tty
+  read -r ANSWER </dev/tty || ANSWER=""
+  case "$ANSWER" in
+    y|Y|yes|YES) log "user confirmed (input: '$ANSWER')" ;;
+    *)           log "user aborted (input: '$ANSWER')"; exit 1 ;;
+  esac
+fi
+
+# ---------- run transfers in parallel ----------
+printf '%s\0' "${SRC_DIRS[@]}" | xargs -0 -I{} -P "$PAR" bash -c '
+  SRC_DIR="$1"
+  REL_PATH="${SRC_DIR#"$SRC_BASE"/}"
+  DST_DIR="$DST_BASE/$REL_PATH"
+
+  TLOG="$(mktemp)"
+  {
+    echo "=== START $(date -Iseconds) :: $SRC_DIR -> $REMOTE:$DST_DIR"
+    ssh -o BatchMode=yes "$REMOTE" "mkdir -p \"$DST_DIR\""
+    nice -n 10 ionice -c2 -n7 rsync --dry-run -av --remove-source-files "$SRC_DIR/" "$REMOTE:$DST_DIR/"
+    nice -n 10 ionice -c2 -n7 rsync           -av --remove-source-files "$SRC_DIR/" "$REMOTE:$DST_DIR/"
+    rc=$?
+    if [[ $rc -eq 0 ]]; then
+      find "$SRC_DIR" -depth -type d -empty -delete
+      echo "=== OK    $(date -Iseconds) :: $SRC_DIR"
+    else
+      echo "=== FAIL rc=$rc $(date -Iseconds) :: $SRC_DIR"
+      ( flock 9; printf "%s\n" "$SRC_DIR" >>"$FAIL_FILE" ) 9>"$FAIL_LOCK"
+    fi
+  } >"$TLOG" 2>&1
+
+  ( flock 9; cat "$TLOG" >>"$LOG_FILE" ) 9>"$LOG_LOCK"
+  rm -f "$TLOG"
+' _ {}
+
+# ---------- summary ----------
+FAILS=$(wc -l <"$FAIL_FILE")
+OKS=$(( TRANSFERS - FAILS ))
+log "summary: ok=$OKS fail=$FAILS total=$TRANSFERS"
+if (( FAILS > 0 )); then
+  log "failed sources:"
+  while IFS= read -r f; do log "  $f"; done <"$FAIL_FILE"
+  exit $(( FAILS > 255 ? 255 : FAILS ))
+fi
+exit 0

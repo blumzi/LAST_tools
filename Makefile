@@ -43,6 +43,7 @@ package: mrclean check-for-github-tokens
 	ln -sf ${LAST_TOP}/bin/last-prune-individual-images     ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-prune-individual-images
 	ln -sf ${LAST_TOP}/bin/last-transient-slack-alert       ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-transient-slack-alert
 	ln -sf ${LAST_TOP}/bin/last-pipeline-log-summary        ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-pipeline-log-summary
+	ln -sf ${LAST_TOP}/bin/last-moveRAW2external            ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-moveRAW2external
 	mkdir -p  ${PACKAGE_DIR}/${SYSTEMD_DIR}
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-pipeline1.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-pipeline1.service
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-pipeline2.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-pipeline2.service
