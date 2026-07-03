@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+#
+# cleanup_proc_dirs.sh
+#
+# Scans directories matching:
+#   /last*/data?/archive/LAST*/20*/*/*/proc
+#
+# For each matched proc/ directory, removes immediate child directories
+# that do not contain a ".status" file directly inside them.
+#
+set -uo pipefail
+
+PATTERN='/last*/data?/archive/LAST*/20*/*/*/proc'
+LOG_FILE="./cleanup_proc_dirs.log"
+MODE=""
+DRY_RUN=0
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") --autonomous|--interactive [--dry-run] [--log FILE]
+
+Scans directories matching:
+  $PATTERN
+
+For each matched proc/ directory, removes immediate child directories
+that do not contain a .status file directly inside them.
+
+Options:
+  --autonomous     Delete all candidates without prompting.
+  --interactive    Prompt before each deletion (y/n/a/q).
+  --dry-run        Show what would be deleted without deleting anything.
+  --log FILE       Path to log file (default: $LOG_FILE).
+  -h, --help       Show this help message.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --autonomous)
+            MODE="autonomous"
+            shift
+            ;;
+        --interactive)
+            MODE="interactive"
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        --log)
+            [[ $# -ge 2 ]] || { echo "Error: --log requires an argument" >&2; exit 1; }
+            LOG_FILE="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -z "$MODE" ]]; then
+    echo "Error: must specify --autonomous or --interactive" >&2
+    usage >&2
+    exit 1
+fi
+
+if ! touch "$LOG_FILE" 2>/dev/null; then
+    echo "Error: cannot write to log file: $LOG_FILE" >&2
+    exit 1
+fi
+
+log() {
+    printf '%s  %s  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" >> "$LOG_FILE"
+}
+
+shopt -s nullglob
+proc_dirs=( $PATTERN )
+shopt -u nullglob
+
+if [[ ${#proc_dirs[@]} -eq 0 ]]; then
+    echo "No directories matched pattern: $PATTERN"
+    exit 0
+fi
+
+scanned=0
+kept=0
+declined=0
+deleted=0
+force_all=0
+
+for proc_dir in "${proc_dirs[@]}"; do
+    [[ -d "$proc_dir" ]] || continue
+    while IFS= read -r -d '' child; do
+        scanned=$((scanned + 1))
+
+        if [[ -f "$child/.status" ]]; then
+            kept=$((kept + 1))
+            continue
+        fi
+
+        if [[ "$MODE" == "interactive" && $force_all -eq 0 ]]; then
+            while true; do
+                read -r -p "Delete '$child' (no .status file)? [y/n/a/q] " answer
+                case "$answer" in
+                    y|Y) break ;;
+                    n|N) declined=$((declined + 1)); continue 2 ;;
+                    a|A) force_all=1; break ;;
+                    q|Q)
+                        echo "Quitting."
+                        echo "Scanned: $scanned, Deleted: $deleted, Declined: $declined, Kept: $kept"
+                        exit 0
+                        ;;
+                    *) echo "Please answer y, n, a, or q." ;;
+                esac
+            done
+        fi
+
+        if [[ $DRY_RUN -eq 1 ]]; then
+            echo "DRY-RUN: would delete $child"
+            log "DRY-RUN" "$child"
+            deleted=$((deleted + 1))
+        else
+            if rm -rf -- "$child"; then
+                echo "Deleted: $child"
+                log "DELETED" "$child"
+                deleted=$((deleted + 1))
+            else
+                echo "ERROR: failed to delete $child" >&2
+                log "ERROR" "$child"
+            fi
+        fi
+    done < <(find "$proc_dir" -mindepth 1 -maxdepth 1 -type d -print0)
+done
+
+if [[ $DRY_RUN -eq 1 ]]; then
+    echo "Scanned: $scanned, Would delete: $deleted, Declined: $declined, Kept: $kept"
+else
+    echo "Scanned: $scanned, Deleted: $deleted, Declined: $declined, Kept: $kept"
+fi
