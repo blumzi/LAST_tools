@@ -4,7 +4,7 @@
 # Files with this name pattern will
 # - not be backed up
 # - will not be removed after backup
-# - will be removed if more than 36 hours have passed since the transfer succeeded
+# - will be removed if more than 12 hours have passed since the transfer succeeded
 #
 ignored_files='/LAST.*_sci_proc_(Image|Mask|PSF)'   # A 'grep -Ev' pattern
 
@@ -86,7 +86,7 @@ basic_exclusion_pattern="--exclude '*/raw'"
 extended_exclusion_pattern="--exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
 rsync_extra_args="${basic_exclusion_pattern} ${extended_exclusion_pattern}"
 
-default_old_age_hours=36
+default_old_age_hours=12
 old_age_hours=${default_old_age_hours}
 
 
