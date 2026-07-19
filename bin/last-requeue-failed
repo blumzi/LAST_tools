@@ -41,8 +41,21 @@ Usage: ${PROG} --newer<XY> TIMESPEC -c CAMERAS [-n] [-l LOGFILE] [-h]
   -l, --log FILE       log file (default: ${LOG_DIR}/${PROG}_<timestamp>_<pid>.log)
   -h, --help           show this help message
 
-Example:
-  ${PROG} --newerct '2 days ago' -c 1,2
+Examples:
+  # Preview only: what would move for cameras 1 and 2, modified in the last 2 days
+  ${PROG} --newermt '2 days ago' -c 1,2 -n
+
+  # Actually requeue camera 1's files modified in the last 2 days
+  ${PROG} --newermt '2 days ago' -c 1
+
+  # All four cameras, using an absolute UTC cutoff (e.g. since a known outage start)
+  ${PROG} --newermt '2026-07-18 20:00:00' -c 1,2,3,4
+
+  # Use inode change time instead of modification time
+  ${PROG} --newerct '6 hours ago' -c 3
+
+  # Custom log file instead of the default /tmp location
+  ${PROG} --newermt '1 day ago' -c 2,4 -l /var/log/last-requeue-failed_manual.log
 EOF
 }
 
