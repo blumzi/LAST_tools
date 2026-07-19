@@ -1,0 +1,199 @@
+#!/bin/bash
+#
+# last-requeue-failed — move files newer than a given reference time from
+#                       failed/ back into new/, for one or more cameras'
+#                       archive directories on the current LAST machine.
+#
+# Usage: last-requeue-failed --newer<XY> TIMESPEC -c CAMERAS [-n] [-l LOGFILE]
+
+set -uo pipefail
+
+readonly LOCK_DIR="/var/lock"
+readonly LOG_DIR="/tmp"
+readonly LOCKFILE="${LOCK_DIR}/last-requeue-failed.lock"
+
+PROG="$(basename "$0")"
+
+usage() {
+  cat <<EOF
+Usage: ${PROG} --newer<XY> TIMESPEC -c CAMERAS [-n] [-l LOGFILE] [-h]
+
+  Moves files from failed/ into new/, within the archive directory of each
+  requested camera on this host, for files whose reference time is newer
+  than TIMESPEC. Only files directly inside failed/ are considered (no
+  recursion). A file already present in new/ under the same name is left
+  in failed/ untouched (never overwritten).
+
+  --newerat TIMESPEC   file's access time is newer than TIMESPEC
+  --newerBt TIMESPEC   file's birth time is newer than TIMESPEC
+  --newerct TIMESPEC   file's inode change time is newer than TIMESPEC
+  --newermt TIMESPEC   file's modification time is newer than TIMESPEC
+                       (exactly one of the above is required; TIMESPEC is
+                       passed straight to find(1), so anything find/date
+                       accepts works, e.g. "2 days ago", "2026-07-15 14:00".
+                       This host's clock is UTC.)
+
+  -c, --cameras LIST   comma-separated camera numbers to process, each in
+                       {1,2,3,4} (the last field of a LAST.01.NN.CC tag).
+                       A camera not physically present on this host is
+                       skipped with a warning, not an error.
+  -n, --dry-run        show what would be moved; move nothing
+  -l, --log FILE       log file (default: ${LOG_DIR}/${PROG}_<timestamp>_<pid>.log)
+  -h, --help           show this help message
+
+Example:
+  ${PROG} --newerct '2 days ago' -c 1,2
+EOF
+}
+
+die() { echo "${PROG}: ERROR: $*" >&2; exit 1; }
+
+# ---------- parse args ----------
+PREDICATE=""
+TIMESPEC=""
+CAMERAS_RAW=""
+DRY_RUN=0
+LOG_FILE=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --newerat|--newerBt|--newerct|--newermt)
+            [[ -z "$PREDICATE" ]] || die "multiple --newerXY options given (already have --newer${PREDICATE})"
+            [[ $# -ge 2 ]] || die "$1 requires a TIMESPEC argument"
+            PREDICATE="${1#--newer}"
+            TIMESPEC="$2"
+            shift 2
+            ;;
+        -c|--cameras)
+            [[ $# -ge 2 ]] || die "$1 requires an argument"
+            CAMERAS_RAW="$2"
+            shift 2
+            ;;
+        -n|--dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        -l|--log)
+            [[ $# -ge 2 ]] || die "$1 requires an argument"
+            LOG_FILE="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            usage >&2
+            die "unknown argument: $1"
+            ;;
+    esac
+done
+
+[[ -n "$PREDICATE" ]] || die "one of --newerat/--newerBt/--newerct/--newermt is required"
+[[ -n "$CAMERAS_RAW" ]] || die "-c/--cameras is required"
+
+# ---------- validate cameras ----------
+IFS=',' read -ra CAM_FIELDS <<< "$CAMERAS_RAW"
+declare -A SEEN_CAM=()
+CAMERAS=()
+for cam in "${CAM_FIELDS[@]}"; do
+    [[ "$cam" =~ ^[1-4]$ ]] || die "invalid camera number: '$cam' (must be one of 1,2,3,4)"
+    if [[ -z "${SEEN_CAM[$cam]:-}" ]]; then
+        SEEN_CAM[$cam]=1
+        CAMERAS+=("$cam")
+    fi
+done
+(( ${#CAMERAS[@]} > 0 )) || die "no camera numbers given"
+
+# ---------- single-instance lock ----------
+exec 8>"$LOCKFILE" || die "cannot open lockfile $LOCKFILE"
+flock -n 8         || die "another instance is running (lockfile: $LOCKFILE)"
+
+# ---------- logging ----------
+RUN_TS="$(date +%Y%m%d-%H%M%S)"
+if [[ -z "$LOG_FILE" ]]; then
+    LOG_FILE="${LOG_DIR}/${PROG}_${RUN_TS}_$$.log"
+fi
+: >>"$LOG_FILE" || die "cannot write to log file: $LOG_FILE"
+
+log() { echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"; }
+
+trap 'log "interrupted (SIGINT/SIGTERM)"; exit 130' INT TERM
+
+HOSTSHORT="$(hostname -s)"
+
+log "host=${HOSTSHORT} predicate=--newer${PREDICATE} timespec=\"${TIMESPEC}\" cameras=${CAMERAS[*]} dry_run=${DRY_RUN}"
+log "log_file=${LOG_FILE}"
+
+scanned=0
+moved=0
+would_move=0
+skipped_collision=0
+skipped_cameras=()
+errors=0
+
+for cam in "${CAMERAS[@]}"; do
+    printf -v cc "%02d" "$cam"
+
+    shopt -s nullglob
+    matches=( /"${HOSTSHORT}"/data*/archive/LAST.*."${cc}" )
+    shopt -u nullglob
+
+    if (( ${#matches[@]} == 0 )); then
+        log "WARN camera ${cam} (LAST.*.${cc}) not found on host ${HOSTSHORT}, skipping"
+        skipped_cameras+=("$cam")
+        continue
+    fi
+    if (( ${#matches[@]} > 1 )); then
+        die "unexpected: multiple archive directories matched for camera ${cam}: ${matches[*]}"
+    fi
+
+    archive_dir="${matches[0]}"
+    failed_dir="${archive_dir}/failed"
+    new_dir="${archive_dir}/new"
+
+    if [[ ! -d "$failed_dir" ]]; then
+        log "WARN ${failed_dir} does not exist, skipping camera ${cam}"
+        skipped_cameras+=("$cam")
+        continue
+    fi
+    if [[ ! -d "$new_dir" ]]; then
+        log "WARN ${new_dir} does not exist, skipping camera ${cam}"
+        skipped_cameras+=("$cam")
+        continue
+    fi
+
+    log "camera ${cam}: scanning ${failed_dir}"
+
+    while IFS= read -r -d '' file; do
+        scanned=$((scanned + 1))
+        base="$(basename "$file")"
+        dest="${new_dir}/${base}"
+
+        if [[ -e "$dest" ]]; then
+            log "SKIP (already in new/): ${base} [camera ${cam}]"
+            skipped_collision=$((skipped_collision + 1))
+            continue
+        fi
+
+        if (( DRY_RUN )); then
+            log "DRY-RUN would move: ${file} -> ${dest}"
+            would_move=$((would_move + 1))
+        else
+            if mv -- "$file" "$dest"; then
+                log "MOVED: ${file} -> ${dest}"
+                moved=$((moved + 1))
+            else
+                log "ERROR moving ${file} -> ${dest}"
+                errors=$((errors + 1))
+            fi
+        fi
+    done < <(find "$failed_dir" -maxdepth 1 -type f "-newer${PREDICATE}" "$TIMESPEC" -print0)
+done
+
+log "summary: scanned=${scanned} moved=${moved} dry_run_would_move=${would_move} skipped_collision=${skipped_collision} skipped_cameras=${skipped_cameras[*]:-none} errors=${errors}"
+
+if (( errors > 0 )); then
+    exit 1
+fi
+exit 0
