@@ -45,7 +45,7 @@ function macmap_get_local_mac() {
     #
     # This is NOT sustainable for new or replacenet machines
     #
-    read -r -a words <<< "$(ip -o link show | grep link/ether | grep ': enp67s0')"
+    read -r -a words <<< "$(ip -o link show | grep link/ether | grep -E ': enp6(7|9)s0')"
     for (( i = 0; i < ${#words[*]}; i++ )); do
         if [ "${words[i]}" = "link/ether" ]; then
             echo "${words[i+1]}"
