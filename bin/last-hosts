@@ -27,7 +27,7 @@ EOF
 units_only=false
 deployed=true
 
-   deployed_units=( last0{1,2,3,4,5,6,7,8,9}{e,w} last1{0,1}{e,w} )
+   deployed_units=( last0{1,2,3,4,5,6,7,8,9}{e,w} last1{0,1}{e,w} last21{e,w} )
 deployed_machines=( last0 ${deployed_units[*]} )
         lab_units=( last12w )
      stored_units=( last12e )
