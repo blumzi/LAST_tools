@@ -1,36 +1,68 @@
 #!/usr/bin/env bash
 #
-# cleanup_proc_dirs.sh
+# last-remove-statusless-proc-dirs
 #
 # Scans directories matching:
-#   /last*/data?/archive/LAST*/20*/*/*/proc
+#   /<this-host>/data[0-9]/archive/LAST*/20*/*/*/proc
 #
 # For each matched proc/ directory, removes immediate child directories
-# that do not contain a ".status" file directly inside them.
+# (visits) that do not contain a ".status" file directly inside them.
+#
+# Visits younger than --min-age-days (default 7) are never tested: a visit
+# counts as young if EITHER its observation time (the YYYY/MM/DD in the path
+# plus the leading HHMMSS of the visit directory name, UTC) OR the visit
+# directory's mtime falls inside the guard window.  A visit whose name does
+# not start with HHMMSS is skipped too, since its age cannot be established.
 #
 set -uo pipefail
 
-PATTERN='/last*/data?/archive/LAST*/20*/*/*/proc'
+PATTERN="/$(hostname -s)/data[0-9]/archive/LAST*/20*/*/*/proc"
 LOG_FILE="./cleanup_proc_dirs.log"
 MODE=""
 DRY_RUN=0
+MIN_AGE_DAYS=7
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") --autonomous|--interactive [--dry-run] [--log FILE]
+Usage: $(basename "$0") --autonomous|--interactive [--min-age-days N] [--dry-run] [--log FILE]
 
 Scans directories matching:
   $PATTERN
 
-For each matched proc/ directory, removes immediate child directories
+For each matched proc/ directory, removes immediate child directories (visits)
 that do not contain a .status file directly inside them.
 
+Visits younger than the age guard are skipped without being tested.  A visit is
+young if EITHER of these is inside the guard window:
+  * its observation time -- the YYYY/MM/DD of the path plus the leading HHMMSS
+    of the visit directory name (both UTC);
+  * its directory mtime -- so a recently reprocessed old visit is left alone.
+A visit directory whose name does not start with HHMMSS is always skipped.
+
 Options:
-  --autonomous     Delete all candidates without prompting.
-  --interactive    Prompt before each deletion (y/n/a/q).
-  --dry-run        Show what would be deleted without deleting anything.
-  --log FILE       Path to log file (default: $LOG_FILE).
-  -h, --help       Show this help message.
+  --autonomous       Delete all candidates without prompting.
+  --interactive      Prompt before each deletion (y/n/a/q).
+  --min-age-days N   Only test visits at least N days old (default: $MIN_AGE_DAYS).
+                     N must be a non-negative integer.  0 turns the guard
+                     off entirely: every visit is tested, including ones
+                     whose name carries no timestamp.
+  --dry-run          Show what would be deleted without deleting anything.
+  --log FILE         Path to log file (default: $LOG_FILE).
+  -h, --help         Show this help message.
+
+Final counts:
+  Scanned  every visit directory found
+  Skipped  too young, or unparseable name -- not tested (subset of Scanned)
+  Kept     tested and holding a .status file
+  Deleted  tested, no .status file, removed
+  Declined tested, no .status file, kept on the operator's answer
+
+Examples:
+  # Preview the default 1-week guard
+  $(basename "$0") --interactive --min-age-days 7 --dry-run
+
+  # Only touch visits older than a month, no prompts
+  $(basename "$0") --autonomous --min-age-days 30
 EOF
 }
 
@@ -47,6 +79,11 @@ while [[ $# -gt 0 ]]; do
         --dry-run)
             DRY_RUN=1
             shift
+            ;;
+        --min-age-days)
+            [[ $# -ge 2 ]] || { echo "Error: --min-age-days requires an argument" >&2; exit 1; }
+            MIN_AGE_DAYS="$2"
+            shift 2
             ;;
         --log)
             [[ $# -ge 2 ]] || { echo "Error: --log requires an argument" >&2; exit 1; }
@@ -71,6 +108,24 @@ if [[ -z "$MODE" ]]; then
     exit 1
 fi
 
+if [[ ! "$MIN_AGE_DAYS" =~ ^[0-9]+$ ]]; then
+    echo "Error: --min-age-days must be a non-negative integer (got: '$MIN_AGE_DAYS')" >&2
+    exit 1
+fi
+
+# One cutoff for the whole run, in UTC, so it is independent of the host's
+# timezone and of how long the run takes.
+if ! CUTOFF_EPOCH=$(date -u -d "$MIN_AGE_DAYS days ago" +%s 2>/dev/null); then
+    echo "Error: cannot compute a cutoff for --min-age-days $MIN_AGE_DAYS" >&2
+    exit 1
+fi
+CUTOFF_STAMP=$(date -u -d "@$CUTOFF_EPOCH" +%Y%m%d%H%M%S)
+CUTOFF_HUMAN=$(date -u -d "@$CUTOFF_EPOCH" '+%Y-%m-%d %H:%M:%S UTC')
+
+# --min-age-days 0 means "test everything", not "cut off at this instant".
+AGE_GUARD=1
+(( MIN_AGE_DAYS == 0 )) && AGE_GUARD=0
+
 if ! touch "$LOG_FILE" 2>/dev/null; then
     echo "Error: cannot write to log file: $LOG_FILE" >&2
     exit 1
@@ -89,7 +144,15 @@ if [[ ${#proc_dirs[@]} -eq 0 ]]; then
     exit 0
 fi
 
+echo "Pattern: $PATTERN"
+if (( AGE_GUARD )); then
+    echo "Cutoff:  testing only visits older than $CUTOFF_HUMAN (min age ${MIN_AGE_DAYS} day(s))"
+else
+    echo "Cutoff:  none -- age guard disabled (--min-age-days 0), every visit is tested"
+fi
+
 scanned=0
+skipped=0
 kept=0
 declined=0
 deleted=0
@@ -97,8 +160,38 @@ force_all=0
 
 for proc_dir in "${proc_dirs[@]}"; do
     [[ -d "$proc_dir" ]] || continue
-    while IFS= read -r -d '' child; do
+
+    # .../YYYY/MM/DD/proc -> the visit's observation date
+    date_path=${proc_dir%/proc}
+    dd=${date_path##*/}; date_path=${date_path%/*}
+    mm=${date_path##*/}; date_path=${date_path%/*}
+    yyyy=${date_path##*/}
+    if [[ ! $yyyy =~ ^[0-9]{4}$ || ! $mm =~ ^[0-9]{2}$ || ! $dd =~ ^[0-9]{2}$ ]]; then
+        echo "WARNING: no YYYY/MM/DD in path, skipping: $proc_dir" >&2
+        log "SKIP-NODATE" "$proc_dir"
+        continue
+    fi
+
+    while IFS=$'\t' read -r -d '' mtime child_name child; do
         scanned=$((scanned + 1))
+        mtime=${mtime%%.*}
+
+        if (( AGE_GUARD )); then
+            # Anything whose age cannot be established is left alone.
+            if [[ ! $child_name =~ ^[0-9]{6} || ! $mtime =~ ^[0-9]+$ ]]; then
+                skipped=$((skipped + 1))
+                [[ -f "$child/.status" ]] || log "SKIP-UNDATED" "$child"
+                continue
+            fi
+
+            # Young by observation time or by mtime -- either one spares it.
+            visit_stamp="${yyyy}${mm}${dd}${child_name:0:6}"
+            if (( 10#$visit_stamp >= 10#$CUTOFF_STAMP || mtime >= CUTOFF_EPOCH )); then
+                skipped=$((skipped + 1))
+                [[ -f "$child/.status" ]] || log "SKIP-YOUNG" "$child"
+                continue
+            fi
+        fi
 
         if [[ -f "$child/.status" ]]; then
             kept=$((kept + 1))
@@ -114,7 +207,7 @@ for proc_dir in "${proc_dirs[@]}"; do
                     a|A) force_all=1; break ;;
                     q|Q)
                         echo "Quitting."
-                        echo "Scanned: $scanned, Deleted: $deleted, Declined: $declined, Kept: $kept"
+                        echo "Scanned: $scanned, Skipped: $skipped, Deleted: $deleted, Declined: $declined, Kept: $kept"
                         exit 0
                         ;;
                     *) echo "Please answer y, n, a, or q." ;;
@@ -136,11 +229,11 @@ for proc_dir in "${proc_dirs[@]}"; do
                 log "ERROR" "$child"
             fi
         fi
-    done < <(find "$proc_dir" -mindepth 1 -maxdepth 1 -type d -print0)
+    done < <(find "$proc_dir" -xdev -mindepth 1 -maxdepth 1 -type d -printf '%T@\t%f\t%p\0')
 done
 
 if [[ $DRY_RUN -eq 1 ]]; then
-    echo "Scanned: $scanned, Would delete: $deleted, Declined: $declined, Kept: $kept"
+    echo "Scanned: $scanned, Skipped: $skipped, Would delete: $deleted, Declined: $declined, Kept: $kept"
 else
-    echo "Scanned: $scanned, Deleted: $deleted, Declined: $declined, Kept: $kept"
+    echo "Scanned: $scanned, Skipped: $skipped, Deleted: $deleted, Declined: $declined, Kept: $kept"
 fi
