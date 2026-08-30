@@ -25,6 +25,12 @@ function usage() {
     Always run/do-not-run the pipeline (across system boots)
         ${PROG} [[-H host] ... ] always-on|always-off 
 
+    Show the pipeline version (v0: pipeline.DemonLAST, v1: pipeline.last.pipes.PipelineDemon)
+        ${PROG} [[-H host] ... ] version [id]
+
+    Set the pipeline version for one data directory (needs a service restart)
+        ${PROG} [[-H host] ... ] version id v0|v1
+
 EOF
 }
 
@@ -75,7 +81,7 @@ fi
 
 
 case "${action}" in
-    status|start|stop|enable|disable)
+    status|start|stop|enable|disable|version)
         ;;
     *)
         usage
@@ -99,6 +105,24 @@ case ${action} in
         ;;
     disable)
         cmd='systemctl disable last-pipeline{1,2}'
+        ;;
+    version)
+        service=/usr/local/share/last-tool/bin/last-pipeline-service
+        id="${2}"
+        version="${3}"
+        if [ "${id}" ] && [[ ! "${id}" =~ ^[0-9]+$ ]]; then
+            usage
+            exit 1
+        fi
+        if [ "${version}" ]; then
+            if [ ! "${id}" ]; then
+                usage
+                exit 1
+            fi
+            cmd="${service} set-version ${id} ${version}"
+        else
+            cmd="${service} version ${id}"
+        fi
         ;;
 esac
 

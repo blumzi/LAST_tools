@@ -8,11 +8,91 @@ export LANG=en_US
 export LANGUAGE="en_US:en"
 PROG=$(basename ${0})
 
+#
+# The pipeline version passed to startBatchLASTPipeline():
+#   v0 - production pipeline (pipeline.DemonLAST)
+#   v1 - development pipeline (pipeline.last.pipes.PipelineDemon)
+#
+default_version="v0"
+known_versions="v0 v1"
+conf_file="${LAST_PIPELINE_CONF:-$(eval echo ~ocs)/.config/last/pipeline.conf}"
+
 function usage() {
-    echo ""
-    echo "Usage: ${PROG} start|stop id"
-    echo "       ${PROG} status"
-    echo ""
+    cat <<- EOF
+
+Usage: ${PROG} start id [version]
+       ${PROG} stop id
+       ${PROG} status
+       ${PROG} version [id]
+       ${PROG} set-version id version
+
+    version: one of: ${known_versions}
+             v0 - pipeline.DemonLAST (production)
+             v1 - pipeline.last.pipes.PipelineDemon (development)
+
+    The version used by 'start' is the first one of:
+       1. the command line argument
+       2. the environment: \$LAST_PIPELINE_VERSION_<id>, then \$LAST_PIPELINE_VERSION
+       3. the configuration file (${conf_file}), lines:
+              version_<id>=v0|v1     (per data directory)
+              version=v0|v1          (all data directories)
+       4. the default (${default_version})
+
+    'set-version' writes the per-data-directory version into the configuration
+    file; the service has to be restarted for it to take effect.
+
+EOF
+}
+
+#
+# Gets the version for a data directory from the configuration file (if any)
+#
+function version_from_conf() {
+    local id="${1}" version
+
+    [ -r "${conf_file}" ] || return 0
+
+    version=$(sed -n -E "s;^[[:space:]]*version_${id}[[:space:]]*=[[:space:]]*([^[:space:]#]+).*;\1;p" "${conf_file}" | tail -1)
+    if [ ! "${version}" ]; then
+        version=$(sed -n -E "s;^[[:space:]]*version[[:space:]]*=[[:space:]]*([^[:space:]#]+).*;\1;p" "${conf_file}" | tail -1)
+    fi
+    echo "${version}"
+}
+
+#
+# Resolves the version for a data directory: argument, environment,
+# configuration file, default - in this order
+#
+function pipeline_version() {
+    local id="${1}" version="${2}" env_var
+
+    if [ ! "${version}" ]; then
+        env_var="LAST_PIPELINE_VERSION_${id}"
+        version="${!env_var}"
+    fi
+    [ "${version}" ] || version="${LAST_PIPELINE_VERSION}"
+    [ "${version}" ] || version="$(version_from_conf "${id}")"
+    [ "${version}" ] || version="${default_version}"
+
+    echo "${version}"
+}
+
+function valid_version() {
+    local version="${1}" known
+
+    for known in ${known_versions}; do
+        [ "${version}" = "${known}" ] && return 0
+    done
+    return 1
+}
+
+#
+# Matches the command lines of both the last-matlab wrapper and the MATLAB
+# process of one pipeline service, e.g.:
+#   ... startBatchLASTPipeline('Id', 1, 'PipelineVersion', 'v0');
+#
+function process_pattern() {
+    echo "startBatchLASTPipeline\('Id', *${1}[,)]"
 }
 
 if [ $# -lt 1 ]; then
@@ -29,8 +109,16 @@ case "${action}" in
             usage
             exit 1
         fi
+
+        version=$( pipeline_version "${id}" "${3}" )
+        if ! valid_version "${version}"; then
+            echo "${PROG}: invalid pipeline version '${version}' (expected one of: ${known_versions})" >&2
+            exit 1
+        fi
+
         eval $(grep SLACK ~ocs/.bash_aliases)
-        exec last-matlab -nodisplay -batch "addpath(\"/home/ocs/matlab/AstroPack/matlab/startup\"); startBatchLASTPipeline('Id', ${id});" &
+        logger -t "${PROG}" "starting LAST pipeline ${id} (PipelineVersion=${version})"
+        exec last-matlab -nodisplay -batch "addpath(\"/home/ocs/matlab/AstroPack/matlab/startup\"); startBatchLASTPipeline('Id', ${id}, 'PipelineVersion', '${version}');" &
         ;;
 
     stop)
@@ -38,7 +126,41 @@ case "${action}" in
             usage
             exit 1
         fi
-        pkill -f "DataDir=${id}" >/dev/null 2>&1
+
+        pattern="$( process_pattern "${id}" )"
+        pkill -f "${pattern}" >/dev/null 2>&1
+        for _ in $(seq 1 30); do
+            pgrep -f "${pattern}" >/dev/null 2>&1 || break
+            sleep 1
+        done
+        if pgrep -f "${pattern}" >/dev/null 2>&1; then
+            logger -t "${PROG}" "LAST pipeline ${id} did not stop gracefully - killing it"
+            pkill -KILL -f "${pattern}" >/dev/null 2>&1
+        fi
+        exit 0
+        ;;
+
+    set-version)
+        version="${3}"
+        if [ ! "${id}" ] || [ ! "${version}" ]; then
+            usage
+            exit 1
+        fi
+        if ! valid_version "${version}"; then
+            echo "${PROG}: invalid pipeline version '${version}' (expected one of: ${known_versions})" >&2
+            exit 1
+        fi
+
+        conf_dir="$( dirname "${conf_file}" )"
+        if ! mkdir -p "${conf_dir}" || ! touch "${conf_file}"; then
+            echo "${PROG}: cannot write ${conf_file}" >&2
+            exit 1
+        fi
+        sed -i -E "/^[[:space:]]*version_${id}[[:space:]]*=/d" "${conf_file}"
+        echo "version_${id}=${version}" >> "${conf_file}"
+        # the file is read by the service, which runs as ocs
+        chown ocs:ocs "${conf_dir}" "${conf_file}" 2>/dev/null
+        echo "${PROG}: pipeline ${id} set to ${version} (restart last-pipeline${id} to apply)"
         exit 0
         ;;
 
@@ -47,6 +169,17 @@ case "${action}" in
         for id in ${expected_ids[*]}; do
             systemctl status last-pipeline${id}
         done
+        ;;
+
+    version)
+        if [ "${id}" ]; then
+            pipeline_version "${id}"
+        else
+            expected_ids=( 1 2 )
+            for id in ${expected_ids[*]}; do
+                printf "%d: %s\n" "${id}" "$( pipeline_version "${id}" )"
+            done
+        fi
         ;;
 
     *)
