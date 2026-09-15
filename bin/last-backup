@@ -447,7 +447,7 @@ function get_unsynced_files() {
 #
 function was_successfully_tranfered() {
     local data_dir="${1}"
-    local rc ndiffs
+    local rc=1 ndiffs      # a failed dry-run means "not verified", never "synced"
     local diffs=$(mktemp)
 
     if get_unsynced_files ${data_dir} > ${diffs}; then
@@ -569,6 +569,11 @@ function backup_one_candidate() {
 
 
     local ndiffs=$(wc -l < ${diffs})
+    if (( ndiffs == 0 )); then      # the dry-run failed (see get_unsynced_files), nothing to split
+        message_error "${job_tag} Could not get the list of files to transfer, skipping it"
+        /bin/rm -f ${diffs}
+        return
+    fi
 
     #
     # If there are more than min_files_per_worker files per worker, split the workload
