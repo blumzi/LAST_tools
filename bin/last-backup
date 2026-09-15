@@ -809,7 +809,7 @@ if [ ${#total_candidates_for_backup[*]} -ne 0 ]; then
     done
 else
     if (( verbosity_level > 0 )); then
-        message_ok "No candidates for backup"
+        message_success "No candidates for backup"
     fi
 fi
 
