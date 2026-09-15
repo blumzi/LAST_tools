@@ -674,8 +674,8 @@ for candidate in ${candidates[*]}; do
         continue
     fi
 
-    hours_from_ready[${candidate}]=${hours}
     hours=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
+    hours_from_ready[${candidate}]=${hours}
 
     if grep -qw transfered ${stat_file}; then
 
