@@ -3,17 +3,28 @@
 # last-moveRAW2external — transfer raw/ data directories from local archive
 #                         to an external host (marvin).
 #
-# Usage: last-moveRAW2external -n NODE -y YEAR -m MM[-MM] [-p PARALLEL] [-r USER@HOST] [-i]
+# Usage: last-moveRAW2external -n NODE -y YEAR -m MM[-MM] [-d DD[-DD]] [-p PARALLEL]
+#                              [-b KBPS] [-L LOGDIR] [-r USER@HOST] [-i]
+#
+# Network notes (LAST_issues #226): the observatory->Weizmann path has ~65 ms
+# RTT, ~0.4% intrinsic packet loss and a policer at ~45 MB/s shared by every
+# node and by last-backup. Throughput is therefore budgeted, not maximised:
+# a few streams per node, each rate-limited, all multiplexed over a single ssh
+# connection so that marvin's sshd MaxStartups is never hit.
 
 set -uo pipefail
 
 readonly LOCK_DIR="/var/lock"
-readonly LOG_DIR="/tmp"
+readonly LOG_DIR_DEFAULT="/tmp"
 readonly REMOTE_DEFAULT="last@marvin"
+readonly PAR_DEFAULT=2
+readonly BWLIMIT_DEFAULT=1200        # KiB/s per rsync stream
+readonly MAX_ATTEMPTS=3              # per raw/ directory
+readonly RETRY_BACKOFF=(30 60 120)   # seconds before attempt 2, 3, ...
 
 usage() {
-  cat <<EOF
-Usage: $(basename "$0") -n NODE -y YEAR -m MM[-MM] [-p PARALLEL] [-r USER@HOST] [-i]
+  cat <<EOU
+Usage: $(basename "$0") -n NODE -y YEAR -m MM[-MM] [-d DD[-DD]] [-p PARALLEL] [-b KBPS] [-L LOGDIR] [-r USER@HOST] [-i]
 
   -n NODE       node number; allowed range depends on hostname suffix:
                   lastNNe -> NODE must be 1 or 2
@@ -23,12 +34,17 @@ Usage: $(basename "$0") -n NODE -y YEAR -m MM[-MM] [-p PARALLEL] [-r USER@HOST] 
   -m MM[-MM]    single month (e.g. 07) or inclusive range (e.g. 07-09); auto-padded
   -d DD[-DD]    single day (e.g. 15) or inclusive range (e.g. 10-20); auto-padded;
                 only valid when -m specifies a single month
-  -p PARALLEL   parallel rsync jobs (default 10)
+  -p PARALLEL   parallel rsync streams (default ${PAR_DEFAULT}); all streams share one
+                ssh connection, so PARALLEL must stay below the remote sshd MaxSessions
+  -b KBPS       per-stream rate limit in KiB/s, 0 = unlimited (default ${BWLIMIT_DEFAULT}).
+                The WAN link carries ~45 MB/s in total for all nodes AND last-backup;
+                keep nodes * PARALLEL * KBPS around 30000 fleet-wide
+  -L LOGDIR     directory for the run log and the fail list (default ${LOG_DIR_DEFAULT})
   -r USER@HOST  remote ssh target (default: ${REMOTE_DEFAULT})
   -i            interactive: print resolved inputs/paths and ask for confirmation
                 before starting any transfer (requires a controlling terminal)
   -h            show this help
-EOF
+EOU
 }
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -38,17 +54,21 @@ NODE_IN=""
 YEAR=""
 MONTH_RAW=""
 DAY_RAW=""
-PAR=10
+PAR=$PAR_DEFAULT
+BWLIMIT=$BWLIMIT_DEFAULT
+LOG_DIR="$LOG_DIR_DEFAULT"
 REMOTE="$REMOTE_DEFAULT"
 INTERACTIVE=0
 
-while getopts ":n:y:m:d:p:r:ih" opt; do
+while getopts ":n:y:m:d:p:b:L:r:ih" opt; do
   case "$opt" in
     n) NODE_IN="$OPTARG" ;;
     y) YEAR="$OPTARG" ;;
     m) MONTH_RAW="$OPTARG" ;;
     d) DAY_RAW="$OPTARG" ;;
     p) PAR="$OPTARG" ;;
+    b) BWLIMIT="$OPTARG" ;;
+    L) LOG_DIR="$OPTARG" ;;
     r) REMOTE="$OPTARG" ;;
     i) INTERACTIVE=1 ;;
     h) usage; exit 0 ;;
@@ -87,6 +107,8 @@ LOCKFILE="$LOCK_DIR/last-moveRAW2external_node${NODE}.lock"
 
 [[ "$PAR" =~ ^[0-9]+$ ]] && (( PAR >= 1 )) \
                               || die "PARALLEL must be a positive integer, got: $PAR"
+[[ "$BWLIMIT" =~ ^[0-9]+$ ]]  || die "KBPS must be a non-negative integer, got: $BWLIMIT"
+[[ -d "$LOG_DIR" && -w "$LOG_DIR" ]] || die "LOGDIR is not a writable directory: $LOG_DIR"
 
 if   [[ "$MONTH_RAW" =~ ^([0-9]{1,2})$ ]]; then
   MS="${BASH_REMATCH[1]}"; ME="$MS"
@@ -147,20 +169,35 @@ FAIL_LOCK="${FAIL_FILE}.lock"
 
 log() { echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"; }
 
+# ---------- one ssh connection for the whole run ----------
+# Every ssh/rsync below multiplexes over this master (ControlMaster); a new
+# connection is opened only if the master has died. Unix sockets need a short
+# path, hence a private dir under /tmp rather than under LOG_DIR.
+CTL_DIR="$(mktemp -d /tmp/lmr.XXXXXX)" || die "cannot create control dir"
+SSH_OPTS="-o BatchMode=yes -o ControlMaster=auto -o ControlPath=${CTL_DIR}/ctl \
+-o ControlPersist=600 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+-o Compression=no -c aes128-gcm@openssh.com"
+
+cleanup() {
+  ssh $SSH_OPTS -O exit "$REMOTE" >/dev/null 2>&1
+  rm -rf "$CTL_DIR"
+}
+trap 'cleanup' EXIT
 trap 'log "interrupted (SIGINT/SIGTERM)"; exit 130' INT TERM
 
-log "host=$HOST_SHORT tag=$LAST_TAG year=$YEAR months=${MONTHS[*]}${DAYS[*]:+ days=${DAYS[*]}} parallel=$PAR"
+log "host=$HOST_SHORT tag=$LAST_TAG year=$YEAR months=${MONTHS[*]}${DAYS[*]:+ days=${DAYS[*]}} parallel=$PAR bwlimit=${BWLIMIT}KiB/s"
 log "src_base=$SRC_BASE"
 log "dst_base=${REMOTE}:${DST_BASE}"
 log "log=$LOG_FILE  fail_list=$FAIL_FILE"
 
-# ---------- pre-flight: remote reachable + base creatable ----------
-ssh -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" "mkdir -p \"$DST_BASE\"" \
+# ---------- pre-flight: remote reachable + base creatable (opens the master) ----------
+ssh $SSH_OPTS -o ConnectTimeout=10 "$REMOTE" "mkdir -p \"$DST_BASE\"" \
   || die "pre-flight ssh to $REMOTE failed"
 log "pre-flight ssh OK"
 
 # ---------- export for inner bash ----------
-export REMOTE SRC_BASE DST_BASE LOG_FILE FAIL_FILE LOG_LOCK FAIL_LOCK
+export REMOTE SRC_BASE DST_BASE LOG_FILE FAIL_FILE LOG_LOCK FAIL_LOCK SSH_OPTS BWLIMIT MAX_ATTEMPTS
+export RETRY_BACKOFF_STR="${RETRY_BACKOFF[*]}"
 
 # ---------- enumerate transfer candidates ----------
 find_args=( "$SRC_BASE" -type d "(" )
@@ -205,6 +242,7 @@ if (( INTERACTIVE )); then
   log "months        : ${MONTHS[*]}"
   (( ${#DAYS[@]} > 0 )) && log "days          : ${DAYS[*]}"
   log "parallel      : $PAR"
+  log "bwlimit       : ${BWLIMIT} KiB/s per stream"
   log "remote        : $REMOTE"
   log "src_base      : $SRC_BASE"
   log "dst_base      : ${REMOTE}:${DST_BASE}"
@@ -222,18 +260,38 @@ if (( INTERACTIVE )); then
 fi
 
 # ---------- run transfers in parallel ----------
+# One rsync per raw/ dir; the target dir is created inside the same session
+# (--rsync-path), so no extra ssh connection per directory. Transient failures
+# (connection/protocol/partial: 10 12 23 24 30 35 255) are retried with backoff;
+# --remove-source-files makes a retry transfer only what has not landed yet.
 printf '%s\0' "${SRC_DIRS[@]}" | xargs -0 -I{} -P "$PAR" bash -c '
   SRC_DIR="$1"
   REL_PATH="${SRC_DIR#"$SRC_BASE"/}"
   DST_DIR="$DST_BASE/$REL_PATH"
+  read -r -a BACKOFF <<<"$RETRY_BACKOFF_STR"
+  BW_ARG=()
+  (( BWLIMIT > 0 )) && BW_ARG=( "--bwlimit=$BWLIMIT" )
 
   TLOG="$(mktemp)"
   {
     echo "=== START $(date -Iseconds) :: $SRC_DIR -> $REMOTE:$DST_DIR"
-    ssh -o BatchMode=yes "$REMOTE" "mkdir -p \"$DST_DIR\""
-    nice -n 10 ionice -c2 -n7 rsync --dry-run -av --remove-source-files "$SRC_DIR/" "$REMOTE:$DST_DIR/"
-    nice -n 10 ionice -c2 -n7 rsync           -av --remove-source-files "$SRC_DIR/" "$REMOTE:$DST_DIR/"
-    rc=$?
+    attempt=1
+    while :; do
+      nice -n 10 ionice -c2 -n7 rsync -av --partial --remove-source-files "${BW_ARG[@]}" \
+        -e "ssh $SSH_OPTS" --rsync-path="mkdir -p \"$DST_DIR\" && rsync" \
+        "$SRC_DIR/" "$REMOTE:$DST_DIR/"
+      rc=$?
+      [[ $rc -eq 0 ]] && break
+      case "$rc" in
+        10|12|23|24|30|35|255) ;;
+        *) break ;;
+      esac
+      (( attempt < MAX_ATTEMPTS )) || break
+      delay=${BACKOFF[attempt-1]:-${BACKOFF[-1]}}
+      echo "=== RETRY rc=$rc attempt=$attempt/$MAX_ATTEMPTS $(date -Iseconds) :: $SRC_DIR (sleeping ${delay}s)"
+      sleep "$delay"
+      attempt=$((attempt+1))
+    done
     if [[ $rc -eq 0 ]]; then
       find "$SRC_DIR" -depth -type d -empty -delete
       echo "=== OK    $(date -Iseconds) :: $SRC_DIR"
