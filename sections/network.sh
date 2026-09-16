@@ -56,7 +56,7 @@ function network_enforce() {
              - ${network_local_ipaddr}/${network_prefix}
             gateway4: ${network_gateway}
             nameservers:
-              addresses: [132.77.4.1, 132.77.22.1]
+              addresses: [10.23.1.25, 132.77.4.1, 132.77.22.1]   # last0 site cache (unbound, serve-expired) first, Weizmann as fallback
               search: [wisdom.weizmann.ac.il, wismain.weizmann.ac.il, weizmann.ac.il]
 EOF
 	if [ -e "${plan}" ]; then

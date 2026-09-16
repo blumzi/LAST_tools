@@ -54,6 +54,9 @@ ff02::2         ip6-allrouters
 132.77.100.5    ntp.weizmann.ac.il
 10.23.1.40      skycam
 10.23.1.222     rpi-ntp
+# Transfer targets at Weizmann: resolvable even when the WAN DNS path is degraded (LAST_issues #226)
+10.140.39.10    marvin.weizmann.ac.il marvin
+10.150.28.18    euclid.weizmann.ac.il euclid
 		
 EOF
 
