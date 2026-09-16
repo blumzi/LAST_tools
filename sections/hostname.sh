@@ -106,22 +106,20 @@ function hostname_check() {
         message_failure "The hostname \"${current_hostname}\" is not a valid LAST hostname"
     fi
 
+    # Every host that hostname_enforce writes into /etc/hosts (the 10.23.* lines
+    # of the MAC map) must be present; checking the same source keeps the check
+    # and the enforce in step, instead of a hard-coded list of mounts.
     local -a hostnames
-    hostnames=( last0 )
-    for ((mount = 1; mount <= 12; mount++)); do
-        for side in 'e' 'w'; do
-            hostnames+=( "$(hostname_make_name "${mount}" "${side}")" )
-        done
-    done
+    mapfile -t hostnames < <( util_uncomment "$(macmap_file)" | grep 10.23 | awk '{print $3}' )
 
     local -a missing
     for hostname in "${hostnames[@]}"; do
-        grep -wq "${hostname}" /etc/hosts >/dev/null || missing+=( "${hostname}" )  
+        grep -wq "${hostname}" /etc/hosts >/dev/null || missing+=( "${hostname}" )
     done
-    if [ ${#missing[*]} -gt 0 ]; then        
-        message_failure "Missing entries for hostname(s) \"${missing[*]}\" in /etc/hosts"
+    if [ ${#missing[*]} -gt 0 ]; then
+        message_failure "Missing entries for hostname(s) \"${missing[*]}\" in /etc/hosts (run: last-tool enforce hostname)"
     else
-        message_success "All LAST hosts have entries in /etc/hosts."
+        message_success "All ${#hostnames[*]} MAC-map hosts have entries in /etc/hosts."
     fi
 
     #
