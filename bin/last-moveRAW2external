@@ -184,7 +184,9 @@ cleanup() {
   rm -rf "$CTL_DIR"
 }
 trap 'cleanup' EXIT
-trap 'log "interrupted (SIGINT/SIGTERM)"; exit 130' INT TERM
+# On interrupt, stop this run's rsyncs first: they exit 20, the workers log
+# ABORT (no retry, no fail-list entry), then the EXIT trap closes the master.
+trap 'log "interrupted (SIGINT/SIGTERM)"; pkill -TERM -f "^rsync .* ${REMOTE}:${DST_BASE}/" 2>/dev/null; exit 130' INT TERM
 
 log "host=$HOST_SHORT tag=$LAST_TAG year=$YEAR months=${MONTHS[*]}${DAYS[*]:+ days=${DAYS[*]}} parallel=$PAR bwlimit=${BWLIMIT}KiB/s"
 log "src_base=$SRC_BASE"
@@ -197,7 +199,7 @@ ssh $SSH_OPTS -o ConnectTimeout=10 "$REMOTE" "mkdir -p \"$DST_BASE\"" \
 log "pre-flight ssh OK"
 
 # ---------- export for inner bash ----------
-export REMOTE SRC_BASE DST_BASE LOG_FILE FAIL_FILE LOG_LOCK FAIL_LOCK SSH_OPTS BWLIMIT MAX_ATTEMPTS
+export REMOTE SRC_BASE DST_BASE LOG_FILE FAIL_FILE LOG_LOCK FAIL_LOCK SSH_OPTS BWLIMIT MAX_ATTEMPTS CTL_DIR
 export RETRY_BACKOFF_STR="${RETRY_BACKOFF[*]}"
 
 # ---------- enumerate transfer candidates ----------
@@ -276,13 +278,18 @@ printf '%s\0' "${SRC_DIRS[@]}" | xargs -0 -I{} -P "$PAR" bash -c '
   TLOG="$(mktemp)"
   {
     echo "=== START $(date -Iseconds) :: $SRC_DIR -> $REMOTE:$DST_DIR"
-    attempt=1
+    attempt=1; aborted=0
     while :; do
       nice -n 10 ionice -c2 -n7 rsync -av --partial --remove-source-files "${BW_ARG[@]}" \
         -e "ssh $SSH_OPTS" --rsync-path="mkdir -p \"$DST_DIR\" && rsync" \
         "$SRC_DIR/" "$REMOTE:$DST_DIR/"
       rc=$?
       [[ $rc -eq 0 ]] && break
+      # rsync exits 20 on SIGINT/SIGTERM; a missing control dir means the run
+      # itself was torn down (interrupt): stop quietly, no retry, no fail-list entry
+      if [[ $rc -eq 20 || ! -d "$CTL_DIR" ]]; then
+        aborted=1; break
+      fi
       case "$rc" in
         10|12|23|24|30|35|255) ;;
         *) break ;;
@@ -290,10 +297,13 @@ printf '%s\0' "${SRC_DIRS[@]}" | xargs -0 -I{} -P "$PAR" bash -c '
       (( attempt < MAX_ATTEMPTS )) || break
       delay=${BACKOFF[attempt-1]:-${BACKOFF[-1]}}
       echo "=== RETRY rc=$rc attempt=$attempt/$MAX_ATTEMPTS $(date -Iseconds) :: $SRC_DIR (sleeping ${delay}s)"
-      sleep "$delay"
+      for ((t = 0; t < delay; t++)); do [[ -d "$CTL_DIR" ]] || break; sleep 1; done
+      [[ -d "$CTL_DIR" ]] || { aborted=1; break; }
       attempt=$((attempt+1))
     done
-    if [[ $rc -eq 0 ]]; then
+    if (( aborted )); then
+      echo "=== ABORT rc=$rc $(date -Iseconds) :: $SRC_DIR (run interrupted)"
+    elif [[ $rc -eq 0 ]]; then
       find "$SRC_DIR" -depth -type d -empty -delete
       echo "=== OK    $(date -Iseconds) :: $SRC_DIR"
     else
@@ -308,8 +318,9 @@ printf '%s\0' "${SRC_DIRS[@]}" | xargs -0 -I{} -P "$PAR" bash -c '
 
 # ---------- summary ----------
 FAILS=$(wc -l <"$FAIL_FILE")
-OKS=$(( TRANSFERS - FAILS ))
-log "summary: ok=$OKS fail=$FAILS total=$TRANSFERS"
+ABORTS=$(grep -c '^=== ABORT' "$LOG_FILE")
+OKS=$(( TRANSFERS - FAILS - ABORTS ))
+log "summary: ok=$OKS fail=$FAILS aborted=$ABORTS total=$TRANSFERS"
 if (( FAILS > 0 )); then
   log "failed sources:"
   while IFS= read -r f; do log "  $f"; done <"$FAIL_FILE"
