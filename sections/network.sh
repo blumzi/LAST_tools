@@ -45,6 +45,8 @@ function network_enforce() {
 
     network_set_defaults
 
+    # nameservers: last0's site DNS cache (unbound, serve-expired) first, the
+    # Weizmann servers as fallback (LAST_issues #226)
     cat <<- EOF > "${tmp}"
     network:
         version: 2
@@ -56,7 +58,7 @@ function network_enforce() {
              - ${network_local_ipaddr}/${network_prefix}
             gateway4: ${network_gateway}
             nameservers:
-              addresses: [10.23.1.25, 132.77.4.1, 132.77.22.1]   # last0 site cache (unbound, serve-expired) first, Weizmann as fallback
+              addresses: [10.23.1.25, 132.77.4.1, 132.77.22.1]
               search: [wisdom.weizmann.ac.il, wismain.weizmann.ac.il, weizmann.ac.il]
 EOF
 	if [ -e "${plan}" ]; then
