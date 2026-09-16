@@ -18,7 +18,7 @@ readonly LOCK_DIR="/var/lock"
 readonly LOG_DIR_DEFAULT="/tmp"
 readonly REMOTE_DEFAULT="last@marvin"
 readonly PAR_DEFAULT=2
-readonly BWLIMIT_DEFAULT=1200        # KiB/s per rsync stream
+readonly BWLIMIT_DEFAULT=900         # KiB/s per rsync stream
 readonly MAX_ATTEMPTS=3              # per raw/ directory
 readonly RETRY_BACKOFF=(30 60 120)   # seconds before attempt 2, 3, ...
 
@@ -37,8 +37,9 @@ Usage: $(basename "$0") -n NODE -y YEAR -m MM[-MM] [-d DD[-DD]] [-p PARALLEL] [-
   -p PARALLEL   parallel rsync streams (default ${PAR_DEFAULT}); all streams share one
                 ssh connection, so PARALLEL must stay below the remote sshd MaxSessions
   -b KBPS       per-stream rate limit in KiB/s, 0 = unlimited (default ${BWLIMIT_DEFAULT}).
-                The WAN link carries ~45 MB/s in total for all nodes AND last-backup;
-                keep nodes * PARALLEL * KBPS around 30000 fleet-wide
+                The WAN link carries ~45 MB/s in total for all nodes AND last-backup
+                (which has its own budget, see last-backup -b); keep
+                nodes * PARALLEL * KBPS around 20000 fleet-wide
   -L LOGDIR     directory for the run log and the fail list (default ${LOG_DIR_DEFAULT})
   -r USER@HOST  remote ssh target (default: ${REMOTE_DEFAULT})
   -i            interactive: print resolved inputs/paths and ask for confirmation
