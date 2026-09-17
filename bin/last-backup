@@ -89,6 +89,12 @@ default_njobs=1
 # see LAST_issues #226.
 default_bwlimit=1200
 bwlimit=${default_bwlimit}
+# At most this many last-backup instances transfer at the same time on this
+# machine (the pipeline starts one per visit); the others wait for a free slot.
+default_max_instances=6
+max_instances=${default_max_instances}
+slot_dir=/var/lock/last-backup-slots
+slot_wait_max=21600   # seconds an instance waits for a slot before going ahead anyway
 basic_exclusion_pattern="--exclude '*/raw'"
 extended_exclusion_pattern="--exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
 rsync_extra_args="${basic_exclusion_pattern} ${extended_exclusion_pattern}"
@@ -131,9 +137,11 @@ function usage() {
     Resources:
      -j|--jobs N      - Run upto N jobs (default: ${default_njobs}) in parallel
      -p|--processes   - Specifies the number of processes to use per job (default: ${default_nprocs})
-     -b|--bwlimit KBPS - Bandwidth budget for this NODE in KiB/s, shared by all running
+     -b|--bwlimit KBPS - Bandwidth budget for this NODE in KiB/s, shared by the transferring
                         last-backup instances and split among their rsync streams;
                         0 = unlimited (default: ${default_bwlimit})
+     -M|--max-instances N - At most N instances transfer concurrently on this node, the
+                        rest queue for a slot (default: ${default_max_instances}; 0 = no limit)
      -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
 
      -a|--age         - Specify old age (in hours) (default: ${default_old_age_hours})
@@ -153,7 +161,7 @@ EOF
 }
 
 getopt_err=$(mktemp)
-OPTS=$( getopt -o 'Ss:f:t:hi:p:xrj:FkvcRab:' --long "age:,running,check,kill,status,jobs,help,extra:,processes:,bwlimit:,identity:,source:,from:,to:,target:,remove,full,verbose" -n "${PROG}" -- "$@" 2> ${getopt_err} )
+OPTS=$( getopt -o 'Ss:f:t:hi:p:xrj:FkvcRab:M:' --long "age:,running,check,kill,status,jobs,help,extra:,processes:,bwlimit:,max-instances:,identity:,source:,from:,to:,target:,remove,full,verbose" -n "${PROG}" -- "$@" 2> ${getopt_err} )
 if [ $? -ne 0 ]; then
     if [ -r ${getopt_err} ]; then
         message_failure "$(< ${getopt_err})"
@@ -319,6 +327,11 @@ while true; do
 
     -b|--bwlimit)
         bwlimit="${2}"
+        shift 2
+        ;;
+
+    -M|--max-instances)
+        max_instances="${2}"
         shift 2
         ;;
     
@@ -548,15 +561,47 @@ function is_LAST_visit() {
 }
 
 #
-# Number of top-level last-backup instances on this machine (chunk subshells,
-# which share the script's command line, are excluded via their parent)
+# Transfer slots: an instance may transfer only while it holds one of the
+# ${max_instances} lock files in ${slot_dir}; the lock is held by an open fd
+# (inherited by the chunk subshells) and released with backup_release_slot.
 #
-function backup_running_instances() {
-    local pid ppid n=0
-    for pid in $(pgrep -f "[l]ast-backup"); do
-        ppid=$(ps -o ppid= -p "${pid}" 2>/dev/null | tr -d ' ')
-        [ -n "${ppid}" ] || continue
-        ps -o args= -p "${ppid}" 2>/dev/null | grep -q "last-backup" || (( n++ ))
+slot_fd=""
+function backup_acquire_slot() {
+    local i waited=0
+    (( max_instances > 0 )) || return 0
+    mkdir -p "${slot_dir}" 2>/dev/null; chmod 1777 "${slot_dir}" 2>/dev/null
+    while :; do
+        for ((i = 1; i <= max_instances; i++)); do
+            exec {slot_fd}>>"${slot_dir}/slot${i}" 2>/dev/null || continue
+            if flock -n "${slot_fd}"; then
+                return 0
+            fi
+            exec {slot_fd}>&-
+        done
+        slot_fd=""
+        if (( waited >= slot_wait_max )); then
+            message_warning "${job_tag} no transfer slot after ${waited}s, proceeding without one"
+            return 0
+        fi
+        (( waited == 0 )) && message_info "${job_tag} all ${max_instances} transfer slots busy, waiting ..."
+        sleep 20; waited=$(( waited + 20 ))
+    done
+}
+
+function backup_release_slot() {
+    [ -n "${slot_fd}" ] && exec {slot_fd}>&-
+    slot_fd=""
+}
+
+#
+# Number of slots currently held on this machine (= instances transferring)
+#
+function backup_active_slots() {
+    local i n=0
+    (( max_instances > 0 )) || { pgrep -fc "[l]ast-backup"; return; }
+    for ((i = 1; i <= max_instances; i++)); do
+        [ -e "${slot_dir}/slot${i}" ] || continue
+        ( exec {fd}>>"${slot_dir}/slot${i}"; flock -n "${fd}" ) 2>/dev/null || (( n++ ))
     done
     echo "${n}"
 }
@@ -604,6 +649,8 @@ function backup_one_candidate() {
         return
     fi
 
+    backup_acquire_slot
+
     #
     # If there are more than min_files_per_worker files per worker, split the workload
     #
@@ -629,13 +676,12 @@ function backup_one_candidate() {
     local failed_chunks=${info_dir}/failed_chunks
     /bin/rm -f ${diffs}
 
-    # per-stream rate limit: the node's budget divided among the last-backup
-    # instances currently running here (top-level ones, not chunk subshells)
-    # and then among this job's chunks
+    # per-stream rate limit: the node's budget divided among the instances
+    # transferring right now (held slots) and then among this job's chunks
     local bwlimit_arg=""
     if [[ "${bwlimit}" =~ ^[0-9]+$ ]] && (( bwlimit > 0 )); then
         local ninstances
-        ninstances=$(backup_running_instances)
+        ninstances=$(backup_active_slots)
         (( ninstances < 1 )) && ninstances=1
         local per_stream=$(( bwlimit / ninstances / ${#chunks[*]} ))
         (( per_stream < 1 )) && per_stream=1
@@ -671,6 +717,7 @@ function backup_one_candidate() {
     done
 
     wait
+    backup_release_slot
 
     if [ -e ${failed_chunks} ]; then
         message_failure "${job_tag} $(wc -l < ${failed_chunks}) chunks (out of ${#chunks[*]}) failed"
