@@ -82,10 +82,12 @@ util_log_invokation ${*}
 identity=
 default_nprocs=3
 default_njobs=1
-# Bandwidth budget per job in KiB/s, divided among the job's rsync streams.
-# The WAN to Weizmann is a ~45 MB/s policed link shared with the raw moves
-# (last-moveRAW2external); see LAST_issues #226.
-default_bwlimit=2000
+# Bandwidth budget per NODE in KiB/s, shared by all last-backup instances
+# running on this machine (the products watcher starts one per ready directory)
+# and divided among each job's rsync streams. The WAN to Weizmann is a ~45 MB/s
+# policed link shared by ~20 nodes and the raw moves (last-moveRAW2external);
+# see LAST_issues #226.
+default_bwlimit=1200
 bwlimit=${default_bwlimit}
 basic_exclusion_pattern="--exclude '*/raw'"
 extended_exclusion_pattern="--exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
@@ -129,7 +131,8 @@ function usage() {
     Resources:
      -j|--jobs N      - Run upto N jobs (default: ${default_njobs}) in parallel
      -p|--processes   - Specifies the number of processes to use per job (default: ${default_nprocs})
-     -b|--bwlimit KBPS - Bandwidth budget per job in KiB/s, split among its rsync streams;
+     -b|--bwlimit KBPS - Bandwidth budget for this NODE in KiB/s, shared by all running
+                        last-backup instances and split among their rsync streams;
                         0 = unlimited (default: ${default_bwlimit})
      -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
 
@@ -545,6 +548,20 @@ function is_LAST_visit() {
 }
 
 #
+# Number of top-level last-backup instances on this machine (chunk subshells,
+# which share the script's command line, are excluded via their parent)
+#
+function backup_running_instances() {
+    local pid ppid n=0
+    for pid in $(pgrep -f "[l]ast-backup"); do
+        ppid=$(ps -o ppid= -p "${pid}" 2>/dev/null | tr -d ' ')
+        [ -n "${ppid}" ] || continue
+        ps -o args= -p "${ppid}" 2>/dev/null | grep -q "last-backup" || (( n++ ))
+    done
+    echo "${n}"
+}
+
+#
 # The actual backup engine, handles one backup candidate
 #
 function backup_one_candidate() {
@@ -612,10 +629,15 @@ function backup_one_candidate() {
     local failed_chunks=${info_dir}/failed_chunks
     /bin/rm -f ${diffs}
 
-    # per-stream rate limit: the job's budget divided among its chunks
+    # per-stream rate limit: the node's budget divided among the last-backup
+    # instances currently running here (top-level ones, not chunk subshells)
+    # and then among this job's chunks
     local bwlimit_arg=""
     if [[ "${bwlimit}" =~ ^[0-9]+$ ]] && (( bwlimit > 0 )); then
-        local per_stream=$(( bwlimit / ${#chunks[*]} ))
+        local ninstances
+        ninstances=$(backup_running_instances)
+        (( ninstances < 1 )) && ninstances=1
+        local per_stream=$(( bwlimit / ninstances / ${#chunks[*]} ))
         (( per_stream < 1 )) && per_stream=1
         bwlimit_arg="--bwlimit=${per_stream}"
     fi
