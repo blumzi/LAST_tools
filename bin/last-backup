@@ -90,11 +90,12 @@ default_njobs=1
 default_bwlimit=1200
 bwlimit=${default_bwlimit}
 # At most this many last-backup instances transfer at the same time on this
-# machine (the pipeline starts one per visit); the others wait for a free slot.
+# machine (the pipeline starts one per visit); the others wait for a free slot
+# for as long as it takes -- a bounded wait let a night's backlog spill past
+# the cap and saturate the WAN.
 default_max_instances=6
 max_instances=${default_max_instances}
 slot_dir=/var/lock/last-backup-slots
-slot_wait_max=21600   # seconds an instance waits for a slot before going ahead anyway
 basic_exclusion_pattern="--exclude '*/raw'"
 extended_exclusion_pattern="--exclude '*_sci_proc_Image_*' --exclude '*_sci_proc_Mask_*' --exclude '*_sci_proc_PSF_*'"
 rsync_extra_args="${basic_exclusion_pattern} ${extended_exclusion_pattern}"
@@ -579,10 +580,6 @@ function backup_acquire_slot() {
             exec {slot_fd}>&-
         done
         slot_fd=""
-        if (( waited >= slot_wait_max )); then
-            message_warning "${job_tag} no transfer slot after ${waited}s, proceeding without one"
-            return 0
-        fi
         (( waited == 0 )) && message_info "${job_tag} all ${max_instances} transfer slots busy, waiting ..."
         sleep 20; waited=$(( waited + 20 ))
     done
