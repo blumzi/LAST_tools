@@ -137,9 +137,10 @@ function usage() {
 
     Resources:
      -j|--jobs N      - Run upto N jobs (default: ${default_njobs}) in parallel
-     -p|--processes   - Specifies the number of processes to use per job (default: ${default_nprocs})
-     -b|--bwlimit KBPS - Bandwidth budget for this NODE in KiB/s, shared by the transferring
-                        last-backup instances and split among their rsync streams;
+     -p|--processes   - Specifies the number of processes to use per job (default: ${default_nprocs});
+                        ignored under a bandwidth budget (one stream per instance)
+     -b|--bwlimit KBPS - Bandwidth budget for this NODE in KiB/s: each of the -M transfer
+                        slots gets an equal share (one stream per instance);
                         0 = unlimited (default: ${default_bwlimit})
      -M|--max-instances N - At most N instances transfer concurrently on this node, the
                         rest queue for a slot (default: ${default_max_instances}; 0 = no limit)
@@ -653,6 +654,13 @@ function backup_one_candidate() {
     #
     local min_files_per_worker=10
     local nworkers=${nprocs}
+    # under a bandwidth budget: one stream per instance. Chunks are split by
+    # file count, not size, so they finish unevenly and a lone tail chunk then
+    # carries the instance's whole share at a fraction of it (measured: 6 slot
+    # holders with one live chunk each, 400 of 1200 KiB/s used).
+    if [[ "${bwlimit}" =~ ^[0-9]+$ ]] && (( bwlimit > 0 )); then
+        nworkers=1
+    fi
     local files_per_worker=$(( ( ndiffs / nworkers ) + 1 ))
     if (( files_per_worker <= min_files_per_worker )); then
         nworkers=1
@@ -673,12 +681,19 @@ function backup_one_candidate() {
     local failed_chunks=${info_dir}/failed_chunks
     /bin/rm -f ${diffs}
 
-    # per-stream rate limit: the node's budget divided among the instances
-    # transferring right now (held slots) and then among this job's chunks
+    # per-stream rate limit: the node's budget divided among the transfer
+    # slots (an equal, fixed share each -- a limit taken from the slots held
+    # at start would stay in force for the hours a stream lasts and let the
+    # first instances after a lull exceed the budget together) and then among
+    # this job's chunks; without slots, among the instances running now
     local bwlimit_arg=""
     if [[ "${bwlimit}" =~ ^[0-9]+$ ]] && (( bwlimit > 0 )); then
         local ninstances
-        ninstances=$(backup_active_slots)
+        if (( max_instances > 0 )); then
+            ninstances=${max_instances}
+        else
+            ninstances=$(backup_active_slots)
+        fi
         (( ninstances < 1 )) && ninstances=1
         local per_stream=$(( bwlimit / ninstances / ${#chunks[*]} ))
         (( per_stream < 1 )) && per_stream=1
