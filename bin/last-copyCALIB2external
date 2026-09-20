@@ -1,0 +1,202 @@
+#!/bin/bash
+#
+# last-copyCALIB2external — copy a camera's calib/ directory to an external
+#                           host (marvin) and, separately, prune the old
+#                           non-dark calibration files that are safely there.
+#
+# Usage: last-copyCALIB2external -n NODE [-b KBPS] [-L LOGDIR] [-r USER@HOST]
+#        last-copyCALIB2external -n NODE --prune-before YYYYMMDD [--delete] [-L LOGDIR] [-r USER@HOST]
+#
+# Unlike last-moveRAW2external this COPIES: the calibration frames stay on the
+# node, the pipeline keeps using them. rsync skips what is already on the
+# remote (size and mtime), so re-running it later brings the remote up to
+# date ("copy the calib data up to the current date").
+#
+# Pruning is a deliberate second step and never happens in a copy run: it
+# removes from the node the top-level twflat/bias/etc. files dated up to the
+# given day, keeps every *_dark_* file and every subdirectory (calibO, extra),
+# and only after rsync confirms that each candidate is on the remote with the
+# same size and mtime. Without --delete it just lists what it would remove.
+#
+# Network: same budget rules as last-moveRAW2external (LAST_issues #226): one
+# rate-limited stream per camera, multiplexed over one ssh connection.
+
+set -uo pipefail
+
+readonly LOCK_DIR="/var/lock"
+readonly LOG_DIR_DEFAULT="/tmp"
+readonly REMOTE_DEFAULT="last@marvin"
+readonly BWLIMIT_DEFAULT=500         # KiB/s for the single rsync stream
+readonly DST_ROOT="/home/last/lastdata"
+
+usage() {
+  cat <<EOU
+Usage: $(basename "$0") -n NODE [-b KBPS] [-L LOGDIR] [-r USER@HOST]
+       $(basename "$0") -n NODE --prune-before YYYYMMDD [--delete] [-L LOGDIR] [-r USER@HOST]
+
+  -n NODE       node number; allowed range depends on hostname suffix:
+                  lastNNe -> NODE must be 1 or 2
+                  lastNNw -> NODE must be 3 or 4
+  -b KBPS       rate limit of the copy in KiB/s, 0 = unlimited (default ${BWLIMIT_DEFAULT});
+                the WAN carries ~45 MB/s for all nodes, raw moves and last-backup together
+  -L LOGDIR     directory for the run log (default ${LOG_DIR_DEFAULT})
+  -r USER@HOST  remote ssh target (default: ${REMOTE_DEFAULT})
+  --prune-before YYYYMMDD
+                prune mode: list (or with --delete, remove) the top-level calib
+                files whose filename date is <= YYYYMMDD, except *_dark_* files
+                and subdirectories, provided each one is on the remote with the
+                same size and mtime. Copies nothing.
+  --delete      actually remove the files listed by --prune-before
+  -h            show this help
+EOU
+}
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+# ---------- parse args ----------
+NODE_IN=""
+BWLIMIT=$BWLIMIT_DEFAULT
+LOG_DIR="$LOG_DIR_DEFAULT"
+REMOTE="$REMOTE_DEFAULT"
+PRUNE_BEFORE=""
+DELETE=0
+
+# long options first (getopts does not know them)
+ARGS=()
+while (( $# )); do
+  case "$1" in
+    --prune-before) [[ $# -ge 2 ]] || die "--prune-before needs YYYYMMDD"; PRUNE_BEFORE="$2"; shift 2 ;;
+    --delete)       DELETE=1; shift ;;
+    --help)         usage; exit 0 ;;
+    --*)            usage >&2; die "unknown option: $1" ;;
+    *)              ARGS+=("$1"); shift ;;
+  esac
+done
+set -- "${ARGS[@]}"
+
+while getopts ":n:b:L:r:h" opt; do
+  case "$opt" in
+    n) NODE_IN="$OPTARG" ;;
+    b) BWLIMIT="$OPTARG" ;;
+    L) LOG_DIR="$OPTARG" ;;
+    r) REMOTE="$OPTARG" ;;
+    h) usage; exit 0 ;;
+    \?) usage >&2; die "unknown option: -$OPTARG" ;;
+    :)  usage >&2; die "option -$OPTARG requires an argument" ;;
+  esac
+done
+
+[[ -n "$REMOTE" ]] || die "-r REMOTE must not be empty"
+[[ "$REMOTE" =~ ^[^@[:space:]]+@[^@[:space:]]+$ ]] \
+  || die "REMOTE must be USER@HOST, got: $REMOTE"
+[[ -n "$NODE_IN" ]] || { usage >&2; die "-n NODE is required"; }
+[[ "$BWLIMIT" =~ ^[0-9]+$ ]] || die "KBPS must be a non-negative integer, got: $BWLIMIT"
+[[ -d "$LOG_DIR" && -w "$LOG_DIR" ]] || die "LOGDIR is not a writable directory: $LOG_DIR"
+if [[ -n "$PRUNE_BEFORE" ]]; then
+  [[ "$PRUNE_BEFORE" =~ ^[0-9]{8}$ ]] || die "--prune-before must be YYYYMMDD, got: $PRUNE_BEFORE"
+else
+  (( DELETE == 0 )) || die "--delete only makes sense with --prune-before"
+fi
+
+# ---------- hostname → camera + paths (same convention as last-moveRAW2external) ----------
+HOST_SHORT="$(hostname -s)"
+[[ "$HOST_SHORT" =~ ^last([0-9]+)([ew])$ ]] \
+  || die "hostname '$HOST_SHORT' does not match expected pattern lastNN[ew]"
+NODE_HOST="${BASH_REMATCH[1]}"
+HOST_SUFFIX="${BASH_REMATCH[2]}"
+[[ "$NODE_IN" =~ ^[0-9]+$ ]] || die "NODE must be digits, got: $NODE_IN"
+case "$HOST_SUFFIX" in
+  e) (( 10#$NODE_IN == 1 || 10#$NODE_IN == 2 )) \
+       || die "NODE must be 1 or 2 for host $HOST_SHORT, got: $NODE_IN" ;;
+  w) (( 10#$NODE_IN == 3 || 10#$NODE_IN == 4 )) \
+       || die "NODE must be 3 or 4 for host $HOST_SHORT, got: $NODE_IN" ;;
+esac
+printf -v NODE "%02d" "$((10#$NODE_IN))"
+if (( 10#$NODE % 2 == 1 )); then DATA_VOL="data1"; else DATA_VOL="data2"; fi
+LAST_TAG="LAST.01.${NODE_HOST}.${NODE}"
+SRC="/${HOST_SHORT}/${DATA_VOL}/archive/${LAST_TAG}/calib"
+DST="${DST_ROOT}/${LAST_TAG}/calib"
+[[ -d "$SRC" ]] || die "no such directory: $SRC"
+
+# ---------- one run per camera ----------
+LOCKFILE="$LOCK_DIR/last-copyCALIB2external_node${NODE}.lock"
+exec 8>"$LOCKFILE" || die "cannot open lockfile $LOCKFILE"
+flock -n 8         || die "another instance is running (lockfile: $LOCKFILE)"
+
+RUN_TS="$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="${LOG_DIR}/last-copyCALIB2external_${RUN_TS}_$$.log"
+: >"$LOG_FILE"
+log() { echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"; }
+
+CTL_DIR="$(mktemp -d /tmp/lcc.XXXXXX)" || die "cannot create control dir"
+SSH_OPTS="-o BatchMode=yes -o ControlMaster=auto -o ControlPath=${CTL_DIR}/ctl \
+-o ControlPersist=600 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+-o Compression=no -c aes128-gcm@openssh.com"
+cleanup() {
+  ssh $SSH_OPTS -O exit "$REMOTE" >/dev/null 2>&1
+  rm -rf "$CTL_DIR"
+}
+trap 'cleanup' EXIT
+trap 'log "interrupted (SIGINT/SIGTERM)"; pkill -TERM -f "^rsync .* ${REMOTE}:${DST}/" 2>/dev/null; exit 130' INT TERM
+
+log "host=$HOST_SHORT tag=$LAST_TAG mode=$([[ -n "$PRUNE_BEFORE" ]] && echo "prune-before=$PRUNE_BEFORE delete=$DELETE" || echo "copy bwlimit=${BWLIMIT}KiB/s")"
+log "src=$SRC"
+log "dst=${REMOTE}:${DST}"
+log "log=$LOG_FILE"
+
+ssh $SSH_OPTS -o ConnectTimeout=10 "$REMOTE" "mkdir -p \"$DST\"" \
+  || die "pre-flight ssh to $REMOTE failed"
+log "pre-flight ssh OK"
+
+# =====================================================================
+# copy mode
+# =====================================================================
+if [[ -z "$PRUNE_BEFORE" ]]; then
+  BW_ARG=(); (( BWLIMIT > 0 )) && BW_ARG=(--bwlimit="$BWLIMIT")
+  log "=== START copy $SRC/ -> ${REMOTE}:${DST}/"
+  rsync -a --partial --stats "${BW_ARG[@]}" -e "ssh $SSH_OPTS" "$SRC/" "${REMOTE}:${DST}/" 2>&1 | tee -a "$LOG_FILE" | grep -E '^(Number of|Total transferred|sent |rsync)'
+  rc=${PIPESTATUS[0]}
+  if (( rc == 0 )); then
+    log "=== OK    copy complete"
+  else
+    log "=== FAIL  rsync exit $rc (re-run to resume; --partial keeps what arrived)"
+  fi
+  exit "$rc"
+fi
+
+# =====================================================================
+# prune mode
+# =====================================================================
+# Candidates: regular files directly under calib/ whose filename carries a
+# date <= PRUNE_BEFORE (LAST.xx.xx.xx_YYYYMMDD.HHMMSS...), never *_dark_*.
+CAND="$(mktemp)"; VERIFIED="$(mktemp)"; MISSING="$(mktemp)"
+trap 'rm -f "$CAND" "$VERIFIED" "$MISSING"; cleanup' EXIT
+find "$SRC" -maxdepth 1 -type f -name 'LAST.*_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].*' ! -name '*_dark_*' -printf '%f\n' \
+  | awk -v lim="$PRUNE_BEFORE" '{ d=$0; sub(/^[^_]*_/, "", d); d=substr(d,1,8); if (d <= lim) print }' \
+  | sort >"$CAND"
+NCAND=$(wc -l <"$CAND")
+log "prune candidates (top-level, dated <= $PRUNE_BEFORE, non-dark): $NCAND"
+if (( NCAND == 0 )); then log "nothing to prune"; exit 0; fi
+
+# Verification: a dry-run rsync of exactly these files reports every one that
+# would still need transferring (size or mtime differ, or absent). Those are
+# NOT deleted. Everything else in the list is on the remote as we have it.
+rsync -an --out-format='%n' -e "ssh $SSH_OPTS" --files-from="$CAND" "$SRC/" "${REMOTE}:${DST}/" 2>>"$LOG_FILE" \
+  | grep -v '/$' | sort >"$MISSING"
+rc=${PIPESTATUS[0]}
+(( rc == 0 )) || die "verification rsync failed (exit $rc); nothing deleted"
+comm -23 "$CAND" "$MISSING" >"$VERIFIED"
+NMISS=$(wc -l <"$MISSING"); NVER=$(wc -l <"$VERIFIED")
+log "verified on remote (same size+mtime): $NVER; not there / different: $NMISS"
+(( NMISS == 0 )) || { log "NOT verified (kept):"; sed 's/^/  /' "$MISSING" | tee -a "$LOG_FILE"; }
+SIZE=$(cd "$SRC" && xargs -a "$VERIFIED" -d '\n' du -ch --apparent-size 2>/dev/null | tail -1 | cut -f1)
+log "would remove $NVER files, $SIZE, from $SRC"
+if (( DELETE == 0 )); then
+  log "dry run (no --delete); first/last candidates:"
+  { head -3 "$VERIFIED"; echo "  ..."; tail -3 "$VERIFIED"; } | sed 's/^/  /' | tee -a "$LOG_FILE"
+  exit 0
+fi
+log "=== START prune"
+(cd "$SRC" && xargs -a "$VERIFIED" -d '\n' rm -f --) 2>&1 | tee -a "$LOG_FILE"
+log "=== OK    removed $NVER files ($SIZE); kept *_dark_*, subdirectories and $NMISS unverified"
+exit 0
