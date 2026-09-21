@@ -17,18 +17,32 @@ default_version="v0"
 known_versions="v0 v1"
 conf_file="${LAST_PIPELINE_CONF:-$(eval echo ~ocs)/.config/last/pipeline.conf}"
 
+#
+# The reference images directory passed to startBatchLASTPipeline() as
+# 'RefPath'. When unset, the daemon auto detects /<host>/data/references.
+# Restricted to a safe character set: the value is interpolated into a MATLAB
+# single-quoted string and read back from the configuration file with sed.
+#
+refpath_regex='^/[A-Za-z0-9._/-]+$'
+
 function usage() {
     cat <<- EOF
 
-Usage: ${PROG} start id [version]
+Usage: ${PROG} start id [version [refpath]]
        ${PROG} stop id
        ${PROG} status
        ${PROG} version [id]
        ${PROG} set-version id version
+       ${PROG} refpath [id]
+       ${PROG} set-refpath id refpath|-
 
     version: one of: ${known_versions}
              v0 - pipeline.DemonLAST (production)
              v1 - pipeline.last.pipes.PipelineDemon (development)
+
+    refpath: absolute path of the reference images directory (holding one
+             <FieldID> sub-directory per field), e.g. /last05e/data/references_v5.
+             When unset, the pipeline uses /<host>/data/references.
 
     The version used by 'start' is the first one of:
        1. the command line argument
@@ -38,8 +52,14 @@ Usage: ${PROG} start id [version]
               version=v0|v1          (all data directories)
        4. the default (${default_version})
 
-    'set-version' writes the per-data-directory version into the configuration
-    file; the service has to be restarted for it to take effect.
+    The refpath used by 'start' is resolved the same way (command line,
+    \$LAST_PIPELINE_REFPATH_<id>, \$LAST_PIPELINE_REFPATH, configuration file
+    lines refpath_<id>=... and refpath=...), with no default. 'start' refuses
+    to run when the resolved refpath is not an existing directory.
+
+    'set-version' and 'set-refpath' write the per-data-directory value into the
+    configuration file ('set-refpath id -' removes it); the service has to be
+    restarted for it to take effect.
 
 EOF
 }
@@ -87,6 +107,43 @@ function valid_version() {
 }
 
 #
+# Gets the reference images directory for a data directory from the
+# configuration file (if any)
+#
+function refpath_from_conf() {
+    local id="${1}" refpath
+
+    [ -r "${conf_file}" ] || return 0
+
+    refpath=$(sed -n -E "s;^[[:space:]]*refpath_${id}[[:space:]]*=[[:space:]]*([^[:space:]#]+).*;\1;p" "${conf_file}" | tail -1)
+    if [ ! "${refpath}" ]; then
+        refpath=$(sed -n -E "s;^[[:space:]]*refpath[[:space:]]*=[[:space:]]*([^[:space:]#]+).*;\1;p" "${conf_file}" | tail -1)
+    fi
+    echo "${refpath}"
+}
+
+#
+# Resolves the reference images directory for a data directory: argument,
+# environment, configuration file - in this order. Empty when none is set.
+#
+function pipeline_refpath() {
+    local id="${1}" refpath="${2}" env_var
+
+    if [ ! "${refpath}" ]; then
+        env_var="LAST_PIPELINE_REFPATH_${id}"
+        refpath="${!env_var}"
+    fi
+    [ "${refpath}" ] || refpath="${LAST_PIPELINE_REFPATH}"
+    [ "${refpath}" ] || refpath="$(refpath_from_conf "${id}")"
+
+    echo "${refpath}"
+}
+
+function valid_refpath() {
+    [[ "${1}" =~ ${refpath_regex} ]]
+}
+
+#
 # Matches the command lines of both the last-matlab wrapper and the MATLAB
 # process of one pipeline service, e.g.:
 #   ... startBatchLASTPipeline('Id', 1, 'PipelineVersion', 'v0');
@@ -116,9 +173,30 @@ case "${action}" in
             exit 1
         fi
 
+        # The refpath, when set, is checked here rather than left to MATLAB:
+        # a MATLAB start that fails takes about a minute, which is slower than
+        # the systemd start rate limit (default: 5 starts in 10 s), so with
+        # Restart=always the service would restart forever. Failing here trips
+        # the limit at once and leaves the unit 'failed'.
+        refpath_arg=""
+        refpath=$( pipeline_refpath "${id}" "${4}" )
+        if [ "${refpath}" ]; then
+            if ! valid_refpath "${refpath}"; then
+                echo "${PROG}: invalid reference directory '${refpath}' (expected an absolute path matching ${refpath_regex})" >&2
+                logger -t "${PROG}" "not starting LAST pipeline ${id}: invalid reference directory '${refpath}'"
+                exit 1
+            fi
+            if [ ! -d "${refpath}" ]; then
+                echo "${PROG}: reference directory not found: ${refpath}" >&2
+                logger -t "${PROG}" "not starting LAST pipeline ${id}: reference directory not found: ${refpath}"
+                exit 1
+            fi
+            refpath_arg=", 'RefPath', '${refpath}'"
+        fi
+
         eval $(grep SLACK ~ocs/.bash_aliases)
-        logger -t "${PROG}" "starting LAST pipeline ${id} (PipelineVersion=${version})"
-        exec last-matlab -nodisplay -batch "addpath(\"/home/ocs/matlab/AstroPack/matlab/startup\"); startBatchLASTPipeline('Id', ${id}, 'PipelineVersion', '${version}');" &
+        logger -t "${PROG}" "starting LAST pipeline ${id} (PipelineVersion=${version}, RefPath=${refpath:-auto})"
+        exec last-matlab -nodisplay -batch "addpath(\"/home/ocs/matlab/AstroPack/matlab/startup\"); startBatchLASTPipeline('Id', ${id}, 'PipelineVersion', '${version}'${refpath_arg});" &
         ;;
 
     stop)
@@ -164,6 +242,37 @@ case "${action}" in
         exit 0
         ;;
 
+    set-refpath)
+        refpath="${3}"
+        if [ ! "${id}" ] || [ ! "${refpath}" ]; then
+            usage
+            exit 1
+        fi
+        if [ "${refpath}" != "-" ] && ! valid_refpath "${refpath}"; then
+            echo "${PROG}: invalid reference directory '${refpath}' (expected an absolute path matching ${refpath_regex})" >&2
+            exit 1
+        fi
+        if [ "${refpath}" != "-" ] && [ ! -d "${refpath}" ]; then
+            echo "${PROG}: warning: reference directory not found: ${refpath} (the service will not start until it exists)" >&2
+        fi
+
+        conf_dir="$( dirname "${conf_file}" )"
+        if ! mkdir -p "${conf_dir}" || ! touch "${conf_file}"; then
+            echo "${PROG}: cannot write ${conf_file}" >&2
+            exit 1
+        fi
+        sed -i -E "/^[[:space:]]*refpath_${id}[[:space:]]*=/d" "${conf_file}"
+        if [ "${refpath}" = "-" ]; then
+            echo "${PROG}: pipeline ${id} reference directory unset (restart last-pipeline${id} to apply)"
+        else
+            echo "refpath_${id}=${refpath}" >> "${conf_file}"
+            echo "${PROG}: pipeline ${id} reference directory set to ${refpath} (restart last-pipeline${id} to apply)"
+        fi
+        # the file is read by the service, which runs as ocs
+        chown ocs:ocs "${conf_dir}" "${conf_file}" 2>/dev/null
+        exit 0
+        ;;
+
     status)
         expected_ids=( 1 2 )
         for id in ${expected_ids[*]}; do
@@ -178,6 +287,19 @@ case "${action}" in
             expected_ids=( 1 2 )
             for id in ${expected_ids[*]}; do
                 printf "%d: %s\n" "${id}" "$( pipeline_version "${id}" )"
+            done
+        fi
+        ;;
+
+    refpath)
+        if [ "${id}" ]; then
+            refpath="$( pipeline_refpath "${id}" )"
+            echo "${refpath:-auto}"
+        else
+            expected_ids=( 1 2 )
+            for id in ${expected_ids[*]}; do
+                refpath="$( pipeline_refpath "${id}" )"
+                printf "%d: %s\n" "${id}" "${refpath:-auto}"
             done
         fi
         ;;

@@ -31,6 +31,13 @@ function usage() {
     Set the pipeline version for one data directory (needs a service restart)
         ${PROG} [[-H host] ... ] version id v0|v1
 
+    Show the reference images directory ('auto' means /<host>/data/references)
+        ${PROG} [[-H host] ... ] refpath [id]
+
+    Set the reference images directory for one data directory (needs a service
+    restart); '-' reverts to auto
+        ${PROG} [[-H host] ... ] refpath id /path/to/references|-
+
 EOF
 }
 
@@ -81,7 +88,7 @@ fi
 
 
 case "${action}" in
-    status|start|stop|enable|disable|version)
+    status|start|stop|enable|disable|version|refpath)
         ;;
     *)
         usage
@@ -122,6 +129,24 @@ case ${action} in
             cmd="${service} set-version ${id} ${version}"
         else
             cmd="${service} version ${id}"
+        fi
+        ;;
+    refpath)
+        service=/usr/local/share/last-tool/bin/last-pipeline-service
+        id="${2}"
+        refpath="${3}"
+        if [ "${id}" ] && [[ ! "${id}" =~ ^[0-9]+$ ]]; then
+            usage
+            exit 1
+        fi
+        if [ "${refpath}" ]; then
+            if [ ! "${id}" ]; then
+                usage
+                exit 1
+            fi
+            cmd="${service} set-refpath ${id} ${refpath}"
+        else
+            cmd="${service} refpath ${id}"
         fi
         ;;
 esac
