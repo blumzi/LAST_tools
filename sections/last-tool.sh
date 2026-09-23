@@ -26,6 +26,34 @@ function last_tool_packaged_links() {
     dpkg -L "${last_tool_package}" 2>/dev/null | grep "^${last_tool_bindir}/last-"
 }
 
+#
+# Scripts that live in ${last_tool_top}/bin but that the package does not expose
+#  in ${last_tool_bindir}.  They are just as exposed to shadowing as the packaged
+#  ones -- last-remove-statusless-proc-dirs was run by name from a stale copy on
+#  all 20 machines on 2026-09-23 while the packaged script had moved on -- so they
+#  are checked too, and any leftover (editor backups, .sav/.new copies) is ignored.
+#
+function last_tool_unpackaged_scripts() {
+    local script name
+    local -a packaged
+
+    mapfile -t packaged < <(last_tool_packaged_links | xargs -r -n1 basename)
+    for script in "${last_tool_top}"/bin/*; do
+        [ -f "${script}" ] && [ -x "${script}" ] || continue
+        name="$(basename "${script}")"
+        case "${name}" in
+            *~|*.sav|*.new|*.bak|*.orig|*.pre[0-9]*) continue ;;
+        esac
+        printf '%s\n' "${packaged[@]}" | grep -qx "${name}" && continue
+        echo "${last_tool_bindir}/${name}"
+    done
+}
+
+function last_tool_all_links() {
+    last_tool_packaged_links
+    last_tool_unpackaged_scripts
+}
+
 function last_tool_link_target() {
     local name="${1}"
 
@@ -49,7 +77,7 @@ function last_tool_check() {
     local link name
     local -a modified
 
-    for link in $(last_tool_packaged_links); do
+    for link in $(last_tool_all_links); do
         (( nlinks++ ))
         name="$(basename "${link}")"
 
@@ -68,7 +96,7 @@ function last_tool_check() {
     done
 
     if (( nok == nlinks )); then
-        message_success "last-tool: all ${nlinks} packaged ${last_tool_bindir}/last-* entries are symlinks into ${last_tool_top}"
+        message_success "last-tool: all ${nlinks} ${last_tool_bindir}/last-* entries (packaged and not) are symlinks into ${last_tool_top}"
     fi
 
     modified=( $(dpkg -V "${last_tool_package}" 2>/dev/null | awk '{print $NF}') )
@@ -83,7 +111,7 @@ function last_tool_enforce() {
     local -i ret=0
     local link name target
 
-    for link in $(last_tool_packaged_links); do
+    for link in $(last_tool_all_links); do
         if last_tool_link_is_ok "${link}"; then
             continue
         fi
@@ -129,7 +157,9 @@ function last_tool_policy() {
     The last-tool package installs its scripts under ${last_tool_top}/bin and
      exposes them in ${last_tool_bindir} as symlinks.
 
-    Every packaged ${last_tool_bindir}/last-* entry must be such a symlink.  A regular
+    Every ${last_tool_bindir}/last-* entry must be such a symlink -- including the
+     scripts the package does not link itself, which are checked from
+     ${last_tool_top}/bin so that running one by name cannot pick up a stale copy.  A regular
      file there (e.g. a script copied by hand) shadows the packaged one, and from
      then on PATH and the crontab entries (which use the full ${last_tool_top}/bin
      path) run different versions of the same script.
