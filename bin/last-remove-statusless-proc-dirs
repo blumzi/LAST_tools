@@ -6,7 +6,8 @@
 #   /<this-host>/data[0-9]/archive/LAST*/20*/*/*/proc
 #
 # For each matched proc/ directory, removes immediate child directories
-# (visits) that do not contain a ".status" file directly inside them.
+# (visits) that do not contain a non-empty ".status" file directly inside them
+# (an empty .status is a visit whose pipeline run died before stamping it).
 #
 # Visits younger than --min-age-days (default 7) are never tested: a visit
 # counts as young if EITHER its observation time (the YYYY/MM/DD in the path
@@ -30,7 +31,8 @@ Scans directories matching:
   $PATTERN
 
 For each matched proc/ directory, removes immediate child directories (visits)
-that do not contain a .status file directly inside them.
+that do not contain a non-empty .status file directly inside them (an empty
+.status means the pipeline died before stamping the visit).
 
 Visits younger than the age guard are skipped without being tested.  A visit is
 young if EITHER of these is inside the guard window:
@@ -53,9 +55,9 @@ Options:
 Final counts:
   Scanned  every visit directory found
   Skipped  too young, or unparseable name -- not tested (subset of Scanned)
-  Kept     tested and holding a .status file
-  Deleted  tested, no .status file, removed
-  Declined tested, no .status file, kept on the operator's answer
+  Kept     tested and holding a non-empty .status file
+  Deleted  tested, no .status file or an empty one, removed
+  Declined tested, no usable .status file, kept on the operator's answer
 
 Examples:
   # Preview the default 1-week guard
@@ -180,7 +182,7 @@ for proc_dir in "${proc_dirs[@]}"; do
             # Anything whose age cannot be established is left alone.
             if [[ ! $child_name =~ ^[0-9]{6} || ! $mtime =~ ^[0-9]+$ ]]; then
                 skipped=$((skipped + 1))
-                [[ -f "$child/.status" ]] || log "SKIP-UNDATED" "$child"
+                [[ -s "$child/.status" ]] || log "SKIP-UNDATED" "$child"
                 continue
             fi
 
@@ -188,19 +190,23 @@ for proc_dir in "${proc_dirs[@]}"; do
             visit_stamp="${yyyy}${mm}${dd}${child_name:0:6}"
             if (( 10#$visit_stamp >= 10#$CUTOFF_STAMP || mtime >= CUTOFF_EPOCH )); then
                 skipped=$((skipped + 1))
-                [[ -f "$child/.status" ]] || log "SKIP-YOUNG" "$child"
+                [[ -s "$child/.status" ]] || log "SKIP-YOUNG" "$child"
                 continue
             fi
         fi
 
-        if [[ -f "$child/.status" ]]; then
+        # -s, not -f: the pipeline writes the file first and the stamp after, so
+        # a zero-length .status marks a visit that died mid-write. It can never
+        # be transferred (last-backup needs a ready-for-transfer line) and would
+        # otherwise sit on the disk for ever.
+        if [[ -s "$child/.status" ]]; then
             kept=$((kept + 1))
             continue
         fi
 
         if [[ "$MODE" == "interactive" && $force_all -eq 0 ]]; then
             while true; do
-                read -r -p "Delete '$child' (no .status file)? [y/n/a/q] " answer
+                read -r -p "Delete '$child' (no usable .status file)? [y/n/a/q] " answer
                 case "$answer" in
                     y|Y) break ;;
                     n|N) declined=$((declined + 1)); continue 2 ;;
