@@ -87,7 +87,16 @@ default_njobs=1
 # and divided among each job's rsync streams. The WAN to Weizmann is a ~45 MB/s
 # policed link shared by ~20 nodes and the raw moves (last-moveRAW2external);
 # see LAST_issues #226.
-default_bwlimit=1200
+#
+# Raised 1200 -> 1800 on 2026-09-29 for the Oct 2026 observing season. Products
+# were measured on euclid at ~104 GB per camera per night, ~4.2 TB/night for the
+# fleet, which would need 48.6 MB/s to stay current -- more than the whole
+# policed link. They therefore cannot keep up at any setting: they buffer on the
+# node disks and drain on cloudy and idle days. 1800 x 20 nodes = 36 MB/s cuts
+# the nightly accrual from ~38 GB to ~12 GB per camera. The raw moves are
+# trimmed to 6 cameras (4.2 MB/s) so the total stays inside the budget:
+# 36 + 4.2 = 40.2 MB/s. See LAST_issues #216.
+default_bwlimit=1800
 bwlimit=${default_bwlimit}
 # At most this many last-backup instances transfer at the same time on this
 # machine (the pipeline starts one per visit); the others wait for a free slot
