@@ -1,0 +1,134 @@
+#!/bin/bash
+
+#
+# Reconciles visits that are stamped 'ready-for-transfer' but not 'transfered'
+#  against what is actually present at the backup target.
+#
+# A visit whose products already sit at the target - because the transfer
+#  succeeded but the receipt was never written, or was lost with the .status
+#  file - is indistinguishable from one that was never sent. Every sweep then
+#  re-sends it, and a change of target turns that into a full duplicate of the
+#  archive (LAST_issues #230).
+#
+# This tool answers the question the transfer path cannot: is it really there?
+#  For each pending visit it compares file names and sizes with the target and,
+#  on a full match, writes the missing receipt instead of transferring anything.
+#
+# It NEVER transfers and NEVER deletes. Dry-run unless --go is given.
+#
+
+# shellcheck disable=SC1091
+source /etc/profile.d/last.sh
+
+module_include lib/ansi
+module_include lib/message
+module_include lib/backup
+module_include lib/const
+
+PROG=$(basename "${0}")
+export LAST_TOOL_PID="${$}"
+
+declare go=false
+declare target="${backup_default_target}"
+declare -i n_pending=0 n_matched=0 n_missing=0 n_partial=0
+
+function usage() {
+    cat <<- EOF
+
+    $(ansi_underline "${PROG}") - reconcile pending visits with the backup target
+
+    A visit stamped 'ready-for-transfer' without a matching 'transfered' line is
+    treated as pending by every transfer run. If its products are in fact already
+    at the target, the visit is re-sent for ever, and after a target change it is
+    duplicated. This tool compares each pending visit with the target and writes
+    the missing receipt when the two agree.
+
+    Usage: ${PROG} [--target <user@host:dir>] [--go]
+
+     --target <t> - the backup target to check against (default: ${backup_default_target})
+     --go         - write the missing receipts (default: report only)
+     -h|--help    - this message
+
+    Nothing is transferred and nothing is deleted, with or without --go.
+
+EOF
+}
+
+OPTS=$( getopt -o 'ht:' --long "help,target:,go" -n "${PROG}" -- "$@" )
+eval set -- "${OPTS}"
+while true; do
+    case "${1}" in
+    -t|--target) target="${2}"; shift 2 ;;
+    --go)        go=true;       shift 1 ;;
+    -h|--help)   usage; exit 0 ;;
+    --)          shift 1; break ;;
+    *)           usage; exit 1 ;;
+    esac
+done
+
+backup_set_target "${target}"
+
+hostname="$(hostname -s)"
+tops="/${hostname}/data[12]"
+
+message_info "Target: ${backup_target}"
+${go} || message_info "Dry run - pass --go to write the receipts"
+
+#
+# Every .status that says ready-for-transfer but not transfered
+#
+while read -r status_file; do
+    [ -r "${status_file}" ] || continue
+    grep -qw "${const_ready_for_transfer:-ready-for-transfer}" "${status_file}" || continue
+    grep -qw "${const_transfered:-transfered}" "${status_file}" && continue
+
+    local_dir=$(dirname "${status_file}")
+    (( n_pending++ ))
+
+    # the path under .../archive/ is the same on both sides
+    if [[ ${local_dir} != */archive/* ]]; then
+        message_warning "Not an archive path, skipped: ${local_dir}"
+        continue
+    fi
+    remote_dir="${backup_topdir}/${local_dir#*/archive/}"
+
+    if ! ssh -q -o "StrictHostKeyChecking accept-new" "${backup_user}@${backup_host}" \
+            "test -d '${remote_dir}'" 2>/dev/null; then
+        (( n_missing++ ))
+        message_info "$(printf '%-62s' "${local_dir}") not at the target - a real transfer is due"
+        continue
+    fi
+
+    # compare names and sizes, ignoring the transfer's own bookkeeping
+    tmp=$(mktemp -d)
+    ( cd "${local_dir}" && du -b -- * 2>/dev/null | grep -vE '	(\.status|\.info|files_list|chunk#[0-9]+\..*)$' | sort ) > "${tmp}/local"
+    ssh -q -o "StrictHostKeyChecking accept-new" "${backup_user}@${backup_host}" \
+        "cd '${remote_dir}' && du -b -- * 2>/dev/null" \
+        | grep -vE '	(\.status|\.info|files_list|chunk#[0-9]+\..*)$' | sort > "${tmp}/remote"
+
+    if [ ! -s "${tmp}/local" ]; then
+        message_warning "$(printf '%-62s' "${local_dir}") no local files to compare, skipped"
+        /bin/rm -rf "${tmp}"; continue
+    fi
+
+    if diff -q "${tmp}/local" "${tmp}/remote" >/dev/null 2>&1; then
+        (( n_matched++ ))
+        if ${go}; then
+            printf '%s %s %s # reconciled by %s\n' \
+                   "$(date --iso-8601=seconds --utc)" "${const_transfered:-transfered}" \
+                   "${backup_target}" "${PROG}" >> "${status_file}"
+            message_success "$(printf '%-62s' "${local_dir}") matches the target - receipt written"
+        else
+            message_success "$(printf '%-62s' "${local_dir}") matches the target - receipt would be written"
+        fi
+    else
+        (( n_partial++ ))
+        message_warning "$(printf '%-62s' "${local_dir}") differs from the target ($(wc -l < "${tmp}/local") local vs $(wc -l < "${tmp}/remote") remote files) - left pending"
+    fi
+    /bin/rm -rf "${tmp}"
+
+done < <( eval find "${tops}"/archive -name .status -path '*/proc/*' 2>/dev/null )
+
+message_empty
+message_info "pending: ${n_pending}  already at target: ${n_matched}  not there: ${n_missing}  partial/differing: ${n_partial}"
+${go} || message_info "Nothing was written - pass --go to apply"

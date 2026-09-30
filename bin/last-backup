@@ -19,7 +19,9 @@ function stamp_as_transfered() {
     local job_tag="${3}"
 
     local stat_file=${src_dir}/.status
-    local stamp_line="$(date --iso-8601=seconds --utc) transfered"
+    # The stamp names the target: a bare "transfered" cannot say WHERE, so after the
+    # target is changed nobody can tell "already safe elsewhere" from "never sent".
+    local stamp_line="$(date --iso-8601=seconds --utc) transfered ${backup_target}"
     local file_type
     local ssh_flags=(-q -o "StrictHostKeyChecking accept-new")
 
@@ -44,8 +46,10 @@ function stamp_as_transfered() {
         message_info "${job_tag} Copying .status to ${dst_dir} ..."
         sudo -u ocs rsync -a ${stat_file} ${backup_target_dir_full_path} 2>/dev/null
         if [ -d .info ]; then
+            # NOTE the missing trailing slash: copy the .info DIRECTORY, so that
+            # chunk#N.* and files_list do not land loose among the data products
             message_info "${job_tag} Copying .info to ${dst_dir} ..."
-            sudo -u ocs rsync -a .info/ ${backup_target_dir_full_path} 2>/dev/null
+            sudo -u ocs rsync -a .info ${backup_target_dir_full_path} 2>/dev/null
         fi
     elif [ "${file_type}" = "regular file" ]; then
         message_failure "${job_tag} Not copying .status and .info to ${dst_dir}, ${dst_dir} IS A REGULAR FILE"
@@ -156,6 +160,9 @@ function usage() {
      -x|--extra       - Specifies additional arguments to rsync (e.g. --exclude=...)
 
      -a|--age         - Specify old age (in hours) (default: ${default_old_age_hours})
+     --mirror         - Transfer a visit even if its .status says it was already
+                        transfered to a DIFFERENT target (default: skip it, so
+                        that changing the target does not duplicate the archive)
      -r|--remove      - Remove source directory if it has been:
                         - successfully transfered
                         - ready-for-transfer for more than ${old_age_hours} hours
@@ -172,7 +179,7 @@ EOF
 }
 
 getopt_err=$(mktemp)
-OPTS=$( getopt -o 'Ss:f:t:hi:p:xrj:FkvcRab:M:' --long "age:,running,check,kill,status,jobs,help,extra:,processes:,bwlimit:,max-instances:,identity:,source:,from:,to:,target:,remove,full,verbose" -n "${PROG}" -- "$@" 2> ${getopt_err} )
+OPTS=$( getopt -o 'Ss:f:t:hi:p:xrj:FkvcRab:M:' --long "age:,running,check,kill,status,jobs,help,extra:,processes:,bwlimit:,max-instances:,identity:,source:,from:,to:,target:,remove,full,verbose,mirror" -n "${PROG}" -- "$@" 2> ${getopt_err} )
 if [ $? -ne 0 ]; then
     if [ -r ${getopt_err} ]; then
         message_failure "$(< ${getopt_err})"
@@ -254,6 +261,7 @@ function show_running_processes() {
 
 full_flag=false
 remove_flag=false
+mirror=false                    # copy a visit even if it was already transfered to another target
 candidates=()
 target=
 status_flag=false
@@ -294,6 +302,11 @@ while true; do
 
     -r|--remove)
         remove_flag=true
+        shift 1
+        ;;
+
+    --mirror)
+        mirror=true
         shift 1
         ;;
 
@@ -639,6 +652,25 @@ function backup_one_candidate() {
     message_empty
     message_info "${job_tag} Source: \"${data_dir}\""
     message_info "${job_tag} Target: \"${backup_target_dir_full_path}\""
+
+    #
+    # Was this visit already transfered, but to a DIFFERENT target?
+    # The dry-run below only ever compares against the CURRENT target, so after the
+    # target is changed every previously-transfered visit looks brand new and gets
+    # re-sent in full - that is how ~12 GB of July-2025 visits were duplicated onto
+    # /bigdata3 in Sep 2026 (LAST_issues #230). Skip by default, mirror on request.
+    #
+    local previous_target
+    previous_target=$(grep -w transfered ${data_dir}/.status 2>/dev/null | tail -1 | awk '{print $3}')
+    if [ "${previous_target}" ] && [ "${previous_target}" != "${backup_target}" ]; then
+        if ${mirror}; then
+            message_info "${job_tag} Was transfered to \"${previous_target}\", mirroring to \"${backup_target}\" (--mirror)"
+        else
+            message_success "${job_tag} Was already transfered to \"${previous_target}\", skipping it (use --mirror to copy it here too)"
+            /bin/rm -f ${diffs}
+            return
+        fi
+    fi
 
     sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_target_dir_full_path#*:}
 

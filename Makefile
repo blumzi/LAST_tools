@@ -29,6 +29,7 @@ package: mrclean check-for-github-tokens
 	ln -sf ${LAST_TOP}/bin/last-backup              		${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-backup
 	ln -sf ${LAST_TOP}/bin/last-products-watcher            ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-products-watcher
 	ln -sf ${LAST_TOP}/bin/last-products-catchup            ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-products-catchup
+	ln -sf ${LAST_TOP}/bin/last-products-reconcile          ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-products-reconcile
 	ln -sf ${LAST_TOP}/bin/last-fetch-from-github 			${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-fetch-from-github
 	ln -sf ${LAST_TOP}/files/root/etc/profile.d/last.sh 	${PACKAGE_DIR}/etc/profile.d/last.sh
 	ln -sf ${LAST_TOP}/bin/last-asroot 						${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-asroot
