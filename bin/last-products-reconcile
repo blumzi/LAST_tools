@@ -92,7 +92,12 @@ while read -r status_file; do
     fi
     remote_dir="${backup_topdir}/${local_dir#*/archive/}"
 
-    if ! ssh -q -o "StrictHostKeyChecking accept-new" "${backup_user}@${backup_host}" \
+    # -n is REQUIRED here, not cosmetic: this runs inside `while read ... done <
+    # <(find ...)`, and ssh reads stdin greedily. Without it the first ssh eats the
+    # rest of the find output, the loop ends after a handful of visits, and the
+    # tool silently reports a fraction of the pending set as if it were all of it
+    # (observed 2026-10-01: 9 reported on last03w where 549 were pending).
+    if ! ssh -n -q -o "StrictHostKeyChecking accept-new" "${backup_user}@${backup_host}" \
             "test -d '${remote_dir}'" 2>/dev/null; then
         (( n_missing++ ))
         message_info "$(printf '%-62s' "${local_dir}") not at the target - a real transfer is due"
@@ -102,7 +107,7 @@ while read -r status_file; do
     # compare names and sizes, ignoring the transfer's own bookkeeping
     tmp=$(mktemp -d)
     ( cd "${local_dir}" && du -b -- * 2>/dev/null | grep -vE '	(\.status|\.info|files_list|chunk#[0-9]+\..*)$' | sort ) > "${tmp}/local"
-    ssh -q -o "StrictHostKeyChecking accept-new" "${backup_user}@${backup_host}" \
+    ssh -n -q -o "StrictHostKeyChecking accept-new" "${backup_user}@${backup_host}" \
         "cd '${remote_dir}' && du -b -- * 2>/dev/null" \
         | grep -vE '	(\.status|\.info|files_list|chunk#[0-9]+\..*)$' | sort > "${tmp}/remote"
 
