@@ -106,7 +106,20 @@ bwlimit=${default_bwlimit}
 # machine (the pipeline starts one per visit); the others wait for a free slot
 # for as long as it takes -- a bounded wait let a night's backlog spill past
 # the cap and saturate the WAN.
-default_max_instances=6
+#
+# 6 -> 1 on 2026-10-01. The per-stream rate is the node budget divided by THIS
+# number (see the bwlimit_arg block below), not by the instances actually
+# transferring -- a deliberately fixed share, so that instances starting after a
+# lull cannot exceed the budget together. But last-products-watcher transfers
+# strictly SEQUENTIALLY: initiate_transfer() calls last-backup synchronously, and
+# one inotifywait covers both data disks, so exactly one instance runs at a time.
+# At 6 that single transfer took 1800/6 = 300 KiB/s and the node used a sixth of
+# its budget: measured 2026-10-01, --bwlimit=200 on the wire under the old 1200,
+# ~1 MB/s of products across 8 v1 nodes against a 24 MB/s entitlement, with a
+# ~2 TB backlog ageing 35 h on the node disks. At 1 the single transfer gets the
+# whole budget; if concurrency ever rises the extra instances queue and take
+# their turn at full rate, so the node total is the budget either way.
+default_max_instances=1
 max_instances=${default_max_instances}
 slot_dir=/var/lock/last-backup-slots
 basic_exclusion_pattern="--exclude '*/raw'"
