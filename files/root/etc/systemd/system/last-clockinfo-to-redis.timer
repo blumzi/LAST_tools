@@ -1,0 +1,9 @@
+[Unit]
+Description=sample the host clock synchronization state and push it to redis
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=128s
+
+[Install]
+WantedBy=timers.target

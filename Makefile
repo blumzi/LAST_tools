@@ -56,6 +56,8 @@ package: mrclean check-for-github-tokens
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-ds9-feeder.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-ds9-feeder.service
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-enclosurelogger.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-enclosurelogger.service
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-products-watcher.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-products-watcher.service
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-clockinfo-to-redis.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-clockinfo-to-redis.service
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-clockinfo-to-redis.timer 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-clockinfo-to-redis.timer
 	@(  \
         repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
         commit=$$(git rev-parse --short HEAD); \

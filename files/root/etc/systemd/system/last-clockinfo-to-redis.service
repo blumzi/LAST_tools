@@ -1,0 +1,6 @@
+[Unit]
+Description=Push the host clock synchronization state to Redis hashes
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /usr/local/share/last-tool/files/last-clockinfo-redis.sh
