@@ -6,6 +6,8 @@
 
 export LANG=en_US
 export LANGUAGE="en_US:en"
+# Fewer glibc malloc arenas: MATLAB keeps ~10 GB less memory between visits (AstroPack #1368)
+export MALLOC_ARENA_MAX=2
 PROG=$(basename ${0})
 
 #
