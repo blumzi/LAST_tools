@@ -1,0 +1,398 @@
+#!/usr/bin/env bash
+#
+# last-remove-unreducible-raw
+#
+# Removes science raw images that can never be reduced from the new/ directory
+# of each camera on this host:
+#   /<this-host>/data[0-9]/archive/LAST.NN.NN.NN/new/*_sci_raw_*.fits
+#
+# The pipeline forms a visit only from a maximal run of >= 10 consecutive
+# image counters (tools.find.groupCounter, MinInGroup=10), with the images
+# ordered by the timestamp in their names.  Shorter runs (aborted visits,
+# fragments after a gap) are never processed and are never removed by the
+# pipeline, so they pile up in new/ (LAST_issues #236).
+#
+# An image is deleted only if ALL of these hold:
+#   1. its counter run in new/ is shorter than 10;
+#   2. its counter run is still shorter than 10 when the images in the
+#      camera's other non-dated directories (failedv0/, failed/, parked.*/,
+#      retry*/, new1/, ...) are added, so a fragment whose other part waits
+#      to be released into new/ is kept;
+#   3. its ctime is older than --min-age-days (a move into new/ updates the
+#      ctime but keeps the mtime, so just-released images count as young);
+#   4. no process is touching a non-dated directory of the camera (a release
+#      or retry in progress); the inotifywait watcher on new/ is ignored.
+# Names that do not parse (not 11 '_' fields, non-numeric counter) and
+# anything that is not a regular file are never deleted.  Just before each
+# deletion the file's inode, size, mtime and ctime must still match the
+# listing and its real path must still be inside the camera's new/.
+#
+set -uo pipefail
+
+# Testing only: LRUR_TEST_ROOT/LRUR_TEST_HOST run the tool on a synthetic tree
+# <root>/<host>/data[0-9]/archive/... (the mount check is then skipped).
+HOST=${LRUR_TEST_HOST:-$(hostname -s)}
+DATA_GLOB="${LRUR_TEST_ROOT:-}/$HOST/data[0-9]"
+MIN_IN_GROUP=10
+LOG_FILE="./remove_unreducible_raw.log"
+MODE=""
+DRY_RUN=0
+MIN_AGE_DAYS=7
+BUSY_PATTERN='v1t_release'
+LIST_OUT=""
+ONLY_LISTED=""
+CAMERAS=()
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") --autonomous|--interactive [--dry-run] [--min-age-days N]
+       [--camera LAST.NN.NN.NN]... [--busy-pattern ERE] [--list FILE]
+       [--only-listed FILE] [--log FILE]
+
+Removes the science raw images in this host's new/ directories that can never
+be reduced because they belong to a run of fewer than $MIN_IN_GROUP consecutive counters:
+  $DATA_GLOB/archive/LAST.NN.NN.NN/new/*_sci_raw_*.fits
+
+An image is kept if its run reaches $MIN_IN_GROUP when the images in the camera's other
+non-dated directories (failedv0/, failed/, parked.*/, ...) are counted too, if
+its ctime is younger than the age guard, or if a process is working on a
+non-dated directory of the camera (see --busy-pattern).
+
+Options:
+  --autonomous        Delete all candidates without prompting.
+  --interactive       Prompt once per camera before deleting (y/n/a/q).
+  --dry-run           Show what would be deleted without deleting anything.
+  --min-age-days N    Only delete images whose ctime is at least N days old
+                      (default: $MIN_AGE_DAYS).  0 turns the age guard off.
+  --camera CAM        Only handle this camera (repeatable; default: all).
+  --busy-pattern ERE  A process whose command line matches ERE marks every
+                      camera busy (default: '$BUSY_PATTERN'; '' disables).
+                      A process naming <camera>/<non-dated dir> always marks
+                      that camera busy.
+  --list FILE         Write the candidates (path, inode, size, mtime, ctime,
+                      timestamp, counter, run in new/, run with siblings) to FILE.
+  --only-listed FILE  Delete only candidates listed in FILE (a --list file
+                      from an earlier --dry-run) with the same path, inode,
+                      size and mtime; the current listing must still select
+                      them.  Listed entries that drop out are counted in Notes.
+  --log FILE          Path to log file (default: $LOG_FILE).
+  -h, --help          Show this help message.
+
+Per-camera counts:
+  Scanned   *_sci_raw_*.fits entries in new/
+  Unparsed  not a regular file, or a name that does not parse -- never deleted
+  Visit     in a run of >= $MIN_IN_GROUP in new/ (the pipeline will reduce it)
+  Guarded   run reaches $MIN_IN_GROUP with the images in the other directories
+  Young     ctime inside the age guard
+  Cand      candidates (0 if the camera is busy)
+  Deleted   removed (Would delete with --dry-run)
+  Refused   changed between the listing and the deletion -- kept
+
+Examples:
+  # Preview, with the candidate list kept for review
+  $(basename "$0") --autonomous --dry-run --list /tmp/unreducible.tsv
+
+  # Delete exactly the reviewed candidates
+  $(basename "$0") --autonomous --only-listed /tmp/unreducible.tsv
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --autonomous)   MODE="autonomous";  shift ;;
+        --interactive)  MODE="interactive"; shift ;;
+        --dry-run)      DRY_RUN=1;          shift ;;
+        --min-age-days|--camera|--busy-pattern|--list|--only-listed|--log)
+            [[ $# -ge 2 ]] || { echo "Error: $1 requires an argument" >&2; exit 1; }
+            case "$1" in
+                --min-age-days) MIN_AGE_DAYS="$2" ;;
+                --camera)       CAMERAS+=( "$2" ) ;;
+                --busy-pattern) BUSY_PATTERN="$2" ;;
+                --list)         LIST_OUT="$2" ;;
+                --only-listed)  ONLY_LISTED="$2" ;;
+                --log)          LOG_FILE="$2" ;;
+            esac
+            shift 2
+            ;;
+        -h|--help) usage; exit 0 ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -z "$MODE" ]]; then
+    echo "Error: must specify --autonomous or --interactive" >&2
+    usage >&2
+    exit 1
+fi
+if [[ "$MODE" == "interactive" ]] && ! { : < /dev/tty; } 2>/dev/null; then
+    echo "Error: --interactive needs a terminal" >&2
+    exit 1
+fi
+if [[ ! "$MIN_AGE_DAYS" =~ ^[0-9]+$ ]]; then
+    echo "Error: --min-age-days must be a non-negative integer (got: '$MIN_AGE_DAYS')" >&2
+    exit 1
+fi
+for cam in "${CAMERAS[@]}"; do
+    [[ "$cam" =~ ^LAST\.[0-9]{2}\.[0-9]{2}\.[0-9]{2}$ ]] || {
+        echo "Error: bad camera name '$cam' (expected LAST.NN.NN.NN)" >&2; exit 1; }
+done
+if [[ -n "$ONLY_LISTED" && ! -r "$ONLY_LISTED" ]]; then
+    echo "Error: cannot read --only-listed file: $ONLY_LISTED" >&2
+    exit 1
+fi
+if ! touch "$LOG_FILE" 2>/dev/null; then
+    echo "Error: cannot write to log file: $LOG_FILE" >&2
+    exit 1
+fi
+if [[ -n "$LIST_OUT" ]] && ! printf 'path\tino\tsize\tmtime\tctime\tts\tcounter\trun_new\trun_union\n' > "$LIST_OUT"; then
+    echo "Error: cannot write to list file: $LIST_OUT" >&2
+    exit 1
+fi
+
+# One cutoff for the whole run; 0 days means no age guard at all.
+CUTOFF_EPOCH=$(( $(date -u +%s) - MIN_AGE_DAYS * 86400 ))
+AGE_GUARD=1
+(( MIN_AGE_DAYS == 0 )) && AGE_GUARD=0
+
+log() {
+    printf '%s  %s  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" >> "$LOG_FILE"
+}
+
+TMP=$(mktemp -d) || { echo "Error: cannot create a temporary directory" >&2; exit 1; }
+trap 'rm -rf "$TMP"' EXIT
+
+# Prints the reason if a process may be moving images of camera $1.
+busy_reason() {
+    local cam=$1 pid args comp
+    while read -r pid args; do
+        [[ "$pid" == "$$" || "$args" == inotifywait\ * || "$args" == *last-remove-unreducible-raw* ]] && continue
+        if [[ -n "$BUSY_PATTERN" && "$args" =~ $BUSY_PATTERN ]]; then
+            echo "pid $pid: ${args:0:120}"
+            return
+        fi
+        [[ "$args" == *"$cam/"* ]] || continue
+        # <camera>/<component>: only dated components (YYYY) are harmless
+        while read -r comp; do
+            comp=${comp#"$cam/"}
+            if [[ ! "$comp" =~ ^20[0-9]{2}$ ]]; then
+                echo "pid $pid: ${args:0:120}"
+                return
+            fi
+        done < <(grep -oE -- "${cam//./\\.}/[^/[:space:]]*" <<< "$args")
+    done < <(ps -eo pid=,args=)
+}
+
+# Lists new/ (N and X records) and the non-dated sibling directories (S
+# records) of camera directory $1.
+list_camera() {
+    local camdir=$1 sib name
+    find "$camdir/new" -xdev -mindepth 1 -maxdepth 1 -name '*_sci_raw_*.fits' \
+        \( -type f -printf 'N\t%f\t%i\t%s\t%T@\t%C@\n' -o -printf 'X\t%f\n' \)
+    for sib in "$camdir"/*/; do
+        sib=${sib%/}
+        name=${sib##*/}
+        [[ -L "$sib" ]] && continue
+        [[ "$name" =~ ^20[0-9]{2}$ ]] && continue
+        case "$name" in new|calib|log|science|move*) continue ;; esac
+        find "$sib" -xdev \( -type f -o -type l \) -name '*_sci_raw_*.fits*' -printf 'S\t%f\n' |
+            awk -v s="$name" 'BEGIN { OFS = "\t" } { print $0, s }'
+    done
+}
+
+# Records -> one line per entry, sortable: ts counter src key ino size mtime ctime.
+# mawk: no interval expressions, so the timestamp pattern is spelled out.
+PARSE_AWK='
+BEGIN { FS = "\t"; OFS = "\t"
+        TSRE = "^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][.][0-9][0-9][0-9][0-9][0-9][0-9][.][0-9][0-9][0-9]$" }
+$1 == "X" { nx++; next }
+{
+    key = $2
+    if ($1 == "S" && key ~ /[.]fz$/) key = substr(key, 1, length(key) - 3)
+    ok = (key ~ /[.]fits$/ && split(key, p, "_") == 11 && p[8] == "sci" && p[9] == "raw" \
+          && p[10] == "Image" && p[2] ~ TSRE && p[5] ~ /^[0-9]+$/)
+    if ($1 == "N") {
+        if (!ok) { nx++; next }
+        seen[key] = 1
+        print p[2], p[5] + 0, "new", key, $3, $4, $5, $6
+    } else if (ok && !(key in seen)) {
+        seen[key] = 1
+        print p[2], p[5] + 0, $3, key, "", "", "", ""
+    }
+}
+END { print "#UNPARSED", nx + 0 > "/dev/stderr" }'
+
+# Sorted entries -> candidates on stdout, counts on stderr.
+CLASSIFY_AWK='
+BEGIN { FS = "\t"; OFS = "\t" }
+{ n++; ts[n] = $1; c[n] = $2; src[n] = $3; key[n] = $4
+  ino[n] = $5; sz[n] = $6; mt[n] = $7; ct[n] = $8 }
+END {
+    # maximal runs of +1 counter steps over all entries ...
+    for (i = 1; i <= n; i++) {
+        if (i == 1 || c[i] + 0 != c[i-1] + 1) r++
+        rid[i] = r; rlen[r]++
+        if (src[i] != "new") rsrc[r] = rsrc[r] " " src[i]
+    }
+    # ... and over the new/ entries alone (same order)
+    prev = ""
+    for (i = 1; i <= n; i++) {
+        if (src[i] != "new") continue
+        if (prev == "" || c[i] + 0 != c[prev] + 1) q++
+        qid[i] = q; qlen[q]++; prev = i
+    }
+    for (i = 1; i <= n; i++) {
+        if (src[i] != "new") continue
+        scanned++
+        if (qlen[qid[i]] >= mig) { visit++; continue }
+        if (rlen[rid[i]] >= mig) {
+            guarded++
+            m = split(rsrc[rid[i]], s, " ")
+            for (j = 1; j <= m; j++) gs[s[j]] = 1
+            continue
+        }
+        if (ageg && ct[i] + 0 > cutoff + 0) { young++; continue }
+        cand++; bytes += sz[i]
+        print newdir "/" key[i], ino[i], sz[i], mt[i], ct[i], ts[i], c[i], qlen[qid[i]], rlen[rid[i]]
+    }
+    srcs = ""
+    for (k in gs) srcs = srcs (srcs == "" ? "" : ",") k
+    printf "#COUNTS\t%d\t%d\t%d\t%d\t%d\t%.0f\t%s\n", scanned, visit, guarded, young, cand, bytes, (srcs == "" ? "-" : srcs) > "/dev/stderr"
+}'
+
+shopt -s nullglob
+data_dirs=( $DATA_GLOB )
+shopt -u nullglob
+if [[ ${#data_dirs[@]} -eq 0 ]]; then
+    echo "No data directories matched: $DATA_GLOB" >&2
+    exit 1
+fi
+
+if (( AGE_GUARD )); then
+    echo "Cutoff: deleting only images with ctime before $(date -u -d "@$CUTOFF_EPOCH" '+%Y-%m-%d %H:%M:%S UTC') (min age $MIN_AGE_DAYS day(s))"
+else
+    echo "Cutoff: none -- age guard disabled (--min-age-days 0)"
+fi
+(( DRY_RUN )) && echo "DRY RUN: nothing will be deleted"
+log "START" "mode=$MODE dry_run=$DRY_RUN min_age_days=$MIN_AGE_DAYS cameras=${CAMERAS[*]:-all}"
+
+printf '%-14s %8s %8s %8s %8s %8s %8s %8s %8s %9s  %s\n' \
+    Camera Scanned Unparsed Visit Guarded Young Cand Deleted Refused GB Notes
+
+T_scan=0; T_cand=0; T_del=0; T_ref=0; T_bytes=0; force_all=0
+
+for dd in "${data_dirs[@]}"; do
+    if [[ -z "${LRUR_TEST_ROOT:-}" ]] && ! mountpoint -q "$dd"; then
+        echo "WARNING: $dd is not mounted, skipped" >&2
+        log "NOT-MOUNTED" "$dd"
+        continue
+    fi
+    for camdir in "$dd"/archive/LAST.[0-9][0-9].[0-9][0-9].[0-9][0-9]; do
+        [[ -d "$camdir/new" ]] || continue
+        cam=${camdir##*/}
+        if (( ${#CAMERAS[@]} )) && [[ " ${CAMERAS[*]} " != *" $cam "* ]]; then
+            continue
+        fi
+        newdir="$camdir/new"
+        if [[ -L "$newdir" || "$(realpath -e -- "$newdir")" != "$newdir" ]]; then
+            echo "WARNING: $newdir is a symlink or not canonical, skipped" >&2
+            log "SKIP-NONCANONICAL" "$newdir"
+            continue
+        fi
+
+        busy=$(busy_reason "$cam")
+        list_camera "$camdir" > "$TMP/records" 2>/dev/null
+        awk "$PARSE_AWK" "$TMP/records" 2> "$TMP/parse" |
+            LC_ALL=C sort -t $'\t' -k1,1 -k2,2n -k4,4 |
+            awk -v mig="$MIN_IN_GROUP" -v ageg="$AGE_GUARD" -v cutoff="$CUTOFF_EPOCH" \
+                -v newdir="$newdir" "$CLASSIFY_AWK" > "$TMP/cand" 2> "$TMP/counts"
+        unparsed=$(awk -F'\t' '$1 == "#UNPARSED" { print $2 }' "$TMP/parse")
+        IFS=$'\t' read -r tag scanned visit guarded young cand bytes gsrc < "$TMP/counts"
+        if [[ "$tag" != "#COUNTS" || -z "$unparsed" ]]; then
+            echo "ERROR: could not classify $newdir, skipped" >&2
+            log "ERROR-CLASSIFY" "$newdir"
+            continue
+        fi
+        scanned=$(( scanned + unparsed ))
+
+        if [[ -n "$ONLY_LISTED" ]]; then
+            # a reviewed entry must be the very same file: path, inode, size, mtime
+            awk -F'\t' 'NR == FNR { ok[$1 FS $2 FS $3 FS $4] = 1; next }
+                         (($1 FS $2 FS $3 FS $4) in ok)' "$ONLY_LISTED" "$TMP/cand" > "$TMP/cand.f"
+            mv "$TMP/cand.f" "$TMP/cand"
+            cand=$(wc -l < "$TMP/cand")
+            listed=$(awk -F'\t' -v d="$newdir/" 'index($1, d) == 1' "$ONLY_LISTED" | wc -l)
+            dropped=$(( listed - cand ))
+            bytes=$(awk -F'\t' '{ s += $3 } END { printf "%.0f", s }' "$TMP/cand")
+        fi
+
+        notes="guard:$gsrc"
+        if [[ -n "$ONLY_LISTED" ]] && (( dropped > 0 )); then
+            notes="$notes listed-not-selected:$dropped"
+            log "LISTED-NOT-SELECTED" "$cam $dropped (gone, changed, or no longer a candidate)"
+        fi
+        if [[ -n "$busy" ]]; then
+            notes="BUSY ($cand skipped) $busy"
+            log "SKIP-BUSY" "$cam $busy"
+            : > "$TMP/cand"
+            cand=0; bytes=0
+        fi
+        [[ -n "$LIST_OUT" ]] && cat "$TMP/cand" >> "$LIST_OUT"
+
+        go=1
+        if [[ "$MODE" == "interactive" && $force_all -eq 0 && $cand -gt 0 ]]; then
+            while true; do
+                read -r -p "Delete $cand images ($(awk -v b="$bytes" 'BEGIN { printf "%.1f", b / 1e9 }') GB) from $newdir? [y/n/a/q] " answer < /dev/tty ||
+                    { echo "Error: --interactive needs a terminal" >&2; log "ERROR-NOTTY" "$cam"; exit 1; }
+                case "$answer" in
+                    y|Y) break ;;
+                    n|N) go=0; log "DECLINED" "$cam $cand"; break ;;
+                    a|A) force_all=1; break ;;
+                    q|Q) echo "Quitting."; log "QUIT" "$cam"; exit 0 ;;
+                    *) echo "Please answer y, n, a, or q." ;;
+                esac
+            done
+        fi
+
+        deleted=0; refused=0; dbytes=0
+        if (( go )); then
+            while IFS=$'\t' read -r path ino size mtime ctime _; do
+                if (( DRY_RUN )); then
+                    log "DRY-RUN" "$path"
+                    deleted=$((deleted + 1)); dbytes=$((dbytes + size))
+                    continue
+                fi
+                now=$(find "$path" -maxdepth 0 -type f -printf '%i\t%s\t%T@\t%C@' 2>/dev/null)
+                if [[ "$now" != "$ino"$'\t'"$size"$'\t'"$mtime"$'\t'"$ctime" \
+                      || "$(realpath -e -- "$path" 2>/dev/null)" != "$path" ]]; then
+                    log "REFUSED-CHANGED" "$path"
+                    refused=$((refused + 1))
+                    continue
+                fi
+                if rm -f -- "$path"; then
+                    log "DELETED" "$path"
+                    deleted=$((deleted + 1)); dbytes=$((dbytes + size))
+                else
+                    log "ERROR" "$path"
+                    refused=$((refused + 1))
+                fi
+            done < "$TMP/cand"
+        fi
+
+        printf '%-14s %8d %8d %8d %8d %8d %8d %8d %8d %9s  %s\n' "$cam" \
+            "$scanned" "$unparsed" "$visit" "$guarded" "$young" "$cand" "$deleted" "$refused" \
+            "$(awk -v b="$dbytes" 'BEGIN { printf "%.3f", b / 1e9 }')" "$notes"
+        log "CAMERA" "$cam scanned=$scanned unparsed=$unparsed visit=$visit guarded=$guarded young=$young cand=$cand deleted=$deleted refused=$refused bytes=$dbytes $notes"
+        T_scan=$((T_scan + scanned)); T_cand=$((T_cand + cand))
+        T_del=$((T_del + deleted)); T_ref=$((T_ref + refused)); T_bytes=$((T_bytes + dbytes))
+    done
+done
+
+verb="Deleted"
+(( DRY_RUN )) && verb="Would delete"
+summary="Scanned: $T_scan, Candidates: $T_cand, $verb: $T_del ($(awk -v b="$T_bytes" 'BEGIN { printf "%.1f", b / 1e9 }') GB), Refused: $T_ref"
+echo "$summary"
+log "END" "$summary"

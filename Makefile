@@ -49,6 +49,7 @@ package: mrclean check-for-github-tokens
 	ln -sf ${LAST_TOP}/bin/last-copyCALIB2external          ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-copyCALIB2external
 	ln -sf ${LAST_TOP}/bin/last-remove-statusless-proc-dirs ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-remove-statusless-proc-dirs
 	ln -sf ${LAST_TOP}/bin/last-requeue-failed              ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-requeue-failed
+	ln -sf ${LAST_TOP}/bin/last-remove-unreducible-raw      ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-remove-unreducible-raw
 	mkdir -p  ${PACKAGE_DIR}/${SYSTEMD_DIR}
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-pipeline1.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-pipeline1.service
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-pipeline2.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-pipeline2.service
