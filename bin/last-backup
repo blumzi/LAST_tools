@@ -28,17 +28,27 @@ function stamp_as_transfered() {
     local time_stamp=$(grep -w "ready-for-transfer" ${stat_file} | tail -1 | cut -d' ' -f1)
     stamp_line+=" # ${hours_from_ready[${src_dir}]} hours from ready for transfer"
 
+    # Instances queued for a transfer slot can finish the same visit together.
+    # A shared ".status.new" then gets written by several of them at once and the
+    # file loses its ready-for-transfer line (AstroPack #1376), so the rewrite is
+    # serialized per visit and each writer uses its own temporary file.
+    local lock_fd tmp_file
+    exec {lock_fd}<"${src_dir}"
+    flock "${lock_fd}"
     if [ ! -e ${stat_file} ]; then
         echo "${stamp_line}" > ${stat_file}
         message_success "${job_tag} Stamped \"${src_dir}\" as \"transfered\"."
     else
+        tmp_file=$(mktemp "${stat_file}.XXXXXX")
         (
-            grep -vw transfered ${stat_file}
+            grep -avw transfered ${stat_file}     # -a: a NUL byte must not turn the output into "Binary file ... matches"
             echo "${stamp_line}"
-        ) > ${stat_file}.new
-        mv ${stat_file}.new ${stat_file}
+        ) > ${tmp_file}
+        chmod --reference=${stat_file} ${tmp_file}
+        mv ${tmp_file} ${stat_file}
     fi
     chown ${user_name}.${user_group} ${stat_file}
+    exec {lock_fd}<&-
     message_success "${job_tag} Stamped \"${src_dir}\" as \"transfered\"."
 
     file_type=$( sudo -u ${user_name} ssh "${ssh_flags[@]}" ${backup_user}@${backup_host} "stat -c %F ${dst_dir#*:} 2>/dev/null" )
@@ -701,7 +711,25 @@ function backup_one_candidate() {
         return
     fi
 
+    local stamp_before
+    stamp_before=$(grep -aw transfered ${data_dir}/.status 2>/dev/null | tail -1)
+
     backup_acquire_slot
+
+    #
+    # The wait for a slot can be long, and other instances may have queued for the
+    # same visit: skip it if one of them is sending it now or has stamped it
+    # meanwhile (AstroPack #1376)
+    #
+    local stamp_after
+    stamp_after=$(grep -aw transfered ${data_dir}/.status 2>/dev/null | tail -1)
+    if [ "$(is_being_backed_up ${data_dir})" ] || \
+       { [ "${stamp_after}" != "${stamp_before}" ] && [[ "${stamp_after}" == *" transfered ${backup_target} "* ]]; }; then
+        message_success "${job_tag} Was transfered by another instance while waiting for a slot, skipping it"
+        backup_release_slot
+        /bin/rm -f ${diffs}
+        return
+    fi
 
     #
     # If there are more than min_files_per_worker files per worker, split the workload
