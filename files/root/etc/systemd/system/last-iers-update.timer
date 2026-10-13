@@ -2,8 +2,9 @@
 Description=Weekly refresh of the IERS Earth orientation files (AstroPack tt_utc)
 
 [Timer]
-OnCalendar=Mon *-*-* 08:00:00
-RandomizedDelaySec=2h
+# ~14 UTC: the pipelines are generally not using the data at that time
+OnCalendar=Mon *-*-* 14:00:00 UTC
+RandomizedDelaySec=30min
 Persistent=true
 
 [Install]
