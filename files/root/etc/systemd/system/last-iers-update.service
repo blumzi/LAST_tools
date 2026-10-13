@@ -6,4 +6,7 @@ After=network-online.target
 [Service]
 Type=oneshot
 User=ocs
+# the nodes reach the internet only through the Weizmann proxy, which a systemd service does not inherit
+Environment=http_proxy=http://bcproxy.weizmann.ac.il:8080
+Environment=https_proxy=http://bcproxy.weizmann.ac.il:8080
 ExecStart=/bin/bash /usr/local/share/last-tool/bin/last-iers-update
