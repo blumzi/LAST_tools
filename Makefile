@@ -50,6 +50,7 @@ package: mrclean check-for-github-tokens
 	ln -sf ${LAST_TOP}/bin/last-remove-statusless-proc-dirs ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-remove-statusless-proc-dirs
 	ln -sf ${LAST_TOP}/bin/last-requeue-failed              ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-requeue-failed
 	ln -sf ${LAST_TOP}/bin/last-remove-unreducible-raw      ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-remove-unreducible-raw
+	ln -sf ${LAST_TOP}/bin/last-iers-update                ${PACKAGE_DIR}/${LOCAL_TOP}/bin/last-iers-update
 	mkdir -p  ${PACKAGE_DIR}/${SYSTEMD_DIR}
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-pipeline1.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-pipeline1.service
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-pipeline2.service 	    ${PACKAGE_DIR}/${SYSTEMD_DIR}/last-pipeline2.service
@@ -59,6 +60,8 @@ package: mrclean check-for-github-tokens
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-products-watcher.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-products-watcher.service
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-clockinfo-to-redis.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-clockinfo-to-redis.service
 	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-clockinfo-to-redis.timer 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-clockinfo-to-redis.timer
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-iers-update.service 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-iers-update.service
+	ln -sf ${LAST_TOP}/files/root/${SYSTEMD_DIR}/last-iers-update.timer 	${PACKAGE_DIR}/${SYSTEMD_DIR}/last-iers-update.timer
 	@(  \
         repo=$$(git remote get-url --all origin | sed -e 's;//.*@;//;'); \
         commit=$$(git rev-parse --short HEAD); \

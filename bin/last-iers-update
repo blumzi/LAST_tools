@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+#
+# last-iers-update - refresh the IERS Earth-orientation files that AstroPack uses for the UTC to TT
+# conversion (celestial.time.tt_utc, via Installer.readIERS_EOP). tt_utc needs these files to reach at
+# least 60 days into the past; when they are older it returns NaN and every transient insertion into the
+# database fails (AstroPack #1396). Run weekly by last-iers-update.timer, as user ocs.
+#
+# The new files are downloaded into a temporary folder and installed only if every download succeeded,
+# none is much smaller than the installed copy, and the C01 series reaches at least as far as the
+# installed one. The previous set is kept in <dir>.prev. Nothing is changed on any failure.
+#
+# Usage: last-iers-update [-n]      -n: download and check only, do not install
+# Env:   LAST_IERS_DIR  data folder (default /home/ocs/matlab/data/SolarSystem/Time)
+#
+set -u
+DIR=${LAST_IERS_DIR:-/home/ocs/matlab/data/SolarSystem/Time}
+DRY=0; [ "${1:-}" = "-n" ] && DRY=1
+URLS=( https://datacenter.iers.org/data/csv/finals2000A.data.csv
+       https://datacenter.iers.org/data/csv/finals2000A.daily.csv
+       https://datacenter.iers.org/data/latestVersion/EOP_14_C04_IAU1980_one_file_1962-now.txt
+       https://datacenter.iers.org/data/latestVersion/EOP_C01_IAU2000_1846-now.txt )
+C01=EOP_C01_IAU2000_1846-now.txt
+
+log() { echo "last-iers-update: $*"; }
+last_mjd() { grep -v '^#' "$1" 2>/dev/null | awk 'NF { m = $1 } END { printf "%.3f", m + 0 }'; }
+
+[ -d "$DIR" ] || { log "data folder $DIR not found - nothing changed"; exit 1; }
+TMP=$(mktemp -d /tmp/last-iers-update.XXXXXX) || exit 1
+trap 'rm -rf "$TMP"' EXIT
+
+for u in "${URLS[@]}"; do
+    f=$(basename "$u")
+    if ! curl -sfL -m 300 -A Mozilla -o "$TMP/$f" "$u"; then
+        log "download failed: $u - nothing changed"; exit 1
+    fi
+    new=$(stat -c %s "$TMP/$f"); old=$(stat -c %s "$DIR/$f" 2>/dev/null || echo 0)
+    if [ "$new" -lt 10000 ] || [ "$new" -lt $(( old * 9 / 10 )) ]; then
+        log "$f: suspicious size $new bytes (installed $old) - nothing changed"; exit 1
+    fi
+    case "$f" in *.csv) head -1 "$TMP/$f" | grep -q MJD || { log "$f: no MJD header - nothing changed"; exit 1; } ;; esac
+done
+
+c01_old=$(last_mjd "$DIR/$C01"); c01_new=$(last_mjd "$TMP/$C01")
+if awk -v n="$c01_new" -v o="$c01_old" 'BEGIN { exit !(n < o) }'; then
+    log "$C01 ends at MJD $c01_new, the installed one at $c01_old - nothing changed"; exit 1
+fi
+if [ "$DRY" = 1 ]; then
+    log "check only: downloads valid, $C01 would go from MJD $c01_old to $c01_new"; exit 0
+fi
+
+rm -rf "$DIR.prev" && cp -a "$DIR" "$DIR.prev" || { log "cannot keep $DIR.prev - nothing changed"; exit 1; }
+for u in "${URLS[@]}"; do
+    f=$(basename "$u")
+    cp "$TMP/$f" "$DIR/.$f.new" && mv -f "$DIR/.$f.new" "$DIR/$f" || { log "installing $f failed - previous set in $DIR.prev"; exit 1; }
+done
+log "updated $DIR: $C01 now ends at MJD $c01_new (was $c01_old)"

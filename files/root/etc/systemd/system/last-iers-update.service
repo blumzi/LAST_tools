@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh the IERS Earth orientation files used by AstroPack for the UTC to TT conversion
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ocs
+ExecStart=/bin/bash /usr/local/share/last-tool/bin/last-iers-update

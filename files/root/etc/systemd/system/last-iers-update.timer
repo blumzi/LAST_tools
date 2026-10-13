@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly refresh of the IERS Earth orientation files (AstroPack tt_utc)
+
+[Timer]
+OnCalendar=Mon *-*-* 08:00:00
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
