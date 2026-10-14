@@ -1,5 +1,8 @@
 [Unit]
 Description=Feeds LAST images to ds9 viwer
+# start only after the data disks are mounted: a camera's new/ folder that does not exist yet ends its
+# inotifywait at once and that camera is never fed (LAST_tools #75)
+RequiresMountsFor=/%H/data1 /%H/data2
 
 [Service]
 User=ocs
