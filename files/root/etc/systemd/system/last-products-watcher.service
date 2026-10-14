@@ -1,5 +1,8 @@
 [Unit]
 Description=LAST products synchronization watcher
+# start only after the data disks are mounted: inotifywait --recursive set up on an empty mount point never
+# sees the disk mounted over it, and its products then wait for the hourly catch-up (LAST_tools #75)
+RequiresMountsFor=/%H/data1 /%H/data2
 
 [Service]
 User=ocs
