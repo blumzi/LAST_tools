@@ -110,7 +110,12 @@ default_njobs=1
 # the nightly accrual from ~38 GB to ~12 GB per camera. The raw moves are
 # trimmed to 6 cameras (4.2 MB/s) so the total stays inside the budget:
 # 36 + 4.2 = 40.2 MB/s. See LAST_issues #216.
-default_bwlimit=1800
+#
+# Raised 1800 -> 2200 on 2026-10-17 for the reprocessing of archived raw images,
+# while the raw moves to marvin are paused: 2200 x 19 nodes = ~42 MB/s, just
+# under the ~45 MB/s policer (measured 31 MB/s at 1800). Lower it again before
+# the raw moves resume.
+default_bwlimit=2200
 bwlimit=${default_bwlimit}
 # At most this many last-backup instances transfer at the same time on this
 # machine (the pipeline starts one per visit); the others wait for a free slot
