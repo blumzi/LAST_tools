@@ -146,6 +146,25 @@ function valid_refpath() {
 }
 
 #
+# Waits until the data disks of a pipeline are mounted, at most ${2} seconds.
+# The disks are mounted 'nofail', so after a boot the service can start before
+# them: a MATLAB started before /<host>/data is mounted builds its path without
+# the catsHTM catalogs and then fails every visit.
+#
+function wait_for_data_disks() {
+    local id="${1}" timeout="${2}" host i
+
+    host="$(hostname -s)"
+    for (( i = 0; i < timeout; i++ )); do
+        if mountpoint -q "/${host}/data" && mountpoint -q "/${host}/data${id}" && [ -d "/${host}/data/catsHTM/GAIA/DR3" ]; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+#
 # Matches the command lines of both the last-matlab wrapper and the MATLAB
 # process of one pipeline service, e.g.:
 #   ... startBatchLASTPipeline('Id', 1, 'PipelineVersion', 'v0');
@@ -172,6 +191,15 @@ case "${action}" in
         version=$( pipeline_version "${id}" "${3}" )
         if ! valid_version "${version}"; then
             echo "${PROG}: invalid pipeline version '${version}' (expected one of: ${known_versions})" >&2
+            exit 1
+        fi
+
+        # Wait for the data disks (also before the refpath check, the refpath
+        # may be on them). The wait stays below the systemd start timeout
+        # (90 s); when it fails, Restart=always tries again.
+        if ! wait_for_data_disks "${id}" 80; then
+            echo "${PROG}: data disks of pipeline ${id} not mounted after 80 s" >&2
+            logger -t "${PROG}" "not starting LAST pipeline ${id}: /$(hostname -s)/data, /$(hostname -s)/data${id} or the catsHTM catalogs not available after 80 s"
             exit 1
         fi
 
