@@ -703,7 +703,15 @@ function backup_one_candidate() {
     sudo -u ocs ssh -o "StrictHostKeyChecking accept-new" ${backup_user}@${backup_host} mkdir -p ${backup_target_dir_full_path#*:}
 
     if was_successfully_tranfered ${data_dir} > ${diffs}; then
-        message_success "${job_tag} Was already transfered, skipping it"
+        # A transfer cut off after its last file arrived (e.g. the target became
+        # unreachable) leaves a complete copy without the stamp: stamp it now, or
+        # it is skipped here every time and never removed
+        if grep -qaw transfered ${data_dir}/.status 2>/dev/null; then
+            message_success "${job_tag} Was already transfered, skipping it"
+        else
+            message_success "${job_tag} Already complete on the target but not stamped, stamping it"
+            stamp_as_transfered "${data_dir}" "${backup_target_dir_full_path}" "${job_tag}"
+        fi
         /bin/rm -f ${diffs}
         return
     fi
