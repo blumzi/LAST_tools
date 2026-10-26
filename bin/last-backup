@@ -552,11 +552,17 @@ function was_successfully_tranfered() {
                 rc=0
                 ;;
             1)
-                if [ "$(< ${diffs})" = ".status" ] && grep -qw transfered ${data_dir}/.status; then
-                    rc=0
-                else
-                    rc=1
-                fi
+                # Was: ".status is the only difference" counted as synced. That tolerance
+                # existed because last-products-watcher appended a bare "transfered" line
+                # to the LOCAL .status after this script had already copied .status to the
+                # target, so .status differed on every transferred visit. With that stamp
+                # gone (last-products-watcher, 2026-10-26) the two copies match, so the
+                # tolerance is no longer needed - and it was load-bearing for the wrong
+                # thing: it let the removal pass delete the local copy while the target
+                # copy was still unstamped, leaving a visit nothing could reconcile
+                # (26 such orphans found on 2026-10-26). A stale .status on the target is
+                # now repaired at the removal site instead.
+                rc=1
 
 #                if [ "$(< ${diffs})" = ".status" ]; then
 #                    local remote_dir=${backup_target}
@@ -976,6 +982,29 @@ if ${remove_flag} && [ ${#candidates_for_removal[*]} -ne 0 ]; then
         if was_successfully_tranfered ${candidate} >${diffs}; then
             /bin/rm -rf ${candidate}
             message_success "  ${candidate} - removed"
+        elif [ "$(< ${diffs})" = ".status" ] && grep -qaw transfered ${candidate}/.status; then
+            #
+            # The only difference is the receipt itself, and ours says transfered. Push it
+            # to the target and re-verify BEFORE removing anything: deleting the local copy
+            # while the target .status is unstamped leaves a visit that nothing can ever
+            # reconcile, because every later run skips a visit the target cannot vouch for.
+            #
+            remote_visit=${backup_target}
+            is_LAST_visit ${candidate} && remote_visit+=/${candidate#*/archive/}
+            if sudo -u ocs rsync -a -e 'ssh -o BatchMode=yes -o "StrictHostKeyChecking accept-new"' \
+                    ${candidate}/.status ${remote_visit}/ 2>/dev/null; then
+                message_success "  ${candidate} - refreshed a stale .status on the target"
+                if was_successfully_tranfered ${candidate} >/dev/null; then
+                    /bin/rm -rf ${candidate}
+                    message_success "  ${candidate} - removed"
+                else
+                    message_error "  ${candidate} - still differs after refreshing .status, will retry"
+                    candidates_for_retry+=( ${candidate} )
+                fi
+            else
+                message_failure "  ${candidate} - could not refresh .status on the target, will retry"
+                candidates_for_retry+=( ${candidate} )
+            fi
         else
             message_error "  ${candidate} - differs from backup ($(wc -l < ${diffs}) diffs), will retry"
             candidates_for_retry+=( ${candidate} )  # give it another chance
