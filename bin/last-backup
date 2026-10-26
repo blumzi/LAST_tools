@@ -1009,4 +1009,9 @@ else
     fi
 fi
 
+# Wait for the backgrounded backup_one_candidate jobs before cleanup, which kills
+# whatever is still running: with -j N only every N-th iteration waits, so without
+# this a run holding N or fewer candidates would launch them all and then kill them.
+wait
+
 cleanup
