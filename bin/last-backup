@@ -525,6 +525,19 @@ function get_unsynced_files() {
 #  0 - no unsynced files
 #  1 - there are unsynced files (on stdout)
 #
+#
+# True only for a stamp written by THIS script, which always names the target:
+#     <iso-time> transfered <user>@<host>:/<path> [# comment]
+# last-products-watcher appends a BARE "<iso-time> transfered" line on its own, weaker,
+# check (last-products-watcher:47). Treating that as proof of transfer hides the visit
+# from the catch-up for ever: measured 2026-10-26, every bare-only stamp on four nodes
+# had an INCOMPLETE copy on the target - 0, 0, 1, 22 and 93 files against the 125-130 of
+# its siblings - while its local copy was complete.
+#
+function has_full_transfer_stamp() {
+    grep -qaE '^[0-9][0-9T:+-]* transfered [^ ]+@[^ ]+:' "${1}" 2>/dev/null
+}
+
 function was_successfully_tranfered() {
     local data_dir="${1}"
     local rc=1 ndiffs      # a failed dry-run means "not verified", never "synced"
@@ -706,7 +719,7 @@ function backup_one_candidate() {
         # A transfer cut off after its last file arrived (e.g. the target became
         # unreachable) leaves a complete copy without the stamp: stamp it now, or
         # it is skipped here every time and never removed
-        if grep -qaw transfered ${data_dir}/.status 2>/dev/null; then
+        if has_full_transfer_stamp ${data_dir}/.status; then
             message_success "${job_tag} Was already transfered, skipping it"
         else
             message_success "${job_tag} Already complete on the target but not stamped, stamping it"
@@ -878,7 +891,7 @@ for candidate in ${candidates[*]}; do
     hours=$(( ( $(date +%s) - $(date --date "${time_stamp}" +%s) ) / 3600 ))
     hours_from_ready[${candidate}]=${hours}
 
-    if grep -qw transfered ${stat_file}; then
+    if has_full_transfer_stamp ${stat_file}; then
 
         if (( hours >= old_age_hours )); then
             candidates_for_removal+=( ${candidate} )
