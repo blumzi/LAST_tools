@@ -43,9 +43,16 @@ function initiate_transfer() {
     LAST_TOOL_QUIET=true ${cmd}
     rc=${?}
 
-    if [ ${rc} -eq 0 ]; then
-        echo "$(date --iso-8601=seconds) ${const_transfered}" >> ${status_file}
-    fi
+    # Deliberately NOT stamping here. last-backup writes the authoritative stamp itself,
+    # and only after an rsync dry-run shows zero differing files; the stamp it writes also
+    # names the target. This exit code cannot stand in for that: last-backup exits 0 when
+    # it had nothing to do, and even for a source that does not exist (verified
+    # 2026-10-26). Appending a bare "transfered" line on rc==0 therefore marked visits as
+    # done when nothing had been sent, and because every transfer run skips a visit that
+    # says transfered, those visits were never retried - measured 2026-10-26, five such
+    # visits on four nodes, each with 0-93 of its ~125 files at the target.
+    # If a transfer did succeed but somehow went unstamped, the catch-up notices on its
+    # next pass ("Already complete on the target but not stamped") and stamps it properly.
 
     return ${rc}
 }
