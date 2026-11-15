@@ -193,39 +193,107 @@ function user_check() {
     return $(( ret ))
 }
 
+#
+# Firefox proxy prefs (manual proxy, bypassed for the LAST LAN)
+#
+user_mozilla_proxy_prefs=(
+    'user_pref("network.proxy.type", 1);'
+    'user_pref("network.proxy.http", "bcproxy.weizmann.ac.il");'
+    'user_pref("network.proxy.http_port", 8080);'
+    'user_pref("network.proxy.ssl", "bcproxy.weizmann.ac.il");'
+    'user_pref("network.proxy.ssl_port", 8080);'
+    'user_pref("network.proxy.no_proxies_on", "localhost, 127.0.0.1, 10.23.0.0/16");'
+)
+
+#
+# Prints the user's Firefox profile directories (one per line), as listed in profiles.ini
+#
+function user_mozilla_profile_dirs() {
+    local top is_relative path
+
+    for top in "${user_home}/.mozilla/firefox" "${user_home}/snap/firefox/common/.mozilla/firefox"; do
+        [ -r "${top}/profiles.ini" ] || continue
+        awk -F= '
+            /^\[/                           { if (p != "") print r "\t" p; p = ""; r = 1; inprof = ($0 ~ /^\[Profile/); next }
+            inprof && $1 == "Path"          { p = substr($0, 6) }
+            inprof && $1 == "IsRelative"    { r = $2 }
+            END                             { if (p != "") print r "\t" p }
+        ' "${top}/profiles.ini" | while IFS=$'\t' read -r is_relative path; do
+            if [ "${is_relative}" = 1 ]; then
+                path="${top}/${path}"
+            fi
+            [ -d "${path}" ] && echo "${path}"
+        done
+    done
+}
+
 function user_check_mozilla_proxy() {
     local errors=0
-    local user_js_file
-    eval user_js_file="${user_home}/.mozilla/firefox/*.default/user.js"
+    local profile_dir user_js_file pref missing
+    local -a profile_dirs
 
-    if [ ! -r "${user_js_file}" ]; then
-        message_failure "The Mozilla user.js file is missing"
-        return 1
-    else
-        message_success "The Mozilla user.js file exists."
+    mapfile -t profile_dirs < <(user_mozilla_profile_dirs)
+    if (( ${#profile_dirs[*]} == 0 )); then
+        message_warning "No Firefox profiles found for ${user_name} (Firefox never ran?), cannot check proxy settings"
+        return 0
     fi
 
-    if (( $(grep -c -E 'user_pref\("network\.proxy\.(type|HTTP|HTTPS)"' "${user_js_file}") == 3 )); then
-        message_success "The Mozilla user.js file has entries for network.proxy.(type|HTTP|HTTPS)"
-    else
-        message_failure "The Mozilla user.js file does not have entries for network.proxy.(type|HTTP|HTTPS)"
-        (( errors++ ))
-    fi
+    for profile_dir in "${profile_dirs[@]}"; do
+        user_js_file="${profile_dir}/user.js"
+        if [ ! -r "${user_js_file}" ]; then
+            message_failure "The Mozilla file \"${user_js_file}\" is missing"
+            (( errors++ ))
+            continue
+        fi
+
+        missing=0
+        for pref in "${user_mozilla_proxy_prefs[@]}"; do
+            grep -Fxq "${pref}" "${user_js_file}" || (( missing++ ))
+        done
+
+        if (( missing == 0 )); then
+            message_success "The Mozilla file \"${user_js_file}\" has the proxy settings"
+        else
+            message_failure "The Mozilla file \"${user_js_file}\" misses ${missing} of ${#user_mozilla_proxy_prefs[*]} proxy settings"
+            (( errors++ ))
+        fi
+    done
 
     return $(( errors ))
 }
 
 function user_enforce_mozilla_proxy() {
-    local user_js_file
-    eval user_js_file=~"${user_name}/.mozilla/firefox/*.default/user.js"
-    mkdir -p "$(dirname "${user_js_file}" )"
+    local profile_dir user_js_file tmp
+    local stale_dir="${user_home}/.mozilla/firefox/*.default"
+    local -a profile_dirs
 
-    {
-        echo '// Weizmann proxy settings'
-        echo 'user_pref("network.proxy.type", "1");'
-        echo 'user_pref("network.proxy.HTTP", "http://bcproxy.weizmann.ac.il:8080");'
-        echo 'user_pref("network.proxy.HTTPS", "http://bcproxy.weizmann.ac.il:8080");'
-    } > "${user_js_file}"
+    # A previous version of this function created a directory literally named '*.default'
+    if [ -d "${stale_dir}" ] && [ "$(ls -A "${stale_dir}")" = user.js ]; then
+        /bin/rm -f "${stale_dir}/user.js"
+        rmdir "${stale_dir}" && message_success "Removed the stale directory \"${stale_dir}\""
+    fi
+
+    mapfile -t profile_dirs < <(user_mozilla_profile_dirs)
+    if (( ${#profile_dirs[*]} == 0 )); then
+        message_warning "No Firefox profiles found for ${user_name} (Firefox never ran?), cannot set proxy settings"
+        return 0
+    fi
+
+    for profile_dir in "${profile_dirs[@]}"; do
+        user_js_file="${profile_dir}/user.js"
+        tmp="$(mktemp)"
+        {
+            # keep any non-proxy prefs already in user.js
+            if [ -r "${user_js_file}" ]; then
+                grep -v -E '(network\.proxy\.|^// Weizmann proxy settings)' "${user_js_file}"
+            fi
+            echo '// Weizmann proxy settings'
+            printf '%s\n' "${user_mozilla_proxy_prefs[@]}"
+        } > "${tmp}"
+        install -m 0644 -o "${user_name}" -g "${user_name}" "${tmp}" "${user_js_file}"
+        /bin/rm -f "${tmp}"
+        message_success "Wrote proxy settings to \"${user_js_file}\""
+    done
 }
 
 function user_enforce_pulseaudio() {
