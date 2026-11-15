@@ -20,7 +20,7 @@ function bios_check() {
 
     if [ "$(id -un)" != root ]; then
         message_failure "Must be root to read BIOS info"
-        return
+        return 1
     fi
 
 #    wakeup_type="$(dmidecode -H 1 2>/dev/null | grep 'Wake-up Type:' | sed -e 's;^.*:.;;')"
@@ -44,8 +44,10 @@ function bios_check() {
     if (( total == 256 )); then
         message_success "The machine has ${total} GB of memory (${#DIMMs[*]} DIMMs, sizes (GB): ${DIMMs[*]})"
     else
-        message_success "The machine has ${total} GB instead of 256 of memory (${#DIMMs[*]} DIMMs, sizes (GB): ${DIMMs[*]})"
+        message_failure "The machine has ${total} GB instead of 256 of memory (${#DIMMs[*]} DIMMs, sizes (GB): ${DIMMs[*]})"
+        return 1
     fi
+    return 0
 }
 
 function bios_policy() {
