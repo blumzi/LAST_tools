@@ -28,10 +28,10 @@
 #04:91:62:c0:8C:7F	10.23.2.18	pswitch09w SWITCH18 pswitch18
 FC:0F:E7:08:13:26	10.23.2.17	pswitch09e SWITCH17 pswitch17
 FC:0F:E7:08:62:87	10.23.2.18	pswitch09w SWITCH18 pswitch18
-04:91:62:c0:7F:F3	10.23.2.19	pswitch10e SWITCH19 pswitch19
-04:91:62:c0:8C:7F	10.23.2.20	pswitch10w SWITCH20 pswitch20
-04:91:62:c0:7F:F3	10.23.2.21	pswitch11e SWITCH21 pswitch21
-04:91:62:c0:8C:7F	10.23.2.22	pswitch11w SWITCH22 pswitch22
+54:10:ec:69:0c:2c	10.23.2.19	pswitch10e SWITCH19 pswitch19
+e8:eb:1b:4b:bd:f4	10.23.2.20	pswitch10w SWITCH20 pswitch20
+80:34:28:30:b2:82	10.23.2.21	pswitch11e SWITCH21 pswitch21
+fc:0f:e7:08:84:96	10.23.2.22	pswitch11w SWITCH22 pswitch22
 #04:91:62:c0:7F:F3	10.23.2.23	pswitch12e SWITCH23 pswitch23
 #04:91:62:c0:8C:7F	10.23.2.24	pswitch12w SWITCH24 pswitch24
 
