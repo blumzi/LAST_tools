@@ -11,7 +11,7 @@ PROG="$(basename "${0}")"
 function help() {
     cat <<- EOF
 
-    Usage: ${PROG} [-h|--help] [-d|--deployed] [-l|--lab] [-s|--stored] [-a|--all]
+    Usage: ${PROG} [-h|--help] [-d|--deployed] [-u|--units] [-l|--lab] [-s|--stored] [-a|--all]
 
     Produces a list of the currently installed (not necessarily running) machines.
     -h|--help:     Shows this help and exits
@@ -63,6 +63,12 @@ while [ ${#} -gt 0 ]; do
         -a|--all)
             echo ${all_machines[*]}
             exit 0
+            ;;
+
+        *)
+            echo "${PROG}: Invalid argument \"${1}\"" >&2
+            help >&2
+            exit 1
             ;;
     esac
 done
