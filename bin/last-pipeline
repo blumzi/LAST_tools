@@ -14,16 +14,22 @@ function usage() {
     cat <<- EOF
 
     Show usage:
-        ${PROG} [-h|--help] 
+        ${PROG} [-h|--help]
+
+    Options:
+        -H|--host <host>   Act on this host (may be repeated; default: all deployed units)
+        -n|--dry-run       Only print the last-asroot command that would be run
 
     Get status:
         ${PROG} [[-H host] ... ] [status]
 
-    Turn on/off for the current system boot session
-        ${PROG} [[-H host] ... ] on|off
+    Turn on/off for the current system boot session (systemctl start/stop)
+        ${PROG} [[-H host] ... ] on|start
+        ${PROG} [[-H host] ... ] off|stop
 
-    Always run/do-not-run the pipeline (across system boots)
-        ${PROG} [[-H host] ... ] always-on|always-off 
+    Always run/do-not-run the pipeline across system boots (systemctl enable/disable)
+        ${PROG} [[-H host] ... ] always-on|enable
+        ${PROG} [[-H host] ... ] always-off|disable
 
     Show the pipeline version (v0: pipeline.DemonLAST, v1: pipeline.last.pipes.PipelineDemon)
         ${PROG} [[-H host] ... ] version [id]
@@ -42,7 +48,10 @@ EOF
 }
 
 
-OPTS=$( getopt -o 'H:hun' --long "dry-run,help,host:,units,units-only" -n "${PROG}" -- "$@" )
+if ! OPTS=$( getopt -o 'H:hun' --long "dry-run,help,host:,units,units-only" -n "${PROG}" -- "$@" ); then
+    usage
+    exit 1
+fi
 eval set -- "${OPTS}"
 
 
@@ -86,6 +95,13 @@ if [ ! "${action}" ]; then
     action=status
 fi
 
+
+case "${action}" in
+    on)         action=start   ;;
+    off)        action=stop    ;;
+    always-on)  action=enable  ;;
+    always-off) action=disable ;;
+esac
 
 case "${action}" in
     status|start|stop|enable|disable|version|refpath)
