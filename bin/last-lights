@@ -7,111 +7,125 @@ source /etc/profile.d/last.sh
 
 PROG=$(basename "${0}")
 
+# Written by Ansible (LAST_Ansible: playbooks/deploy/instruments/lights):
+#   LIGHTS_SWITCH        address of the "last0 control" power switch
+#   LIGHTS_OUTLET        the lights' outlet on it
+#   LIGHTS_OID           eoPowerAdminState.<outlet> (RFC 7460)
+#   LIGHTS_SNMPCONFPATH  directory holding the SNMPv3 credentials (powerLights)
+LIGHTS_CONF=${LIGHTS_CONF:-/etc/last/lights.conf}
+
+# IANA PowerStateSet (IEEE1621) values used by the switch
+readonly STATE_ON=259
+readonly STATE_OFF=257
+
 function usage() {
     module_include lib/ansi
 
     cat <<- EOF
 
-    At the LAST observatory (Neot Smadar) we have some lights controlled by 
-     remote controlled power switches.
+    At the LAST observatory (Neot Smadar) the lights (the light projectors)
+     are powered by outlet #1 of the "last0 control" power switch.
 
-    This tool controls the power switches and lets the user:
-     - Get the status of the sockets where the lights are connected
-     - Turn ON/OFF the lights, either all at once or just the specified list.
+    This tool controls that outlet over SNMP and lets the user:
+     - Get the status of the lights
+     - Turn the lights ON, OFF, or TOGGLE them
 
     $(ansi_underline "Usage"):
-        ${PROG} <power-switch-name>
-            - Gets the current status of the light hooked to the specified power-switch
+        ${PROG}
+            - Shows whether the lights are on or off
 
-        ${PROG} on|off|toggle [[<power-switch-name>] ... ]
-            - Turn ON, OFF or TOGGLE either ALL the lights (when no power-swithces are specified)
-               or just on the power-switches specified as arguments.
+        ${PROG} on|off|toggle
+            - Turns the lights ON, OFF, or the opposite of what they are now
 
     $(ansi_bold "Notes"):
-        - Power switches may be addressed either by their hostname or ip-address.
-        - Valid <switch-name>s: pswitch02w, 02w, 2w, 11e, 05W, etc.
+        - The switch user (powerLights) can switch the lights' outlet and
+           nothing else on that switch.
+        - Settings: ${LIGHTS_CONF} (installed by Ansible).
 
 EOF
 }
 
-
-declare -A known_light_sockets=(
-    ["02e"]=6 ["pswitch02e"]=6 ["10.23.2.3"]=6
-    ["02w"]=1 ["pswitch02w"]=1 ["10.23.2.4"]=1
-    ["05w"]=2 ["pswitch05w"]=1 ["10.23.2.10"]=1
-    ["08w"]=2 ["pswitch08w"]=2 ["10.23.2.16"]=2
-    
-)
-
-function all_switches() {
-    declare all=()
-
-    for key in ${!known_light_sockets[*]}; do
-        if [[ ${key} == pswitch* ]]; then
-            all+=( ${key} )
-        fi
-    done
-
-    echo ${all[*]}
+function die() {
+    echo "${PROG}: ${*}" >&2
+    exit 1
 }
 
-declare pswitch
-declare sockets
-declare value
+# snmp <snmpget|snmpset> [args...]: run against the switch with the
+# powerLights credentials only (not the user's ~/.snmp or the system config).
+function snmp() {
+    local cmd=${1}
+    shift
+    SNMPCONFPATH="${LIGHTS_SNMPCONFPATH}" MIBS='' \
+        "${cmd}" -t 2 -r 1 -Oqv "${LIGHTS_SWITCH}" "${@}"
+}
 
-action=''
+# get_state: prints "on" or "off"; otherwise says why on stderr and returns 1.
+# Always call it as `x=$(get_state) || exit 1`: it runs in a subshell, where
+# an exit would not stop the script.
+function get_state() {
+    local value
+    if ! value=$(snmp snmpget "${LIGHTS_OID}" 2>&1); then
+        echo "${PROG}: cannot read the lights (${LIGHTS_SWITCH} outlet ${LIGHTS_OUTLET}): ${value}" >&2
+        return 1
+    fi
+    case "${value}" in
+        "${STATE_ON}")  echo on ;;
+        "${STATE_OFF}") echo off ;;
+        *)
+            echo "${PROG}: unexpected answer for the lights (${LIGHTS_SWITCH} outlet ${LIGHTS_OUTLET}): ${value}" >&2
+            return 1
+            ;;
+    esac
+}
+
+# set_state on|off: switches, then reads back and prints the result.
+function set_state() {
+    local want=${1} value out
+    if [ "${want}" = on ]; then value=${STATE_ON}; else value=${STATE_OFF}; fi
+    if ! out=$(snmp snmpset "${LIGHTS_OID}" i "${value}" 2>&1); then
+        die "cannot switch the lights ${want} (${LIGHTS_SWITCH} outlet ${LIGHTS_OUTLET}): ${out}"
+    fi
+    sleep 1
+    local now
+    now=$(get_state) || exit 1
+    if [ "${now}" != "${want}" ]; then
+        die "asked for ${want}, but the lights read ${now}"
+    fi
+    echo "lights ${now}"
+}
+
 if [ "${1}" = '-h' ] || [ "${1}" = "--help" ]; then
     usage
     exit 0
-elif [ "${1}" = on ] || [ "${1}" = off ] || [ "${1}" = toggle ]; then
-    action="${1}"
-    shift 1
 fi
 
-# valid pswitch names: "{pswitch}0[1-9][ew] {pswitch}1[0-2][ew]"
- 
-selected_power_switches=()
+[ -r "${LIGHTS_CONF}" ] || die "${LIGHTS_CONF} is missing: deploy LAST_Ansible playbooks/deploy/instruments/lights"
+# shellcheck disable=SC1090
+source "${LIGHTS_CONF}"
+[ -n "${LIGHTS_SWITCH}" ] && [ -n "${LIGHTS_OID}" ] || die "${LIGHTS_CONF} lacks LIGHTS_SWITCH or LIGHTS_OID"
+[ -r "${LIGHTS_SNMPCONFPATH}/snmp.conf" ] || die "cannot read ${LIGHTS_SNMPCONFPATH}/snmp.conf (are you in group ocs?)"
+command -v snmpget >/dev/null || die "snmpget is not installed (package snmp)"
 
-while [ ${#} -gt 0 ]; do
-    name=${1,,}
-    name=${name#pswitch}
-    if [[ "${name}" == [1-9][ew] ]]; then
-        name=pswitch0${name}
-    elif [[ "${name}" == 0[1-9][ew] ]]; then
-        name=pswitch${name}
-    elif [[ "${name}" == 1[0-2][ew] ]]; then
-        name=pswitch${name}
-    else
-        echo "${PROG}: Invalid power switch name \"${name}\""
-        exit 1
-    fi
-
-    known=false
-    for key in ${!known_light_sockets[*]}; do
-        if [ "${name}" = "${key}" ]; then
-            known=true
-            break
-        fi
-    done
-
-    if ! ${known}; then
-        echo "${PROG}: No lights on power switch \"${name}\". Use one of: ${!known_light_sockets[*]}"
-        exit 1
-    fi
-
-    selected_power_switches+=( ${name} )
-    shift 1
-done
-
-if [ ${#selected_power_switches[*]} -eq 0 ]; then
-    selected_power_switches=( $(all_switches) )
+if [ ${#} -gt 1 ]; then
+    usage
+    exit 1
 fi
 
-for pswitch in ${selected_power_switches[*]}; do
-    socket=${known_light_sockets[${pswitch}]}
-    if [ "${action}" = "" ]; then
-        echo ${pswitch} $(last-pswitch ${pswitch} ${socket})
-    else
-        last-pswitch ${pswitch} ${socket} ${action}
-    fi
-done
+case "${1}" in
+    '')
+        state=$(get_state) || exit 1
+        echo "lights ${state}"
+        ;;
+    on|off)
+        set_state "${1}"
+        ;;
+    toggle)
+        state=$(get_state) || exit 1
+        if [ "${state}" = on ]; then set_state off; else set_state on; fi
+        ;;
+    *)
+        echo "${PROG}: unknown action \"${1}\" (use on, off or toggle)" >&2
+        usage
+        exit 1
+        ;;
+esac
