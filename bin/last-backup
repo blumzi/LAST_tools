@@ -51,21 +51,70 @@ function stamp_as_transfered() {
     exec {lock_fd}<&-
     message_success "${job_tag} Stamped \"${src_dir}\" as \"transfered\"."
 
+    # The target check and the copies below can fail when the target is briefly unreachable. ssh exits with 255 for
+    # its own failure, and stat with 1 for a missing folder, so a refused or timed-out connection is no longer
+    # reported as "DOES NOT EXIST", and a failed copy is reported instead of discarded. Either way the target keeps
+    # an unstamped .status, which refresh_stale_target_status (next regular run) or --remove pushes again (#80).
+    local stat_rc rc
     file_type=$( sudo -u ${user_name} ssh "${ssh_flags[@]}" ${backup_user}@${backup_host} "stat -c %F ${dst_dir#*:} 2>/dev/null" )
+    stat_rc=${?}
     if [ "${file_type}" = directory ]; then
         message_info "${job_tag} Copying .status to ${dst_dir} ..."
         sudo -u ocs rsync -a ${stat_file} ${backup_target_dir_full_path} 2>/dev/null
+        rc=${?}
+        if (( rc != 0 )); then
+            message_failure "${job_tag} Could not copy .status to ${dst_dir} (rsync exit ${rc}), it will be pushed again"
+        fi
         if [ -d .info ]; then
             # NOTE the missing trailing slash: copy the .info DIRECTORY, so that
             # chunk#N.* and files_list do not land loose among the data products
             message_info "${job_tag} Copying .info to ${dst_dir} ..."
             sudo -u ocs rsync -a .info ${backup_target_dir_full_path} 2>/dev/null
+            rc=${?}
+            if (( rc != 0 )); then
+                message_failure "${job_tag} Could not copy .info to ${dst_dir} (rsync exit ${rc})"
+            fi
         fi
     elif [ "${file_type}" = "regular file" ]; then
         message_failure "${job_tag} Not copying .status and .info to ${dst_dir}, ${dst_dir} IS A REGULAR FILE"
+    elif (( stat_rc == 255 )); then
+        message_failure "${job_tag} Not copying .status and .info to ${dst_dir}: could not reach ${backup_host} (ssh exit 255), .status will be pushed again"
     elif [ ! "${file_type}" ]; then
         message_failure "${job_tag} Not copying .status and .info to ${dst_dir}, ${dst_dir} DOES NOT EXIST"
     fi
+}
+
+#
+# A visit stamped "transfered" here whose copy on the target still has an unstamped .status (the copy of .status
+# failed when it was stamped, see stamp_as_transfered) is skipped by every later send run, and before #80 only the
+# daily --remove run repaired it. Checked here in the regular send runs for the visits stamped in the last 24 hours:
+# ONE ssh lists the target folders whose .status lacks the stamp, then each such .status is pushed again. A failed
+# check or push is retried in the next run.
+#
+function refresh_stale_target_status() {
+    local -a visits=( "$@" ) remote=() stale=()
+    local v r out rc
+    (( ${#visits[@]} )) || return 0
+    for v in "${visits[@]}"; do
+        remote+=( "${backup_target#*:}/${v#*/archive/}" )
+    done
+    out=$( printf '%s\n' "${remote[@]}" | sudo -u ${user_name} ssh -q -o BatchMode=yes -o "StrictHostKeyChecking accept-new" \
+        ${backup_user}@${backup_host} 'while read -r d; do [ -d "$d" ] && ! grep -qaE "^[0-9][0-9T:+-]* transfered [^ ]+@[^ ]+:" "$d/.status" 2>/dev/null && echo "$d"; done' )
+    rc=${?}
+    if (( rc != 0 )); then
+        message_info "Could not check the target .status of ${#visits[@]} recently stamped visits (ssh exit ${rc}), will retry"
+        return 0
+    fi
+    for v in "${visits[@]}"; do
+        r="${backup_target#*:}/${v#*/archive/}"
+        grep -qxF "${r}" <<< "${out}" || continue
+        if sudo -u ocs rsync -a -e 'ssh -o BatchMode=yes -o "StrictHostKeyChecking accept-new"' \
+                "${v}/.status" "${backup_user}@${backup_host}:${r}/" 2>/dev/null; then
+            message_success "  ${v} - refreshed a stale .status on the target"
+        else
+            message_failure "  ${v} - could not refresh .status on the target, will retry"
+        fi
+    done
 }
 
 function cleanup() {
@@ -1019,6 +1068,21 @@ fi
 #  - are not marked-as-transfered 
 #  - are marked-as-transfered but not really backed up (either backup error or different from the backup)
 #
+
+#
+# Regular runs: push again the .status of visits stamped here in the last 24 hours whose target copy is still
+# unstamped (#80; --remove repairs the older ones before it deletes anything)
+#
+if ! ${remove_flag}; then
+    recently_stamped=()
+    stamp_limit=$(( $(date +%s) - 86400 ))
+    for candidate in ${candidates_for_removal[*]} ${still_young[*]}; do
+        is_LAST_visit ${candidate} || continue
+        stamp_time=$(grep -aE '^[0-9][0-9T:+-]* transfered [^ ]+@[^ ]+:' ${candidate}/.status 2>/dev/null | tail -1 | cut -d' ' -f1)
+        [ "${stamp_time}" ] && (( $(date --date "${stamp_time}" +%s 2>/dev/null || echo 0) >= stamp_limit )) && recently_stamped+=( ${candidate} )
+    done
+    refresh_stale_target_status ${recently_stamped[*]}
+fi
 
 total_candidates_for_backup=( ${candidates_for_backup[*]} ${candidates_for_retry[*]} )
 if [ ${#total_candidates_for_backup[*]} -ne 0 ]; then
