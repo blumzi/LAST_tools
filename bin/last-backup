@@ -99,7 +99,7 @@ function refresh_stale_target_status() {
         remote+=( "${backup_target#*:}/${v#*/archive/}" )
     done
     out=$( printf '%s\n' "${remote[@]}" | sudo -u ${user_name} ssh -q -o BatchMode=yes -o "StrictHostKeyChecking accept-new" \
-        ${backup_user}@${backup_host} 'while read -r d; do [ -d "$d" ] && ! grep -qaE "^[0-9][0-9T:+-]* transfered [^ ]+@[^ ]+:" "$d/.status" 2>/dev/null && echo "$d"; done' )
+        ${backup_user}@${backup_host} 'while read -r d; do [ -d "$d" ] && ! grep -qaE "^[0-9][0-9T:+-]* transfered [^ ]+@[^ ]+:" "$d/.status" 2>/dev/null && echo "$d"; done; exit 0' )
     rc=${?}
     if (( rc != 0 )); then
         message_info "Could not check the target .status of ${#visits[@]} recently stamped visits (ssh exit ${rc}), will retry"
